@@ -44,6 +44,10 @@ export class Player {
         // back to the cobalt-cube placeholder. Lets us wire all three
         // character slots before the PNGs land.
         this.assetId = assetId;
+        // Two-way facing for the PNG render path. 'right' is the
+        // canonical PNG orientation; 'left' triggers a horizontal flip
+        // in the renderer. Updated once per step in _advanceTarget.
+        this.facing = 'right';
     }
 
     /** Replace the current path. Empty array stops the player on the spot. */
@@ -125,6 +129,16 @@ export class Player {
         }
         const next = this.path.shift();
         const c = cellCenter(next.gx, next.gy);
+        // Derive screen-x heading from the grid step. In iso projection
+        // screenX = (gx - gy) * (TW/2), so sign(dgx - dgy) is the screen-x
+        // sign of the move. Cardinals map: east/north → right, west/south
+        // → left. dgx === dgy is the no-op case (same cell) — guard
+        // against clobbering facing with a meaningless update.
+        const dgx = next.gx - this.gx;
+        const dgy = next.gy - this.gy;
+        if (dgx !== dgy) {
+            this.facing = (dgx - dgy) >= 0 ? 'right' : 'left';
+        }
         this._target = { gx: next.gx, gy: next.gy, x: c.x, y: c.y };
     }
 
