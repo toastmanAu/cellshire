@@ -958,6 +958,7 @@ export class Renderer {
                 const drawX = player.x - asset.anchorX;
                 const drawY = feetY - asset.height;
                 // Contact shadow first (under the feet, scales with sprite).
+                // The shadow is symmetric so it doesn't flip with facing.
                 ctx.save();
                 ctx.globalAlpha *= 0.32;
                 ctx.fillStyle = 'rgba(30, 22, 8, 1)';
@@ -966,7 +967,24 @@ export class Renderer {
                 ctx.fill();
                 ctx.restore();
                 const src = asset.displayCanvas || asset.canvas;
-                ctx.drawImage(src, drawX, drawY, asset.width, asset.height);
+                if (player.facing === 'left') {
+                    // Mirror around player.x. After scale(-1,1) the image's
+                    // anchor pixel (originally anchorX from the left) is now
+                    // (width - anchorX) from the visible left edge. To land
+                    // it on player.x we draw at -(player.x + width - anchorX).
+                    ctx.save();
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(
+                        src,
+                        -(player.x + asset.width - asset.anchorX),
+                        drawY,
+                        asset.width,
+                        asset.height,
+                    );
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(src, drawX, drawY, asset.width, asset.height);
+                }
                 return;
             }
             // Asset id set but PNG not loaded → drop through to the cube
