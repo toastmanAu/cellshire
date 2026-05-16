@@ -100,11 +100,10 @@ Wrap the PNG draw inside `_drawPlayer` with a left-facing flip:
 ```js
 if (player.facing === 'left') {
     ctx.save();
-    ctx.translate(player.x, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(
         src,
-        -asset.anchorX - (asset.width - 2 * asset.anchorX),
+        -(player.x + asset.anchorX),
         drawY,
         asset.width,
         asset.height,
@@ -115,11 +114,13 @@ if (player.facing === 'left') {
 }
 ```
 
-The translate-then-scale-around-player-x trick pins the visual centre
-so the mirrored sprite stays anchored at the same world position.
-The inner offset compensates for the asset's anchor: if `anchorX`
-is centred (`= width / 2`) the term reduces to `-anchorX`. The full
-form handles off-centre anchors defensively.
+**Anchor math derivation.** After `ctx.scale(-1, 1)`, calling
+`drawImage(src, x_arg, ...)` places pixels such that the image's
+anchor (originally at `anchorX` from the source's left edge) lands
+at screen-x `= -x_arg - anchorX`. Setting that equal to `player.x`
+gives `x_arg = -(player.x + anchorX)`. This is symmetric with the
+unflipped `drawX = player.x - anchorX` and works for *any* anchor
+position, not just centred sprites.
 
 Cube branch unchanged — the placeholder is left-right symmetric, so
 flipping it would be a no-op visually.

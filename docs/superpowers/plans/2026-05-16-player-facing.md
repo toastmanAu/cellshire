@@ -245,15 +245,17 @@ Replace with:
                 ctx.restore();
                 const src = asset.displayCanvas || asset.canvas;
                 if (player.facing === 'left') {
-                    // Mirror around player.x. After scale(-1,1) the image's
-                    // anchor pixel (originally anchorX from the left) is now
-                    // (width - anchorX) from the visible left edge. To land
-                    // it on player.x we draw at -(player.x + width - anchorX).
+                    // Mirror around player.x. After scale(-1,1), drawing at
+                    // x_arg places pixels such that the image's anchor pixel
+                    // (originally anchorX from the source's left) lands at
+                    // screen x = -x_arg - anchorX. Setting that = player.x
+                    // gives x_arg = -(player.x + anchorX). Note: this is
+                    // symmetric with the unflipped drawX = player.x - anchorX.
                     ctx.save();
                     ctx.scale(-1, 1);
                     ctx.drawImage(
                         src,
-                        -(player.x + asset.width - asset.anchorX),
+                        -(player.x + asset.anchorX),
                         drawY,
                         asset.width,
                         asset.height,
