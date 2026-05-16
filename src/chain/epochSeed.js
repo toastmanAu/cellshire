@@ -15,6 +15,15 @@ const LAST_EPOCH_KEY = 'cellshire:lastEpoch';
  * Resolve which RPC endpoint to call.
  *   URL flag (?node=...) > localStorage > defaultUrl
  * URL flag with a value writes to storage. Empty string clears it.
+ *
+ * @param {object} args
+ * @param {string|null} args.url - The raw `?node` URL param value.
+ *   `null` (or undefined) means the flag was absent; `''` means it
+ *   was present with no value (clear-stored sentinel); a non-empty
+ *   string is the new endpoint to persist + use.
+ * @param {{get, set, remove}} args.storage - safeStorage-shaped wrapper.
+ * @param {string} args.defaultUrl - Fallback when neither url nor
+ *   storage has a value.
  */
 export function resolveNodeEndpoint({ url, storage, defaultUrl }) {
     if (url === '') {
