@@ -1,5 +1,5 @@
 import { describe, it, expect } from '../test/harness.js';
-import { getAvailableCharacters } from './catalog.js';
+import { getAvailableCharacters, TIERS } from './catalog.js';
 import { PLAYER_SKIN_IDS } from '../assets/assetManifest.js';
 
 describe('getAvailableCharacters', () => {
@@ -13,7 +13,7 @@ describe('getAvailableCharacters', () => {
             expect(typeof c.name).toBe('string');
             expect(typeof c.tagline).toBe('string');
             expect(typeof c.accent).toBe('string');
-            expect(c.kind).toBe('default');
+            expect(TIERS.includes(c.tier)).toBe(true);
         }
     });
 

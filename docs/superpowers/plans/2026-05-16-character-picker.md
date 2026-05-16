@@ -336,7 +336,7 @@ Create `src/characters/catalog.test.js`:
 
 ```js
 import { describe, it, expect } from '../test/harness.js';
-import { getAvailableCharacters } from './catalog.js';
+import { getAvailableCharacters, TIERS } from './catalog.js';
 import { PLAYER_SKIN_IDS } from '../assets/assetManifest.js';
 
 describe('getAvailableCharacters', () => {
@@ -350,7 +350,7 @@ describe('getAvailableCharacters', () => {
             expect(typeof c.name).toBe('string');
             expect(typeof c.tagline).toBe('string');
             expect(typeof c.accent).toBe('string');
-            expect(c.kind).toBe('default');
+            expect(TIERS.includes(c.tier)).toBe(true);
         }
     });
 
@@ -391,24 +391,31 @@ Create `src/characters/catalog.js`:
 /**
  * Character catalog — the list of characters the player can choose
  * from. v0 returns the three starter defaults. Future versions append
- * player-owned extras (kind: 'unique' | 'common' | 'locked').
+ * player-owned extras (tier: 'unique' | 'common' | 'locked').
+ *
+ * Note: `tier` here is the availability/source tier. Don't confuse it
+ * with the asset manifest's `kind` field, which is the render-layer
+ * type (terrain | object). Same characters, different field, different
+ * meaning.
  *
  * Keeping this in its own module so the picker UI never hard-codes
  * the slot list, and on-chain wallet/cell sources have a clean home.
  */
 
 const DEFAULTS = [
-    { id: 'player_miner',  name: 'Miner',  tagline: 'Stout Prospector',     accent: '#F2C744', kind: 'default' },
-    { id: 'player_seeker', name: 'Seeker', tagline: 'Robed Crystalwright',  accent: '#5BD5E8', kind: 'default' },
-    { id: 'player_tinker', name: 'Tinker', tagline: 'Goggled Engineer',     accent: '#C77A3B', kind: 'default' },
+    { id: 'player_miner',  name: 'Miner',  tagline: 'Stout Prospector',     accent: '#F2C744', tier: 'default' },
+    { id: 'player_seeker', name: 'Seeker', tagline: 'Robed Crystalwright',  accent: '#5BD5E8', tier: 'default' },
+    { id: 'player_tinker', name: 'Tinker', tagline: 'Goggled Engineer',     accent: '#C77A3B', tier: 'default' },
 ];
+
+export const TIERS = ['default', 'unique', 'common', 'locked'];
 
 export function getAvailableCharacters() {
     return DEFAULTS.slice();
 }
 
 export function isEnabled(character) {
-    return character.kind !== 'locked';
+    return character.tier !== 'locked';
 }
 ```
 
@@ -699,7 +706,7 @@ export function installCharacterPicker({ catalog, onConfirm }) {
     cards.setAttribute('role', 'radiogroup');
     panel.appendChild(cards);
 
-    const enabled = catalog.filter(c => c.kind !== 'locked');
+    const enabled = catalog.filter(c => c.tier !== 'locked');
     let selectedId = null;
     const cardButtons = [];
 
@@ -711,7 +718,7 @@ export function installCharacterPicker({ catalog, onConfirm }) {
         btn.setAttribute('role', 'radio');
         btn.setAttribute('aria-checked', 'false');
         btn.dataset.assetId = c.id;
-        btn.dataset.kind = c.kind;
+        btn.dataset.tier = c.tier;
         btn.dataset.index = String(idx + 1);
 
         const preview = document.createElement('div');

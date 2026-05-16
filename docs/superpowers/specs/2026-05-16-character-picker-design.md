@@ -58,7 +58,7 @@ no canvas — the world keeps rendering behind it through the scrim.
   name:    'Miner',
   tagline: 'Stout Prospector',
   accent:  '#F2C744',             // CSS color for card border/cube tint
-  kind:    'default',             // 'default' | 'unique' | 'common' | 'locked'
+  tier:    'default',             // 'default' | 'unique' | 'common' | 'locked'
 }
 ```
 
@@ -69,8 +69,12 @@ implementations append extras after the defaults:
 - **common** — purchased from a future store
 - **locked** — visible but not selectable (teaser UX; dimmed + lock icon)
 
-The picker iterates whatever the catalog returns and respects `kind`
-for visual treatment and selectability (`enabled = kind !== 'locked'`).
+The picker iterates whatever the catalog returns and respects `tier`
+for visual treatment and selectability (`enabled = tier !== 'locked'`).
+
+> The field is called `tier` (not `kind`) to avoid collision with the
+> asset manifest's existing `kind: 'object' | 'terrain'` (render
+> layer) on the same character entries.
 
 **Why a new `src/characters/` directory:** defaults today come from the
 asset manifest, but extras will come from wallet / cell-graph sources
@@ -166,7 +170,7 @@ Mounted to `document.body` as a sibling of `#app`:
                 role="radio"
                 aria-checked="false"
                 data-asset-id="player_miner"
-                data-kind="default"
+                data-tier="default"
                 data-index="1">
           <div class="char-card__preview" style="--accent: #F2C744">
             <img src="assets/player_miner.png" alt="" onerror="…fallback…" />
@@ -280,7 +284,7 @@ Three focused unit tests plus one manual smoke flow:
 3. **`getAvailableCharacters`**:
    - Returns three defaults
    - Each entry has the required keys (`id`, `name`, `tagline`,
-     `accent`, `kind`)
+     `accent`, `tier`)
    - All three default ids exist in `PLAYER_SKIN_IDS` (defends against
      drift between catalog and asset manifest)
 
