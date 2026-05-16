@@ -78,6 +78,11 @@ export async function getCurrentEpochHash(endpoint, { fetch }) {
 }
 
 async function rpc(endpoint, fetch, method, params) {
+    // TODO: wrap with AbortController + ~3s timeout so a stalled RPC
+    // (TCP-reachable but HTTP-slow, e.g. a syncing node) doesn't hang
+    // the loading screen indefinitely. Spec acknowledges this as a v0
+    // deferral. See docs/superpowers/specs/2026-05-16-epoch-seed-design.md
+    // §"Edge cases" — "Network slow (5s+)".
     const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

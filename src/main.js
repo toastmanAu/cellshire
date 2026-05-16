@@ -110,6 +110,9 @@ async function main() {
     // Note: this removal path intentionally bypasses _pendingDepletions
     // because that map is always empty at boot (no animations have
     // been spawned yet). The crumble anim is purely a runtime affordance.
+    // TODO: GC stale `cellshire:mined:*` keys (other epochs) on boot.
+    // Spec acknowledges this as a future task; ~100B–1KB per stale
+    // entry is negligible today but worth a sweep when convenient.
     const minedState = loadMinedState(safeStorage, epoch);
     for (const [posKey, remaining] of Object.entries(minedState)) {
         const [gx, gy] = posKey.split(',').map(Number);

@@ -18,6 +18,18 @@ describe('minedStoreKey', () => {
     it('returns null when epoch is null', () => {
         expect(minedStoreKey(null)).toBeNull();
     });
+
+    it('returns null when epoch is undefined', () => {
+        expect(minedStoreKey(undefined)).toBeNull();
+    });
+
+    it('returns null when epoch is empty string', () => {
+        expect(minedStoreKey('')).toBeNull();
+    });
+
+    it('builds a valid key for epoch "0" — epoch 0 is real on chain', () => {
+        expect(minedStoreKey('0')).toBe('cellshire:mined:0');
+    });
 });
 
 describe('loadMinedState', () => {
