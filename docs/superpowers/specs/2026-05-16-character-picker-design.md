@@ -250,22 +250,18 @@ Plain string, no JSON envelope. Future namespace neighbors planned:
 
 ## Tests
 
-**Context:** cellshire currently has no `package.json`, no test runner,
-no build step — it's served as static JS from `index.html`. Adding a
-test runner is a real scope expansion. Three options, in order of
-expansion size:
+**Test runner: self-running browser test page** (chosen 2026-05-16,
+preserves the zero-build property of the repo). One new file
+`tests.html` at the repo root imports the modules as ES modules,
+asserts inline, and prints pass/fail counts to the page + console.
+Run by serving the repo and visiting `/tests.html` in any browser.
 
-| Option | What it costs | What you get |
-|---|---|---|
-| **A — Self-running browser test page** | One new file `tests.html` that imports the modules as ES modules, asserts in-page, prints pass/fail. No npm. | Real unit tests, runs in any browser, zero tooling. |
-| **B — Add Vitest** | New `package.json`, `npm install`, jsdom for DOM tests. ~3 dev deps. | Industry-standard, watch mode, easy CI later. |
-| **C — Manual smoke only (v0)** | Nothing new. | Picker ships fast; regressions on `resolveCharacterChoice` won't be caught automatically. |
+A small `src/test/harness.js` provides `describe`, `it`, `expect` —
+maybe ~60 lines, no dependencies, no DOM mocking framework. Tests
+that need DOM use real DOM (we're already in a browser); tests of
+pure functions ignore it.
 
-**This decision is deferred to Phill's spec-review pass.** The
-implementation plan will branch on the answer. Default if undecided:
-**option A** (preserves the zero-build property of the repo today).
-
-Once chosen, three focused unit tests plus one manual smoke flow:
+Three focused unit tests plus one manual smoke flow:
 
 1. **`resolveCharacterChoice`** — table-driven:
    - URL valid → URL
