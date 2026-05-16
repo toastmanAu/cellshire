@@ -122,6 +122,9 @@ export function installCharacterPicker({ catalog, onConfirm }) {
     function confirm() {
         if (confirmed || !selectedId) return;
         confirmed = true;
+        // Remove the key listener immediately so the 320ms fade window
+        // can't process Arrow/numeric keys against detached state.
+        window.removeEventListener('keydown', onKey);
         confirmBtn.disabled = true;
         onConfirm(selectedId);
         root.classList.add('char-picker--leaving');
@@ -135,6 +138,7 @@ export function installCharacterPicker({ catalog, onConfirm }) {
     }
 
     function onKey(e) {
+        if (cardButtons.length === 0) return;
         const n = parseInt(e.key, 10);
         if (Number.isFinite(n) && n >= 1 && n <= cardButtons.length) {
             e.preventDefault();
@@ -159,6 +163,10 @@ export function installCharacterPicker({ catalog, onConfirm }) {
         }
     }
     window.addEventListener('keydown', onKey);
+
+    // Expose dismiss on the root so test cleanup helpers can find live
+    // instances and run their full teardown instead of bypassing it.
+    root._dismiss = dismiss;
 
     document.body.appendChild(root);
     return { dismiss, root };

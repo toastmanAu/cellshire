@@ -3,7 +3,13 @@ import { installCharacterPicker } from './CharacterPicker.js';
 import { getAvailableCharacters } from '../characters/catalog.js';
 
 function cleanup() {
-    document.querySelectorAll('.char-picker').forEach(n => n.remove());
+    // Call each picker's own dismiss() so the global keydown listener
+    // is removed too — bare node.remove() would leak the listener and
+    // ghost-handle keystrokes in subsequent tests.
+    document.querySelectorAll('.char-picker').forEach(n => {
+        if (typeof n._dismiss === 'function') n._dismiss();
+        else n.remove();
+    });
 }
 
 describe('CharacterPicker (mount + selection)', () => {
