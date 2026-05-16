@@ -106,6 +106,10 @@ async function main() {
     // epoch. Positions with remainingCapacity > 0 update their
     // OreState; positions at 0 are removed from the world outright (no
     // crumble anim — that already played last session).
+    //
+    // Note: this removal path intentionally bypasses _pendingDepletions
+    // because that map is always empty at boot (no animations have
+    // been spawned yet). The crumble anim is purely a runtime affordance.
     const minedState = loadMinedState(safeStorage, epoch);
     for (const [posKey, remaining] of Object.entries(minedState)) {
         const [gx, gy] = posKey.split(',').map(Number);
@@ -113,7 +117,7 @@ async function main() {
         if (!obj) continue;
         const oreState = game.oreStates.get(obj.id);
         if (!oreState) continue;
-        oreState.capacityRemaining = remaining;
+        oreState.restoreCapacity(remaining);
         if (remaining <= 0) {
             game.tileMap.removeObjectAt(gx, gy);
             game.oreStates.delete(obj.id);

@@ -35,6 +35,15 @@ export class OreState {
     isDepleted() { return this.capacityRemaining <= 0; }
 
     /**
+     * Restore the remaining capacity to a known value (e.g. from a
+     * persisted mined-state at boot). Clamped to [0, maxCapacity] so
+     * external callers can't push the invariant out of range.
+     */
+    restoreCapacity(n) {
+        this.capacityRemaining = Math.max(0, Math.min(this.maxCapacity, n));
+    }
+
+    /**
      * Attempt one mining hit. Rolls a yield in the catalog's yieldRange,
      * decrements capacity, returns the result. Returns null if the ore
      * is already depleted (caller should remove the cell at that point).
