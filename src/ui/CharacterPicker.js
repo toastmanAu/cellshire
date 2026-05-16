@@ -10,12 +10,18 @@
  * scrim (see styles.css :: .char-picker__scrim).
  */
 
+let _pickerUid = 0;
+
 export function installCharacterPicker({ catalog, onConfirm }) {
+    // Unique title id per instance so overlapping mounts (e.g. mid-fade
+    // dismiss + immediate re-show) don't collide on aria-labelledby.
+    const titleId = `char-picker-title-${++_pickerUid}`;
+
     const root = document.createElement('div');
     root.className = 'char-picker';
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-modal', 'true');
-    root.setAttribute('aria-labelledby', 'char-picker-title');
+    root.setAttribute('aria-labelledby', titleId);
 
     const scrim = document.createElement('div');
     scrim.className = 'char-picker__scrim';
@@ -26,7 +32,7 @@ export function installCharacterPicker({ catalog, onConfirm }) {
     root.appendChild(panel);
 
     const title = document.createElement('h1');
-    title.id = 'char-picker-title';
+    title.id = titleId;
     title.textContent = 'CELLSHIRE';
     panel.appendChild(title);
 
@@ -45,7 +51,11 @@ export function installCharacterPicker({ catalog, onConfirm }) {
     const cardButtons = [];
 
     enabled.forEach((c, idx) => {
+        // role=presentation strips the <li> from the a11y tree so the
+        // radiogroup directly "owns" its radio children (NVDA + strict
+        // a11y validators require this ownership chain).
         const li = document.createElement('li');
+        li.setAttribute('role', 'presentation');
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'char-card';
@@ -119,6 +129,7 @@ export function installCharacterPicker({ catalog, onConfirm }) {
     }
 
     function dismiss() {
+        if (!root.isConnected) return;
         root.remove();
     }
 
