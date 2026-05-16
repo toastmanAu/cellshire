@@ -76,14 +76,11 @@ async function main() {
     }
 
     // Always procedurally generate. Skip save restore so we measure
-    // cold-gen perf every reload.
+    // cold-gen perf every reload — surfaced via PerfHUD, not console.
     const seed = Math.floor(Math.random() * 1e9);
     const t0 = performance.now();
     const stats = generateWorld(game.tileMap, seed);
     const genMs = performance.now() - t0;
-    console.log('[spike] world generated', {
-        seed, size: game.tileMap.width, genMs: genMs.toFixed(1), ...stats,
-    });
     game.renderer.markDirty();
 
     // Build mining state from the procgen output. Same `seed` is mixed
