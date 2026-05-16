@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>cellshire tests</title>
+    <style>
+        body { font-family: ui-monospace, monospace; padding: 24px;
+               background: #0d1117; color: #e6edf3; }
+        h1 { color: #f0f6fc; margin-top: 0; }
+        .pass { color: #3fb950; }
+        .fail { color: #f85149; }
+        .summary { margin: 16px 0 24px; font-size: 1.2em; }
+        .case { margin: 2px 0; }
+        pre { background: #161b22; padding: 10px 14px; border-radius: 4px;
+              overflow-x: auto; border-left: 3px solid #f85149; }
+    </style>
+</head>
+<body>
+    <h1>cellshire tests</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { runAll } from './src/test/harness.js';
+        // Test imports — keep alphabetised, one per line.
+        import './src/test/sanity.test.js';
+
+        const out = document.getElementById('results');
+        const results = await runAll();
+        const passed = results.filter(r => r.ok).length;
+        const failed = results.length - passed;
+
+        const summary = document.createElement('div');
+        summary.className = 'summary ' + (failed === 0 ? 'pass' : 'fail');
+        summary.textContent = `${passed} passed, ${failed} failed`;
+        out.appendChild(summary);
+
+        for (const r of results) {
+            const line = document.createElement('div');
+            line.className = 'case ' + (r.ok ? 'pass' : 'fail');
+            line.textContent = `${r.ok ? 'PASS' : 'FAIL'}  ${r.describe || ''} > ${r.name}`;
+            out.appendChild(line);
+            if (!r.ok) {
+                const pre = document.createElement('pre');
+                pre.textContent = r.err.stack || String(r.err);
+                out.appendChild(pre);
+            }
+        }
+
+        console.log(`tests: ${passed} passed, ${failed} failed`);
+        for (const r of results.filter(x => !x.ok)) {
+            console.error(r.describe, '>', r.name, '\n', r.err);
+        }
+    </script>
+</body>
+</html>
