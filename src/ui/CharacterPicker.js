@@ -64,10 +64,12 @@ export function installCharacterPicker({ catalog, onConfirm }) {
         btn.dataset.assetId = c.id;
         btn.dataset.tier = c.tier;
         btn.dataset.index = String(idx + 1);
+        // Set --accent on the button so the [aria-checked="true"] ring
+        // resolves it; descendants (preview, cube) inherit it naturally.
+        btn.style.setProperty('--accent', c.accent);
 
         const preview = document.createElement('div');
         preview.className = 'char-card__preview';
-        preview.style.setProperty('--accent', c.accent);
 
         const img = document.createElement('img');
         img.src = `assets/${c.id}.png`;
