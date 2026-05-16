@@ -17,6 +17,7 @@ import { getAvailableCharacters, resolveCharacterChoice } from './characters/cat
 import { safeStorage } from './lib/safeStorage.js';
 import { installCharacterPicker } from './ui/CharacterPicker.js';
 import { getProcgenSeed } from './chain/epochSeed.js';
+import { loadMinedState } from './mining/minedStore.js';
 
 async function main() {
     const fill = document.getElementById('loading-fill');
@@ -95,6 +96,30 @@ async function main() {
     // Build mining state from the procgen output. Same `seed` is mixed
     // in so per-ore capacity is deterministic across reloads.
     game.populateOreStates(makeSeededRand(seed ^ 0x70F0));
+
+    // Tag the Game with the epoch so _mineOre can persist hits to the
+    // correct per-epoch storage key. Null on random seed = no
+    // persistence (see minedStore.recordMine).
+    game.currentEpoch = epoch;
+
+    // Restore any mined-ore state from a prior session in the same
+    // epoch. Positions with remainingCapacity > 0 update their
+    // OreState; positions at 0 are removed from the world outright (no
+    // crumble anim — that already played last session).
+    const minedState = loadMinedState(safeStorage, epoch);
+    for (const [posKey, remaining] of Object.entries(minedState)) {
+        const [gx, gy] = posKey.split(',').map(Number);
+        const obj = game.tileMap.objectAt(gx, gy);
+        if (!obj) continue;
+        const oreState = game.oreStates.get(obj.id);
+        if (!oreState) continue;
+        oreState.capacityRemaining = remaining;
+        if (remaining <= 0) {
+            game.tileMap.removeObjectAt(gx, gy);
+            game.oreStates.delete(obj.id);
+        }
+    }
+    game.renderer.markDirty();
 
     // Place the player on a walkable cell near the centre of the map.
     // We use a connected-component flood-fill so the player always

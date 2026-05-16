@@ -21,6 +21,8 @@ import { isWalkable, isInteractable, findAdjacentWalkable } from '../grid/walkab
 import { OreState } from '../mining/OreState.js';
 import { isOre, oreConfig, oreDisplayName } from '../mining/oreCatalog.js';
 import { playPlacementFor, playMineHit, playMineDeplete } from '../ui/Audio.js';
+import { recordMine } from '../mining/minedStore.js';
+import { safeStorage } from '../lib/safeStorage.js';
 
 export class Game {
     constructor(canvas, ui = null) {
@@ -49,6 +51,13 @@ export class Game {
         // populateOreStates() after procgen — kept side-band so the
         // renderer / save / placement systems stay mining-agnostic.
         this.oreStates = new Map();
+
+        // Set by main.js after the chain-derived procgen seed is
+        // resolved. String form of the epoch number (e.g. "14455"), or
+        // null when the seed source was 'random' — in which case
+        // recordMine no-ops because persistence is meaningless on a
+        // non-deterministic world.
+        this.currentEpoch = null;
 
         // Ores currently mid-depletion. Entry value is the absolute ms
         // timestamp at which the obj should actually be removed from
@@ -395,6 +404,10 @@ export class Game {
         if (!result) return;
 
         this.player?.inventory.add(result.currency, result.amount);
+        // Persist remaining capacity per (epoch, position) so a reload
+        // mid-epoch can't reset the ore. No-op when currentEpoch is
+        // null (random seed path — non-deterministic world).
+        recordMine(safeStorage, this.currentEpoch, obj.gx, obj.gy, state.capacityRemaining);
 
         const cfg = oreConfig(result.currency);
         const dustColor = cfg?.dustColor ?? '#9d8e74';
