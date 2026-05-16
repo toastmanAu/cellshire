@@ -14,10 +14,14 @@
 
 /**
  * Returns the storage key for an epoch's mined-state, or null when
- * epoch is null (random-seed boot path — no persistence).
+ * epoch is missing (null, undefined, or empty string — random-seed
+ * boot path or unset state). Numeric 0 IS a valid epoch (epoch 0
+ * exists on the CKB chain) so we don't reject all falsy values.
  */
 export function minedStoreKey(epochNumber) {
-    if (epochNumber === null || epochNumber === undefined) return null;
+    if (epochNumber === null || epochNumber === undefined || epochNumber === '') {
+        return null;
+    }
     return `cellshire:mined:${epochNumber}`;
 }
 
@@ -45,7 +49,12 @@ export function loadMinedState(storage, epochNumber) {
 export function recordMine(storage, epochNumber, gx, gy, remainingCapacity) {
     const key = minedStoreKey(epochNumber);
     if (!key) return;
-    const state = loadMinedState(storage, epochNumber);
-    state[`${gx},${gy}`] = remainingCapacity;
+    // Spread to avoid mutating the object returned by loadMinedState —
+    // matches the codebase's immutability convention and future-proofs
+    // against loadMinedState ever returning a cached reference.
+    const state = {
+        ...loadMinedState(storage, epochNumber),
+        [`${gx},${gy}`]: remainingCapacity,
+    };
     storage.set(key, JSON.stringify(state));
 }
