@@ -130,8 +130,35 @@ export function installCharacterPicker({ catalog, onConfirm }) {
 
     function dismiss() {
         if (!root.isConnected) return;
+        window.removeEventListener('keydown', onKey);
         root.remove();
     }
+
+    function onKey(e) {
+        const n = parseInt(e.key, 10);
+        if (Number.isFinite(n) && n >= 1 && n <= cardButtons.length) {
+            e.preventDefault();
+            const target = cardButtons[n - 1];
+            select(target.dataset.assetId);
+            target.focus();
+            return;
+        }
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const dir = e.key === 'ArrowRight' ? 1 : -1;
+            const idx = cardButtons.findIndex(b => b.dataset.assetId === selectedId);
+            const start = idx < 0 ? (dir > 0 ? -1 : cardButtons.length) : idx;
+            const next = (start + dir + cardButtons.length) % cardButtons.length;
+            select(cardButtons[next].dataset.assetId);
+            cardButtons[next].focus();
+            return;
+        }
+        if (e.key === 'Enter' && selectedId) {
+            e.preventDefault();
+            confirm();
+        }
+    }
+    window.addEventListener('keydown', onKey);
 
     document.body.appendChild(root);
     return { dismiss, root };

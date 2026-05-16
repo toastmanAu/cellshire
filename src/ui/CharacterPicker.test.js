@@ -71,3 +71,83 @@ describe('CharacterPicker (mount + selection)', () => {
         expect(document.querySelector('.char-picker')).toBeNull();
     });
 });
+
+function key(name) {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true }));
+}
+
+describe('CharacterPicker (keyboard)', () => {
+    it('pressing 2 selects the second card', () => {
+        cleanup();
+        installCharacterPicker({
+            catalog: getAvailableCharacters(), onConfirm: () => {},
+        });
+        key('2');
+        const cards = document.querySelectorAll('.char-card');
+        expect(cards[1].getAttribute('aria-checked')).toBe('true');
+        cleanup();
+    });
+
+    it('ArrowRight cycles forward and wraps at the end', () => {
+        cleanup();
+        installCharacterPicker({
+            catalog: getAvailableCharacters(), onConfirm: () => {},
+        });
+        key('3');               // select last
+        key('ArrowRight');      // wraps to first
+        const cards = document.querySelectorAll('.char-card');
+        expect(cards[0].getAttribute('aria-checked')).toBe('true');
+        cleanup();
+    });
+
+    it('ArrowLeft cycles backward and wraps at the start', () => {
+        cleanup();
+        installCharacterPicker({
+            catalog: getAvailableCharacters(), onConfirm: () => {},
+        });
+        key('1');               // select first
+        key('ArrowLeft');       // wraps to last
+        const cards = document.querySelectorAll('.char-card');
+        expect(cards[2].getAttribute('aria-checked')).toBe('true');
+        cleanup();
+    });
+
+    it('Enter confirms when a card is selected', async () => {
+        cleanup();
+        let fired = null;
+        installCharacterPicker({
+            catalog: getAvailableCharacters(),
+            onConfirm: id => { fired = id; },
+        });
+        key('1');
+        key('Enter');
+        expect(fired).toBe('player_miner');
+        await new Promise(r => setTimeout(r, 400));
+        cleanup();
+    });
+
+    it('Enter is ignored when nothing is selected', () => {
+        cleanup();
+        let fired = null;
+        installCharacterPicker({
+            catalog: getAvailableCharacters(),
+            onConfirm: id => { fired = id; },
+        });
+        key('Enter');
+        expect(fired).toBeNull();
+        cleanup();
+    });
+
+    it('keydown listener is removed on dismiss', () => {
+        cleanup();
+        let fired = null;
+        const { dismiss } = installCharacterPicker({
+            catalog: getAvailableCharacters(),
+            onConfirm: id => { fired = id; },
+        });
+        dismiss();
+        key('1');                    // should no longer be intercepted
+        key('Enter');
+        expect(fired).toBeNull();
+    });
+});
