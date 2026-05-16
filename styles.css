@@ -766,3 +766,174 @@ html, body {
     /* Touch devices often have a crosshair-incompatible cursor. */
     #game-canvas { cursor: default; }
 }
+
+/* ── Character picker ───────────────────────────────────────────── */
+
+.char-picker {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    transition: opacity 300ms ease;
+}
+
+.char-picker--leaving {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.char-picker__scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 12, 20, 0.7);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+.char-picker__panel {
+    position: relative;
+    width: min(720px, 92vw);
+    padding: 32px 36px 28px;
+    background: #1a2030;
+    border: 1px solid #2c3550;
+    border-radius: 12px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+    color: #f5e9c8;
+    text-align: center;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+.char-picker__panel h1 {
+    margin: 0 0 4px;
+    font-size: 1.6rem;
+    letter-spacing: 0.18em;
+    color: #f5e9c8;
+}
+
+.char-picker__subtitle {
+    margin: 0 0 24px;
+    font-size: 0.95rem;
+    color: #9aa4bf;
+    letter-spacing: 0.04em;
+}
+
+.char-picker__cards {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 24px;
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+}
+
+.char-picker__cards > li { display: contents; }
+
+.char-card {
+    position: relative;
+    flex: 1 1 0;
+    max-width: 200px;
+    min-height: 260px;
+    padding: 20px 12px 16px;
+    background: #232a3d;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    transition: transform 200ms ease, border-color 200ms ease,
+                box-shadow 200ms ease, background 200ms ease;
+}
+
+.char-card:hover {
+    transform: translateY(-4px);
+    background: #29314a;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.char-card[aria-checked="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent),
+                0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.char-card__preview {
+    width: 96px;
+    height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.char-card__preview img {
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: pixelated;
+}
+
+/* Tinted-cube fallback when the PNG is missing. */
+.char-card__cube {
+    width: 56px;
+    height: 56px;
+    background: var(--accent);
+    transform: rotateX(55deg) rotateZ(45deg);
+    box-shadow:
+        4px 4px 0 color-mix(in srgb, var(--accent) 70%, #000 30%),
+        8px 8px 0 color-mix(in srgb, var(--accent) 50%, #000 50%);
+}
+
+.char-card__name {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #f5e9c8;
+}
+
+.char-card__tagline {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #9aa4bf;
+    letter-spacing: 0.02em;
+}
+
+.char-card__key {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-size: 0.75rem;
+    color: #6b7592;
+    border: 1px solid #3a4361;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: ui-monospace, monospace;
+}
+
+.char-picker__confirm {
+    appearance: none;
+    background: #f5b340;
+    border: none;
+    color: #1a2030;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 150ms ease, transform 150ms ease;
+}
+
+.char-picker__confirm:disabled {
+    background: #3a4361;
+    color: #6b7592;
+    cursor: not-allowed;
+}
+
+.char-picker__confirm:not(:disabled):hover {
+    background: #f7c25c;
+    transform: translateY(-1px);
+}
