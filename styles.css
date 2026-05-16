@@ -33,6 +33,14 @@
 
 * { box-sizing: border-box; }
 
+/* Play vs build mode. The Mykonos builder toolbar + asset palette only
+   make sense in dev mode (?dev=1); in the default play mode the player
+   walks around with click-to-walk and these panels are hidden. */
+body.mode-play #toolbar,
+body.mode-play #palette {
+    display: none !important;
+}
+
 html, body {
     margin: 0;
     padding: 0;

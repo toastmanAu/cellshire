@@ -131,10 +131,37 @@ export const ASSET_MANIFEST = [
     { ...B('tower_chapel',  'Tower Chapel',  { w: 2, d: 2 }), builder: A.towerChapel },
     { ...B('main_chapel',   'Main Chapel',   { w: 3, d: 3 }), builder: A.mainChapel },
     { ...B('windmill',      'Windmill',      { w: 2, d: 2 }), builder: A.windmillBuilding },
+
+    // ── CHARACTERS ────────────────────────────────────────────────
+    // Player skins. Geometry: 1×1 footprint, sizeScale 0.5 → 32 px on
+    // screen at zoom 1 (half a tile wide), source PNG aspect drives
+    // height. flatBase: true so the trimmed PNG's bottom edge anchors
+    // at the diamond's front corner (feet stand in the tile).
+    // No builder fallback — until the PNG is generated and processed,
+    // the entry is silently dropped and the renderer keeps drawing
+    // the cobalt-cube placeholder.
+    {
+        id: 'player_miner', name: 'Miner', category: 'character', kind: 'object',
+        footprint: { w: 1, d: 1 }, filename: 'player_miner.png',
+        sizeScale: 0.5, flatBase: true,
+    },
+    {
+        id: 'player_seeker', name: 'Seeker', category: 'character', kind: 'object',
+        footprint: { w: 1, d: 1 }, filename: 'player_seeker.png',
+        sizeScale: 0.5, flatBase: true,
+    },
+    {
+        id: 'player_tinker', name: 'Tinker', category: 'character', kind: 'object',
+        footprint: { w: 1, d: 1 }, filename: 'player_tinker.png',
+        sizeScale: 0.5, flatBase: true,
+    },
 ];
 
 export const ASSET_INDEX = Object.freeze(
     ASSET_MANIFEST.reduce((acc, a) => { acc[a.id] = a; return acc; }, {})
 );
 
-export const CATEGORIES = ['terrain', 'nature', 'props', 'water', 'buildings'];
+export const CATEGORIES = ['terrain', 'nature', 'props', 'water', 'buildings', 'character'];
+
+/** All player-skin asset ids in canonical order. */
+export const PLAYER_SKIN_IDS = ['player_miner', 'player_seeker', 'player_tinker'];

@@ -11,6 +11,8 @@ import { UIManager } from './ui/UIManager.js';
 import { loadUiAudio } from './ui/Audio.js';
 import { generateWorld } from './worldgen/procgen.js';
 import { installPerfHUD } from './ui/PerfHUD.js';
+import { installInventoryHUD } from './ui/InventoryHUD.js';
+import { isWalkable } from './grid/walkability.js';
 
 async function main() {
     const fill = document.getElementById('loading-fill');
@@ -35,13 +37,23 @@ async function main() {
 
     const canvas = document.getElementById('game-canvas');
     const game = new Game(canvas);
+
+    // Mode selection. Default is play mode (click-to-walk miner); the
+    // ?dev=1 flag re-exposes the Mykonos builder toolbar and palette for
+    // property-zone / asset-pack work.
+    const params = new URLSearchParams(location.search);
+    const devMode = params.get('dev') === '1';
+    game.mode = devMode ? 'build' : 'play';
+    document.body.classList.add(devMode ? 'mode-build' : 'mode-play');
+
     const ui = new UIManager(game);
     game.ui = ui;
     ui.update();
+    // Debug hook so devtools sessions can inspect runtime state.
+    if (typeof window !== 'undefined') window.__cellshire = { game };
 
     // Spike: optional ?size=N URL param resizes the tileMap before
     // procgen so we can sweep 100 / 200 / 256 / 300 without code edits.
-    const params = new URLSearchParams(location.search);
     const requestedSize = parseInt(params.get('size'), 10);
     if (Number.isFinite(requestedSize) && requestedSize >= 10 && requestedSize <= 600) {
         const tm = game.tileMap;
@@ -70,6 +82,26 @@ async function main() {
         seed, size: game.tileMap.width, genMs: genMs.toFixed(1), ...stats,
     });
     game.renderer.markDirty();
+
+    // Build mining state from the procgen output. Same `seed` is mixed
+    // in so per-ore capacity is deterministic across reloads.
+    game.populateOreStates(makeSeededRand(seed ^ 0x70F0));
+
+    // Place the player on a walkable cell near the centre of the map.
+    // We use a connected-component flood-fill so the player always
+    // spawns in the largest reachable region (small sand islands are
+    // skipped).
+    if (game.mode === 'play') {
+        const spawn = findSpawnCell(game.tileMap);
+        if (spawn) {
+            game.spawnPlayer(spawn.gx, spawn.gy, {
+                assetId: resolveCharacterAsset(params.get('character')),
+            });
+            installInventoryHUD(game.player);
+        } else {
+            console.warn('[cellshire] no walkable spawn found — seed:', seed);
+        }
+    }
 
     installPerfHUD(game, { seed, genMs, ...stats });
 
@@ -145,6 +177,98 @@ function seedExampleVillage(game) {
     placeO('lantern_post', 4, 6);
     placeO('lantern_post', 9, 6);
     placeO('small_bridge', 5, H - 2);
+}
+
+/**
+ * Pick a spawn cell on the **largest connected walkable region**. A naive
+ * spiral-from-centre fails on water-heavy seeds: the closest walkable cell
+ * to centre might be a tiny sand island with no land bridge to any ore.
+ *
+ * We flood-fill all walkable components, then return the cell of the
+ * largest one that's closest to the map centre — biggest reachable area,
+ * still framed nicely by the initial camera.
+ */
+function findSpawnCell(tileMap) {
+    const W = tileMap.width;
+    const H = tileMap.height;
+    const cx = Math.floor(W / 2);
+    const cy = Math.floor(H / 2);
+    const visited = new Uint8Array(W * H);
+
+    let bestSize = 0;
+    let bestCell = null;
+    let bestCenterDist = Infinity;
+
+    for (let gy0 = 0; gy0 < H; gy0++)
+    for (let gx0 = 0; gx0 < W; gx0++) {
+        if (visited[gy0 * W + gx0]) continue;
+        if (!isWalkable(tileMap, gx0, gy0)) {
+            visited[gy0 * W + gx0] = 1;
+            continue;
+        }
+        const queue = [[gx0, gy0]];
+        visited[gy0 * W + gx0] = 1;
+        const region = [];
+        while (queue.length) {
+            const [gx, gy] = queue.pop();
+            region.push([gx, gy]);
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const nx = gx + dx;
+                const ny = gy + dy;
+                if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                if (visited[ny * W + nx]) continue;
+                visited[ny * W + nx] = 1;
+                if (!isWalkable(tileMap, nx, ny)) continue;
+                queue.push([nx, ny]);
+            }
+        }
+        if (region.length < bestSize) continue;
+        // For this region, find the walkable cell closest to map centre.
+        let closest = null;
+        let closestDist = Infinity;
+        for (const [gx, gy] of region) {
+            const d = (gx - cx) * (gx - cx) + (gy - cy) * (gy - cy);
+            if (d < closestDist) { closestDist = d; closest = [gx, gy]; }
+        }
+        if (region.length > bestSize
+            || (region.length === bestSize && closestDist < bestCenterDist)) {
+            bestSize = region.length;
+            bestCell = closest;
+            bestCenterDist = closestDist;
+        }
+    }
+    if (!bestCell) return null;
+    return { gx: bestCell[0], gy: bestCell[1] };
+}
+
+
+/**
+ * Resolve a short `?character=<key>` URL param into a manifest asset id.
+ * Accepts the short form (`miner`) or the full id (`player_miner`).
+ * Returns null when the param is missing or unrecognised — caller
+ * spawns with the placeholder cube in that case.
+ */
+function resolveCharacterAsset(param) {
+    if (!param) return null;
+    const VALID = ['player_miner', 'player_seeker', 'player_tinker'];
+    if (VALID.includes(param)) return param;
+    const short = `player_${param}`;
+    if (VALID.includes(short)) return short;
+    console.warn('[cellshire] unknown ?character=', param,
+        '— falling back to placeholder. Valid: miner | seeker | tinker');
+    return null;
+}
+
+/** Seeded RNG (mulberry32) — matches the one in procgen for parity. */
+function makeSeededRand(seed) {
+    let s = seed >>> 0;
+    return function () {
+        s = (s + 0x6D2B79F5) >>> 0;
+        let t = s;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
 }
 
 main().catch(err => {

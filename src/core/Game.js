@@ -10,12 +10,17 @@ import { CONFIG } from '../config.js';
 import { Camera } from './Camera.js';
 import { Renderer } from './Renderer.js';
 import { InputManager } from './InputManager.js';
+import { Player } from './Player.js';
 import { TileMap } from '../grid/TileMap.js';
 import { PlacementSystem } from '../building/PlacementSystem.js';
 import { ASSET_INDEX, ASSET_MANIFEST } from '../assets/assetManifest.js';
 import { SaveSystem } from '../storage/SaveSystem.js';
 import { cellToScreen } from '../grid/IsoGrid.js';
-import { playPlacementFor } from '../ui/Audio.js';
+import { findPath } from '../grid/Pathfinder.js';
+import { isWalkable, isInteractable, findAdjacentWalkable } from '../grid/walkability.js';
+import { OreState } from '../mining/OreState.js';
+import { isOre, oreConfig, oreDisplayName } from '../mining/oreCatalog.js';
+import { playPlacementFor, playMineHit, playMineDeplete } from '../ui/Audio.js';
 
 export class Game {
     constructor(canvas, ui = null) {
@@ -30,11 +35,36 @@ export class Game {
         // re-rendered. The renderer itself is otherwise idle.
         this.camera.onChange(() => this.renderer.markDirty());
 
+        // 'play' = walking miner game, click-to-walk/interact.
+        // 'build' = legacy Mykonos builder, kept for property-zone work.
+        // Main.js flips to 'build' when ?dev=1 is set.
+        this.mode = 'play';
+
+        // Player avatar — created lazily by main.js once procgen has run
+        // and a walkable spawn cell exists. Game still functions without
+        // one (build-mode hover/preview do not need a player).
+        this.player = null;
+
+        // Mining state keyed by PlacedObject.id. Populated by
+        // populateOreStates() after procgen — kept side-band so the
+        // renderer / save / placement systems stay mining-agnostic.
+        this.oreStates = new Map();
+
+        // Ores currently mid-depletion. Entry value is the absolute ms
+        // timestamp at which the obj should actually be removed from
+        // the tilemap. Scheduling removal one frame *before* the anim
+        // ends prevents a flicker where the static cache rebuilds and
+        // briefly redraws the ore on the same frame it disappears.
+        this._pendingDepletions = new Map();
+
         // Default selection
         this.tool = 'place';                  // 'place' | 'erase' | 'pan'
         this.category = 'terrain';
         this.selectedAssetId = ASSET_MANIFEST.find(a => a.category === 'terrain').id;
         this.ui = ui;
+
+        // Frame-loop dt clock for player interpolation.
+        this._lastFrameMs = performance.now();
 
         // Preview-only flip state for the current selection. Toggled by the
         // user (H / V) before commit; the values are baked into the
@@ -54,6 +84,26 @@ export class Game {
         const c = cellToScreen(this.tileMap.width / 2, this.tileMap.height / 2);
         const { innerWidth: w, innerHeight: h } = window;
         this.camera.centerOn(c.x, c.y, w, h);
+    }
+
+    /**
+     * Place the player at (gx, gy) with an optional skin assetId. The
+     * renderer will draw the asset PNG when loaded and fall back to
+     * the placeholder cobalt cube when the asset isn't (yet) present.
+     * No-op if the cell isn't walkable; the caller (main.js) is
+     * expected to find a walkable spawn first.
+     */
+    spawnPlayer(gx, gy, opts = {}) {
+        if (!isWalkable(this.tileMap, gx, gy)) return false;
+        this.player = new Player({ gx, gy, assetId: opts.assetId ?? null });
+        this.renderer.player = this.player;
+        this.renderer.markDirty();
+        // Recentre the camera on the player so first-frame UX is "you are
+        // here" rather than "where is the map".
+        const c = cellToScreen(gx + 0.5, gy + 0.5);
+        const { innerWidth: w, innerHeight: h } = window;
+        this.camera.centerOn(c.x, c.y, w, h);
+        return true;
     }
 
     /* ── Intents from UI / input ──────────────────────────────── */
@@ -205,6 +255,12 @@ export class Game {
 
     onPrimaryClick(gx, gy) {
         if (!this.tileMap.inBounds(gx, gy)) return;
+
+        if (this.mode === 'play') {
+            this._handlePlayClick(gx, gy);
+            return;
+        }
+
         if (this.tool === 'erase') {
             // Capture what's about to be removed so we can pick the right
             // SFX (water erase splashes, everything else thuds).
@@ -242,6 +298,11 @@ export class Game {
     }
 
     onSecondaryClick(gx, gy) {
+        // In play mode the right-click / long-press has no use yet —
+        // reserved for context actions (item swap, cancel walk). Block
+        // the erase path so a stray right-click can't damage the world.
+        if (this.mode === 'play') return;
+
         // Right click always erases.
         if (!this.tileMap.inBounds(gx, gy)) return;
         const objHere = this.tileMap.objectAt(gx, gy);
@@ -251,6 +312,142 @@ export class Game {
             this.renderer.markDirty();
             playPlacementFor(targetId);
         }
+    }
+
+    /* ── Play mode click handling ─────────────────────────────── */
+
+    /**
+     * Decide what a primary click in play mode means:
+     *   - empty walkable tile → start walking there.
+     *   - interactable object (ore, vendor) → walk to the closest
+     *     adjacent walkable tile, then fire onInteract on arrival.
+     *   - anything else (water, cypress, off-grid) → ignore.
+     */
+    _handlePlayClick(gx, gy) {
+        if (!this.player) return;
+        const p = this.player;
+
+        if (isInteractable(this.tileMap, gx, gy)) {
+            const adj = findAdjacentWalkable(this.tileMap, gx, gy, p.gx, p.gy);
+            if (!adj) return;
+            const path = findPath(this.tileMap, p.gx, p.gy, adj.gx, adj.gy);
+            if (!path) return;
+            p.setPath(path);
+            this._pendingInteract = { gx, gy };
+            this.renderer.markDirty();
+            return;
+        }
+
+        if (!isWalkable(this.tileMap, gx, gy)) return;
+        const path = findPath(this.tileMap, p.gx, p.gy, gx, gy);
+        if (!path) return;
+        p.setPath(path);
+        this._pendingInteract = null;
+        this.renderer.markDirty();
+    }
+
+    /**
+     * Build an OreState for every ore PlacedObject currently in the
+     * tileMap. Call once after procgen — capacity values are rolled
+     * deterministically against the supplied rand fn so the same seed
+     * always produces the same per-ore lifespan.
+     */
+    populateOreStates(rand = Math.random) {
+        this.oreStates.clear();
+        for (const obj of this.tileMap.objects) {
+            if (!isOre(obj.assetId)) continue;
+            const state = OreState.fromAsset(obj.assetId, rand);
+            if (state) this.oreStates.set(obj.id, state);
+        }
+    }
+
+    /**
+     * Dispatch interaction with the tile the player just walked up to.
+     * For ores → mine. For everything else (future: vendors, NPCs) →
+     * log + toast stub.
+     */
+    onInteract(gx, gy) {
+        const obj = this.tileMap.objectAt(gx, gy);
+        if (obj && isOre(obj.assetId)) {
+            this._mineOre(obj);
+            return;
+        }
+        const name = obj ? obj.assetId : this.tileMap.getTerrain(gx, gy);
+        // eslint-disable-next-line no-console
+        console.log('[interact]', name, 'at', gx, gy);
+        this.ui?.showToast?.(`Interact: ${name}`);
+    }
+
+    /**
+     * One mining hit on an ore PlacedObject. Decrements its OreState,
+     * credits the player's inventory, fires the juice (audio + FX),
+     * and on depletion starts the crumble anim + schedules the actual
+     * removal one frame before the anim ends (see _pendingDepletions).
+     */
+    _mineOre(obj) {
+        const state = this.oreStates.get(obj.id);
+        if (!state) return;
+        // Suppress re-clicks against an ore that's mid-depletion — its
+        // OreState still exists until the anim finishes, but capacity
+        // is already 0 and we don't want to double-process.
+        if (this._pendingDepletions.has(obj.id)) return;
+        const result = state.mine();
+        if (!result) return;
+
+        this.player?.inventory.add(result.currency, result.amount);
+
+        const cfg = oreConfig(result.currency);
+        const dustColor = cfg?.dustColor ?? '#9d8e74';
+        const textColor = cfg?.textColor ?? '#1b5ba8';
+        const c = cellToScreen(obj.gx + 0.5, obj.gy + 0.5);
+
+        if (result.depleted) {
+            // Bigger burst + the staggered double-thud for the crumble.
+            this.renderer.spawnFloatingText(c.x, c.y - 12, `+${result.amount}`, {
+                color: textColor,
+                durationMs: 1000,
+                rise: 36,
+                font: 'bold 16px system-ui, sans-serif',
+            });
+            this.renderer.spawnDustPuff(c.x, c.y, {
+                color: dustColor,
+                count: 12,
+                speed: 90,
+                durationMs: 800,
+                sizeRange: [2, 5],
+            });
+            playMineDeplete();
+            this._startDepletion(obj);
+        } else {
+            this.renderer.spawnFloatingText(c.x, c.y - 8, `+${result.amount}`, {
+                color: textColor,
+            });
+            this.renderer.spawnDustPuff(c.x, c.y, { color: dustColor });
+            playMineHit();
+            this.renderer.markDirty();
+        }
+    }
+
+    /**
+     * Kick off the crumble animation on an ore and queue its actual
+     * removal one frame before the anim ends. The renderer treats the
+     * obj as "animating" for the whole duration (static cache skips
+     * it), so the live overlay's shrink+fade draw is what the player
+     * sees; once the anim completes the obj is already gone from
+     * `tileMap.objects` and the rebuilt static cache reflects that.
+     */
+    _startDepletion(obj) {
+        const DURATION = 450;
+        this.renderer.spawnAnim(`deplete-${obj.id}`, null, DURATION);
+        // Schedule the actual tilemap removal ~one RAF tick before the
+        // anim end so the cache rebuild triggered by the anim's
+        // completion sees the obj already gone.
+        this._pendingDepletions.set(obj.id, {
+            removeAtMs: performance.now() + DURATION - 16,
+            gx: obj.gx,
+            gy: obj.gy,
+        });
+        this.renderer.markDirty();
     }
 
     /**
@@ -295,6 +492,37 @@ export class Game {
         // there are no animations running, so this loop is effectively
         // free at idle. We still keep `requestAnimationFrame` ticking so
         // we resume instantly when input or animations resume.
+        const now = performance.now();
+        const dt = Math.min(0.1, (now - this._lastFrameMs) / 1000);
+        this._lastFrameMs = now;
+
+        if (this.player) {
+            if (this.player.isMoving()) {
+                this.player.tick(dt);
+                this.renderer.markDirty();
+            }
+            // Fire pending interact whenever the player is idle — covers
+            // both "just arrived from a walk" and "clicked an ore while
+            // already standing next to it" (zero-length path).
+            if (!this.player.isMoving() && this._pendingInteract) {
+                const { gx, gy } = this._pendingInteract;
+                this._pendingInteract = null;
+                this.onInteract(gx, gy);
+            }
+        }
+
+        // Process queued ore removals (deplete-anim almost done).
+        if (this._pendingDepletions.size > 0) {
+            const tNow = now;
+            for (const [id, entry] of this._pendingDepletions) {
+                if (tNow < entry.removeAtMs) continue;
+                this.tileMap.removeObjectAt(entry.gx, entry.gy);
+                this.oreStates.delete(id);
+                this._pendingDepletions.delete(id);
+                this.renderer.markDirty();
+            }
+        }
+
         this.renderer.draw();
         requestAnimationFrame(this._loop);
     }

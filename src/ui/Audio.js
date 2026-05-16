@@ -128,6 +128,25 @@ export function playVegPlacement(volume = 0.6)         { play('placementVeg',   
 export function playTreePlacement(volume = 0.6)        { play('placementTree',  volume); }
 
 /**
+ * One pickaxe hit on an ore deposit. Reuses the brick-stone clip — its
+ * chunky knock reads as mining without needing a dedicated asset.
+ */
+export function playMineHit(volume = 0.55) {
+    play('placementStone', volume);
+}
+
+/**
+ * Crumble sound for ore depletion — two stone hits staggered by ~110ms
+ * so the second lands after the first finishes its attack envelope.
+ * The clip's debounce defaults to 35ms which is well under our gap so
+ * the second hit always fires.
+ */
+export function playMineDeplete() {
+    play('placementStone', 0.55);
+    setTimeout(() => play('placementStone', 0.7), 110);
+}
+
+/**
  * Asset ids whose placement / erase should trigger the brick-stone SFX.
  * Includes the obvious stone terrain + props plus the white-plastered
  * Mykonos buildings (which are masonry under the paint).

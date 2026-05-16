@@ -101,17 +101,27 @@ export class Renderer {
         this.previewAssetId = null;  // null when not in place mode
         this.previewValid = true;
         this.eraseMode = false;
+        // Player entity drawn in the live overlay (set by Game.spawnPlayer).
+        this.player = null;
         // Flip flags applied to the ghost preview (set by Game).
         this.previewFlipH = false;
         this.previewFlipV = false;
 
         // Per-frame snapshot of currently-running placement animations.
-        // Keyed by 'obj-<id>' for placed objects and 't-<gx>,<gy>' for
-        // terrain tiles. Values are normalised progress in [0, 1).
+        // Keyed by 'obj-<id>' for placed-object pop-in, 'deplete-<id>'
+        // for ore crumble-out, and 't-<gx>,<gy>' for terrain pop-in.
+        // Values are normalised progress in [0, 1).
         this._anims = new Map();
         this._frameAnims = new Map();
         this._animObjectIds = new Set();   // numeric obj ids currently animating
         this._animTerrainKeys = new Set(); // 'gx,gy' strings currently animating
+
+        // Mining juice — one-shot FX that live entirely in the live
+        // overlay and self-purge when their normalised progress hits 1.
+        // The render loop's idle-gate (see draw()) extends to cover
+        // these so the canvas redraws while FX are alive.
+        this._floatingTexts = []; // {x,y,text,color,start,duration}
+        this._particles    = []; // {x,y,vx,vy,color,start,duration,size}
 
         // Cached layers + the version stamps that produced them.
         // Chrome = backdrop + vignette in screen space (depends only on
@@ -167,6 +177,13 @@ export class Renderer {
             if (!Number.isNaN(id)) this._animObjectIds.add(id);
             // The animating object is no longer part of the static cache.
             this._objectsVersion = -1;
+        } else if (key.startsWith('deplete-')) {
+            // Mining deplete anim — same set-membership as a pop anim so
+            // the static cache skips this obj while it fades; the live
+            // overlay branches on the key to draw the shrink+fade curve.
+            const id = +key.slice('deplete-'.length);
+            if (!Number.isNaN(id)) this._animObjectIds.add(id);
+            this._objectsVersion = -1;
         } else if (key.startsWith('t-')) {
             // 't-<gx>,<gy>' — stash the cell key for the terrain cache to
             // skip while the elastic effect plays, otherwise the baked
@@ -189,6 +206,10 @@ export class Renderer {
                 this._anims.delete(key);
                 if (key.startsWith('obj-')) {
                     const id = +key.slice(4);
+                    if (!Number.isNaN(id)) this._animObjectIds.delete(id);
+                    removedObj = true;
+                } else if (key.startsWith('deplete-')) {
+                    const id = +key.slice('deplete-'.length);
                     if (!Number.isNaN(id)) this._animObjectIds.delete(id);
                     removedObj = true;
                 } else if (key.startsWith('t-')) {
@@ -236,6 +257,151 @@ export class Renderer {
         return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
     }
 
+    /* ── Mining juice FX (floating text + dust chips) ─────────── */
+
+    /**
+     * One-shot "+N" floating text that drifts upward and fades over
+     * `durationMs`. Positioned in world coordinates so it sticks to the
+     * ore it came from as the camera pans.
+     */
+    spawnFloatingText(worldX, worldY, text, {
+        color = '#1b5ba8',
+        durationMs = 850,
+        rise = 28,
+        font = 'bold 14px system-ui, sans-serif',
+    } = {}) {
+        this._floatingTexts.push({
+            x: worldX, y: worldY, text, color,
+            start: performance.now(), duration: durationMs,
+            rise, font,
+        });
+        this._dirty = true;
+    }
+
+    /**
+     * Burst of small chips at (worldX, worldY). Each chip has random
+     * radial velocity + gravity, shrinks + fades over its lifetime.
+     */
+    spawnDustPuff(worldX, worldY, {
+        color = '#9d8e74',
+        count = 5,
+        speed = 60,        // px/sec average
+        gravity = 140,     // px/sec^2 downward
+        durationMs = 650,
+        sizeRange = [2, 4],
+    } = {}) {
+        const now = performance.now();
+        for (let i = 0; i < count; i++) {
+            // Spray slightly upward + sideways: angle biased to the
+            // upper hemisphere so chips arc up before gravity pulls
+            // them down. Reads as "knocked off the rock" not "leaked
+            // from below".
+            const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.1;
+            const v = speed * (0.6 + Math.random() * 0.8);
+            const size = sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]);
+            this._particles.push({
+                x: worldX, y: worldY,
+                vx: Math.cos(angle) * v,
+                vy: Math.sin(angle) * v,
+                color, gravity,
+                start: now, duration: durationMs,
+                size,
+            });
+        }
+        this._dirty = true;
+    }
+
+    _tickFX(now) {
+        if (this._floatingTexts.length > 0) {
+            this._floatingTexts = this._floatingTexts.filter(
+                t => now - t.start < t.duration,
+            );
+        }
+        if (this._particles.length > 0) {
+            this._particles = this._particles.filter(
+                p => now - p.start < p.duration,
+            );
+        }
+    }
+
+    _drawFX() {
+        const ctx = this.ctx;
+        const now = performance.now();
+
+        // Particles first — chips sit below the floating number layer.
+        for (const p of this._particles) {
+            const elapsed = (now - p.start) / 1000;
+            const t = (now - p.start) / p.duration;
+            if (t >= 1) continue;
+            const x = p.x + p.vx * elapsed;
+            const y = p.y + p.vy * elapsed + 0.5 * p.gravity * elapsed * elapsed;
+            const size = p.size * (1 - t * 0.6); // shrink to 40%
+            const alpha = 1 - t;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Floating numbers on top.
+        for (const f of this._floatingTexts) {
+            const t = (now - f.start) / f.duration;
+            if (t >= 1) continue;
+            const easedRise = 1 - Math.pow(1 - t, 2);   // ease-out
+            const y = f.y - f.rise * easedRise;
+            const alpha = 1 - Math.max(0, t - 0.5) * 2; // hold full alpha first half
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, alpha);
+            ctx.font = f.font;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(251, 246, 236, 0.95)';
+            ctx.strokeText(f.text, f.x, y);
+            ctx.fillStyle = f.color;
+            ctx.fillText(f.text, f.x, y);
+            ctx.restore();
+        }
+    }
+
+    /**
+     * Draw a depleting ore — scales down and fades out over the anim's
+     * normalised t. Used by the live overlay when a `deplete-<id>` anim
+     * is active for an obj.
+     */
+    _drawDepletingObject(obj, t) {
+        const ctx = this.ctx;
+        const asset = getAsset(obj.assetId);
+        if (!asset) return;
+        const { x, y } = cellToScreen(obj.gx, obj.gy);
+        const dx = x - asset.anchorX;
+        const dy = y - asset.anchorY;
+        // Ease-in shrink so the first half is gentle then it collapses.
+        const eased = t * t;
+        const s = 1 - eased * 0.7;          // 1.0 → 0.3
+        const alpha = 1 - eased;            // 1.0 → 0.0
+        const pivot = cellToScreen(obj.gx + obj.footprint.w / 2, obj.gy + obj.footprint.d / 2);
+        if (asset.flatBase) {
+            pivot.y += (obj.footprint.w + obj.footprint.d) * TH / 4;
+        }
+        ctx.save();
+        ctx.globalAlpha *= Math.max(0, alpha);
+        ctx.translate(pivot.x, pivot.y);
+        ctx.scale(s, s);
+        ctx.translate(-pivot.x, -pivot.y);
+        // Slight upward bob as if the ore lifts in the moment it
+        // crumbles. Subtle — 4px max — keeps the eye on the shrink.
+        ctx.translate(0, -4 * eased);
+        this._drawAssetImage(ctx, asset, dx, dy, obj.gx, obj.gy, obj.footprint, {
+            flipH: obj.flipH,
+            flipV: obj.flipV,
+        });
+        ctx.restore();
+    }
+
     resize() {
         const dpr = window.devicePixelRatio || 1;
         const w = window.innerWidth;
@@ -262,11 +428,16 @@ export class Renderer {
     /** Draw the entire frame, but only when something has actually changed. */
     draw() {
         this._snapshotAnims();
+        const now = performance.now();
+        this._tickFX(now);
         // Any pending anim — even one whose start time is still in the
         // future — must keep the loop alive so we eventually reach its
-        // start window. Otherwise the dirty flag would settle to false
-        // and the staggered reveal would freeze before it began.
-        const animsPending = this._anims.size > 0;
+        // start window. Mining FX (floating text + particles) extend
+        // this gate so they keep animating after the anim/dirty signal
+        // has settled.
+        const animsPending = this._anims.size > 0
+            || this._floatingTexts.length > 0
+            || this._particles.length > 0;
         if (!this._dirty && !animsPending) return;
         this._dirty = false;
 
@@ -650,32 +821,56 @@ export class Renderer {
         const ctx = this.ctx;
         const items = [];
 
-        // Currently-animating objects + their shadows.
+        // Currently-animating objects + their shadows. An obj id may be
+        // in the anim set because of a pop-in (`obj-<id>`) or a mining
+        // crumble (`deplete-<id>`). We branch on which key is present.
         for (const obj of this.tileMap.objects) {
             if (!this._animObjectIds.has(obj.id)) continue;
-            const t = this._animT(`obj-${obj.id}`);
-            if (t == null) continue;
+            const popT     = this._animT(`obj-${obj.id}`);
+            const depleteT = this._animT(`deplete-${obj.id}`);
             const asset = getAsset(obj.assetId);
             if (!asset) continue;
-            // Shadow first (sits below). Drawn at the same depth band.
-            if (this._castsShadow(asset)) {
+            if (popT != null) {
+                // Pop-in (placement): elastic curve + scaled shadow.
+                if (this._castsShadow(asset)) {
+                    items.push({
+                        key: obj.sortKey() - 0.5,
+                        draw: () => {
+                            const prev = ctx.globalAlpha;
+                            ctx.globalAlpha = prev * SHADOW_ALPHA * Math.min(1, Math.max(0, popT * 1.4 - 0.1));
+                            this._drawShadowFor(ctx, asset, obj.gx, obj.gy, obj.footprint, {
+                                flipH: obj.flipH,
+                                flipV: obj.flipV,
+                            });
+                            ctx.globalAlpha = prev;
+                        },
+                    });
+                }
                 items.push({
-                    key: obj.sortKey() - 0.5,
-                    draw: () => {
-                        const prev = ctx.globalAlpha;
-                        ctx.globalAlpha = prev * SHADOW_ALPHA * Math.min(1, Math.max(0, t * 1.4 - 0.1));
-                        this._drawShadowFor(ctx, asset, obj.gx, obj.gy, obj.footprint, {
-                            flipH: obj.flipH,
-                            flipV: obj.flipV,
-                        });
-                        ctx.globalAlpha = prev;
-                    },
+                    key: obj.sortKey(),
+                    draw: () => this._drawAnimatingObject(obj, popT),
+                });
+            } else if (depleteT != null) {
+                // Mining crumble: shrink + fade. Shadow fades alongside.
+                if (this._castsShadow(asset)) {
+                    items.push({
+                        key: obj.sortKey() - 0.5,
+                        draw: () => {
+                            const prev = ctx.globalAlpha;
+                            ctx.globalAlpha = prev * SHADOW_ALPHA * (1 - depleteT);
+                            this._drawShadowFor(ctx, asset, obj.gx, obj.gy, obj.footprint, {
+                                flipH: obj.flipH,
+                                flipV: obj.flipV,
+                            });
+                            ctx.globalAlpha = prev;
+                        },
+                    });
+                }
+                items.push({
+                    key: obj.sortKey(),
+                    draw: () => this._drawDepletingObject(obj, depleteT),
                 });
             }
-            items.push({
-                key: obj.sortKey(),
-                draw: () => this._drawAnimatingObject(obj, t),
-            });
         }
 
         // Currently-animating terrain tiles.
@@ -723,8 +918,101 @@ export class Renderer {
             }
         }
 
+        // Player avatar — sorted into the same depth band as terrain +
+        // objects so it slides cleanly behind props one row ahead of it.
+        if (this.player) {
+            items.push({
+                key: this.player.sortKey() + 0.0001,
+                draw: () => this._drawPlayer(this.player),
+            });
+        }
+
         if (items.length > 1) items.sort((a, b) => a.key - b.key);
         for (const item of items) item.draw();
+
+        // FX (floating text + dust chips) draw last so they sit on
+        // top of every other live-overlay element. They live in world
+        // space so they pan / zoom with the camera.
+        if (this._floatingTexts.length > 0 || this._particles.length > 0) {
+            this._drawFX();
+        }
+    }
+
+    /**
+     * Placeholder player avatar — a chunky cobalt humanoid block sized to
+     * match the real character PNG that will land later (sizeScale 0.5,
+     * 1:2 aspect, flatBase). Feet sit at the diamond's front corner.
+     */
+    _drawPlayer(player) {
+        const ctx = this.ctx;
+
+        // Asset path: if the player has a skin asset id AND it's loaded
+        // (PNG present + processed), draw the sprite instead of the cube.
+        // Anchor math mirrors flatBase prop convention: trimmed PNG's
+        // bottom edge lands at the diamond's front-corner row, centred
+        // horizontally on the interpolated player position.
+        if (player.assetId) {
+            const asset = getAsset(player.assetId);
+            if (asset) {
+                const feetY = player.y + TH / 2;
+                const drawX = player.x - asset.anchorX;
+                const drawY = feetY - asset.height;
+                // Contact shadow first (under the feet, scales with sprite).
+                ctx.save();
+                ctx.globalAlpha *= 0.32;
+                ctx.fillStyle = 'rgba(30, 22, 8, 1)';
+                ctx.beginPath();
+                ctx.ellipse(player.x, feetY, asset.width * 0.32, TH * 0.18, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                const src = asset.displayCanvas || asset.canvas;
+                ctx.drawImage(src, drawX, drawY, asset.width, asset.height);
+                return;
+            }
+            // Asset id set but PNG not loaded → drop through to the cube
+            // fallback. Keeps `?character=miner` working even before the
+            // PNG has been generated.
+        }
+
+        const box = player.drawBox();
+        const PAL = CONFIG.palette;
+
+        // Contact shadow — small flat ellipse under the feet.
+        ctx.save();
+        ctx.globalAlpha *= 0.32;
+        ctx.fillStyle = 'rgba(30, 22, 8, 1)';
+        ctx.beginPath();
+        ctx.ellipse(box.x + box.w / 2, box.y + box.h, box.w * 0.42, box.h * 0.06, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Body block (3 voxels tall) with a subtle vertical gradient so
+        // the cube faces read.
+        const bodyH = Math.round(box.h * 0.7);
+        const bodyY = box.y + (box.h - bodyH);
+        const grad = ctx.createLinearGradient(0, bodyY, 0, bodyY + bodyH);
+        grad.addColorStop(0, PAL.cobaltLight);
+        grad.addColorStop(1, PAL.cobaltDeep);
+        ctx.fillStyle = grad;
+        ctx.fillRect(box.x, bodyY, box.w, bodyH);
+
+        // Head block (~1 voxel) above the body.
+        const headH = box.h - bodyH;
+        const headPad = Math.max(2, Math.round(box.w * 0.12));
+        ctx.fillStyle = PAL.whiteShadow;
+        ctx.fillRect(box.x + headPad, box.y, box.w - headPad * 2, headH);
+
+        // Cube-face highlight along the top of body + head so the chunky
+        // voxel language reads even without a real sprite.
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+        ctx.fillRect(box.x, bodyY, box.w, 2);
+        ctx.fillRect(box.x + headPad, box.y, box.w - headPad * 2, 2);
+
+        // Dark outline so the placeholder reads on every biome.
+        ctx.strokeStyle = 'rgba(20, 14, 4, 0.55)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(box.x + 0.5, bodyY + 0.5, box.w - 1, bodyH - 1);
+        ctx.strokeRect(box.x + headPad + 0.5, box.y + 0.5, box.w - headPad * 2 - 1, headH - 1);
     }
 
     _drawAnimatingObject(obj, t) {
