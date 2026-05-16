@@ -45,8 +45,11 @@ function j(v) {
 }
 
 export async function runAll() {
+    // Drain the suite so re-runs (e.g. a future "re-run" button) start
+    // from a clean slate rather than accumulating registrations.
+    const snapshot = suite.splice(0);
     const results = [];
-    for (const t of suite) {
+    for (const t of snapshot) {
         try {
             await t.fn();
             results.push({ ...t, ok: true });
