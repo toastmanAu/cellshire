@@ -13,6 +13,9 @@ import { generateWorld } from './worldgen/procgen.js';
 import { installPerfHUD } from './ui/PerfHUD.js';
 import { installInventoryHUD } from './ui/InventoryHUD.js';
 import { isWalkable } from './grid/walkability.js';
+import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
+import { safeStorage } from './lib/safeStorage.js';
+import { installCharacterPicker } from './ui/CharacterPicker.js';
 
 async function main() {
     const fill = document.getElementById('loading-fill');
@@ -94,10 +97,27 @@ async function main() {
     if (game.mode === 'play') {
         const spawn = findSpawnCell(game.tileMap);
         if (spawn) {
-            game.spawnPlayer(spawn.gx, spawn.gy, {
-                assetId: resolveCharacterAsset(params.get('character')),
+            const catalog = getAvailableCharacters();
+            const chosen = resolveCharacterChoice({
+                url: params.get('character'),
+                storage: safeStorage,
+                catalog,
             });
+            game.spawnPlayer(spawn.gx, spawn.gy, { assetId: chosen });
             installInventoryHUD(game.player);
+
+            // No stored / URL choice — show the first-load gate. World
+            // is already rendering, so the picker overlays on top of it.
+            if (chosen === null) {
+                installCharacterPicker({
+                    catalog,
+                    onConfirm: (assetId) => {
+                        game.player.assetId = assetId;
+                        safeStorage.set('cellshire:character', assetId);
+                        game.renderer.markDirty();
+                    },
+                });
+            }
         } else {
             console.warn('[cellshire] no walkable spawn found — seed:', seed);
         }
@@ -241,23 +261,6 @@ function findSpawnCell(tileMap) {
     return { gx: bestCell[0], gy: bestCell[1] };
 }
 
-
-/**
- * Resolve a short `?character=<key>` URL param into a manifest asset id.
- * Accepts the short form (`miner`) or the full id (`player_miner`).
- * Returns null when the param is missing or unrecognised — caller
- * spawns with the placeholder cube in that case.
- */
-function resolveCharacterAsset(param) {
-    if (!param) return null;
-    const VALID = ['player_miner', 'player_seeker', 'player_tinker'];
-    if (VALID.includes(param)) return param;
-    const short = `player_${param}`;
-    if (VALID.includes(short)) return short;
-    console.warn('[cellshire] unknown ?character=', param,
-        '— falling back to placeholder. Valid: miner | seeker | tinker');
-    return null;
-}
 
 /** Seeded RNG (mulberry32) — matches the one in procgen for parity. */
 function makeSeededRand(seed) {
