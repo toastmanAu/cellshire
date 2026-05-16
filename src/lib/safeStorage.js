@@ -13,13 +13,12 @@ function makeMemoryBackend() {
     };
 }
 
-const defaultBackend = () =>
-    (typeof window !== 'undefined' && window.localStorage) || null;
-
 /**
  * Build a safe-storage instance. Pass a custom backend for tests.
  */
-export function makeSafeStorage(backend = defaultBackend()) {
+export function makeSafeStorage(
+    backend = (typeof window !== 'undefined' && window.localStorage) || null,
+) {
     let active = backend || makeMemoryBackend();
     const fallback = makeMemoryBackend();
 
@@ -28,7 +27,7 @@ export function makeSafeStorage(backend = defaultBackend()) {
             return fn(active);
         } catch (_err) {
             active = fallback;
-            return fn(active);
+            try { return fn(active); } catch { /* memory failed — give up silently */ }
         }
     }
 
