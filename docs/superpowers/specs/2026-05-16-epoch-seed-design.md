@@ -1,4 +1,4 @@
-# Epoch-Hash Procgen Seed — Design Spec
+# Epoch-Hash Procgen Seed + Mined-Ore Persistence — Design Spec
 
 **Status:** approved 2026-05-16
 
@@ -11,6 +11,15 @@ the same epoch window sees the same world. Sets up the planned
 the chain state. Must support user-configurable RPC endpoints (so
 players can point at their own light client / fiber node / public
 RPC).
+
+**Anti-cheat sub-goal:** persist mined-ore state per epoch in
+localStorage so a page reload mid-epoch cannot re-mine already-mined
+ores. Acknowledged limitation: a player who clears localStorage CAN
+reset their mined-state — but that also wipes their inventory,
+character choice, and any future wallet binding, so it's a
+self-punishing cheat. The cheat-proof version lands when on-chain
+mining (separate kanban item "Mining tx") ships; this spec is the
+off-chain best-effort layer that aligns with that future model.
 
 ## Non-goals
 
@@ -35,6 +44,8 @@ RPC).
 | Default endpoint | `https://testnet.ckb.dev` (public CKB testnet RPC) |
 | Determinism scope | Per-epoch (same epoch → same world for all players) |
 | PerfHUD surface | Yes — show `epoch 14523 (live)` |
+| Mined-state persistence | Per-epoch localStorage map of `pos → remainingCapacity` |
+| Cheat-proofness | Best-effort: reload-safe, clear-cache-bypassable, on-chain authoritative later |
 
 ## Architecture
 
@@ -122,8 +133,108 @@ visible throughout — no extra UX work needed.
 |---|---|---|---|
 | `cellshire:node` | endpoint string (e.g. `"https://testnet.ckb.dev"`) | `resolveNodeEndpoint` when URL flag is present | `resolveNodeEndpoint` at boot |
 | `cellshire:lastEpoch` | JSON `{ hash, number }` | `getProcgenSeed` after a successful live fetch | `getProcgenSeed` on a failed live fetch |
+| `cellshire:mined:<epoch_number>` | JSON `{ "5,5": 0, "12,8": 2 }` — position → remaining capacity | `_mineOre` after every hit | boot, after `populateOreStates` |
 
-Both stored via the existing `safeStorage` wrapper.
+All stored via the existing `safeStorage` wrapper. The `<epoch_number>`
+suffix is the decimal epoch number (e.g. `cellshire:mined:14455`).
+When the epoch changes, the storage key changes; the old key becomes
+stale but is left in place (small storage cost, ~1KB per stale entry,
+GC is a future task).
+
+### Mined-ore persistence
+
+**Goal:** a page reload inside the same epoch must not let the player
+re-mine ores that were already mined (fully or partially). Cross-epoch
+reloads correctly re-seed the world and start with fresh mined-state.
+
+**Position identity.** The pair `(gx, gy)` is the stable identity. The
+world is procgen'd from the deterministic epoch seed, so the SAME
+ores appear at the SAME positions across reloads in the same epoch.
+`PlacedObject.id` is NOT stable (assigned by `_nextId`) so we don't
+use it.
+
+**Data shape.** `{ "<gx>,<gy>": <remainingCapacity>, ... }`. Missing
+position = full capacity (never mined). Value `0` = depleted. The
+position string uses `${gx},${gy}` to match the existing key convention
+in `InputManager._lastBrushKey`.
+
+**New module: `src/mining/minedStore.js`.** Three small exports:
+
+```js
+/**
+ * Build the storage key for the current epoch. Pure.
+ * Returns 'cellshire:mined:14455' or null if epoch is null
+ * (source === 'random' — we don't persist mining state in that case;
+ * the world is non-deterministic so persistence is meaningless).
+ */
+export function minedStoreKey(epochNumber) → string | null
+
+/**
+ * Read the persisted mined-state for an epoch.
+ * Returns a plain object: { "<gx>,<gy>": remainingCapacity, ... }
+ * Returns {} if the key is missing, malformed, or epochNumber is null.
+ */
+export function loadMinedState(storage, epochNumber) → object
+
+/**
+ * Write a single position's remaining capacity. Read-modify-write
+ * on the JSON blob. Called after every mining hit.
+ * No-op if epochNumber is null (random seed path).
+ */
+export function recordMine(storage, epochNumber, gx, gy, remainingCapacity)
+```
+
+**Boot-flow integration.** After `populateOreStates(...)` in `main.js`:
+
+```js
+// Restore mined-ore state for this epoch.
+const mined = loadMinedState(safeStorage, epoch);
+for (const [posKey, remaining] of Object.entries(mined)) {
+    const [gx, gy] = posKey.split(',').map(Number);
+    const obj = game.tileMap.objectAt(gx, gy);
+    if (!obj) continue;                       // ore not at this position
+    const state = game.oreStates.get(obj.id);
+    if (!state) continue;                     // not an ore
+    state.capacityRemaining = remaining;
+    if (remaining <= 0) {
+        // Depleted in a prior session — remove the obj outright. No
+        // crumble anim (it already played last session).
+        game.tileMap.removeObjectAt(gx, gy);
+        game.oreStates.delete(obj.id);
+    }
+}
+game.renderer.markDirty();
+```
+
+**Mining-side write.** Inside `Game._mineOre` after the existing
+`state.mine()` call:
+
+```js
+recordMine(safeStorage, this.currentEpoch, obj.gx, obj.gy,
+    state.capacityRemaining);
+```
+
+`this.currentEpoch` is a new field on `Game`, set from `main.js`
+after `getProcgenSeed`. When `source === 'random'`, `currentEpoch`
+is `null` and `recordMine` is a no-op (no persistence on random
+worlds).
+
+**Edge cases:**
+
+- **Cross-epoch reload.** Epoch number changes → storage key changes
+  → new (empty) mined-state is loaded → fresh world. Old key
+  ignored (correct).
+- **Stale storage entry for a position that no longer has an ore.**
+  Procgen drift, theoretically impossible if seed is identical, but
+  guarded by the `if (!obj) continue` check. Defensive.
+- **Cache-clear bypass.** Player can clear localStorage to reset
+  mined-state — but loses inventory, character, etc. simultaneously.
+  Accepted limitation; full anti-cheat is on-chain (separate kanban
+  item).
+- **Source = 'random'.** No persistence. The world is already
+  non-deterministic, so persisting mining state is meaningless and
+  would corrupt the next session if the player came back to a 'live'
+  fetch. `recordMine` no-ops on null epoch.
 
 ### Source ladder
 
@@ -226,6 +337,22 @@ Module under test is `src/chain/epochSeed.js`; tests live alongside.
    - JSON-RPC error body: throws
    - Network error: throws
 
+5. **`minedStoreKey`**:
+   - epochNumber `"14455"` → `"cellshire:mined:14455"`
+   - epochNumber `null` → `null` (random seed path → no persistence)
+
+6. **`loadMinedState`** (with fake storage):
+   - Missing key → `{}`
+   - Malformed JSON → `{}` (defensive parse)
+   - Valid JSON → returns the parsed object
+   - epochNumber `null` → `{}` regardless of storage contents
+
+7. **`recordMine`** (with fake storage):
+   - First write to a fresh epoch creates the entry
+   - Second write to a different position adds without clobbering
+   - Re-write to the same position updates the value (decrement path)
+   - epochNumber `null` → no-op (storage untouched)
+
 Manual smoke flow (Phill, in a browser):
 
 1. Clear localStorage. Load app. PerfHUD shows `epoch <N> (live)` in
@@ -242,6 +369,22 @@ Manual smoke flow (Phill, in a browser):
 7. Clear `cellshire:lastEpoch` and repeat (6). Confirm PerfHUD shows
    `random — no chain`. Console warns through the full ladder.
 
+**Mined-state smoke flow** (after the above succeed with `(live)`):
+
+8. Walk to an ore, mine it once (capacity drops by 1). In DevTools:
+   `localStorage.getItem('cellshire:mined:' + <epoch>)` shows the
+   position with the new remaining capacity.
+9. Reload. Walk back to the same ore. Confirm it has the reduced
+   capacity (one less hit until depletion).
+10. Mine the ore to depletion. Reload. The ore is GONE from the world
+    (removed at boot, no crumble anim).
+11. Wait until an epoch boundary crosses (or manually flip the cached
+    epoch number). Reload. The mined-state key for the OLD epoch is
+    ignored; the world re-generates fresh and that ore reappears.
+12. Confirm `localStorage` contains both `cellshire:mined:<oldEpoch>`
+    (stale) and `cellshire:mined:<newEpoch>` (fresh). Stale entries
+    are OK to leave; GC is a future task.
+
 ## Edge cases
 
 - **Network slow (5s+).** No explicit timeout in v0 — `fetch` will
@@ -255,7 +398,30 @@ Manual smoke flow (Phill, in a browser):
 - **`localStorage` disabled.** `safeStorage` already handles this —
   cached fallback effectively becomes "always cold", so the player
   gets a `random` seed each load when the node is unreachable. Not
-  ideal but expected.
+  ideal but expected. Mined-state persistence ALSO becomes a no-op
+  (writes silently go to in-memory fallback, reset on reload). Player
+  effectively gets free re-mining; this is the same end-state as the
+  cache-clear bypass and is accepted.
+- **Stale `cellshire:mined:*` keys.** Old epochs accumulate. Each is
+  ~100B-1KB. GC pass is a future task (probably "on boot, delete
+  every cellshire:mined:* key whose suffix isn't the current epoch").
+- **Per-position depleted state restored at boot.** If an ore was
+  mined to depletion last session, the boot-flow integration removes
+  the obj outright (no crumble anim — that animation already played).
+  The player sees the world the way they left it.
+
+## Files changed
+
+| Path | Change |
+|---|---|
+| `src/chain/epochSeed.js` | NEW — `resolveNodeEndpoint`, `getCurrentEpochHash`, `seedFromHash`, `getProcgenSeed`. ~100 lines. |
+| `src/chain/epochSeed.test.js` | NEW — unit tests for all four. ~80 lines. |
+| `src/mining/minedStore.js` | NEW — `minedStoreKey`, `loadMinedState`, `recordMine`. ~40 lines. |
+| `src/mining/minedStore.test.js` | NEW — unit tests for all three. ~50 lines. |
+| `src/main.js` | MODIFY — `await getProcgenSeed(...)`; after `populateOreStates`, restore mined state for `epoch`. |
+| `src/core/Game.js` | MODIFY — `this.currentEpoch = null` field; `_mineOre` calls `recordMine`. |
+| `src/ui/PerfHUD.js` | MODIFY — surface `source` + `epoch` in the existing overlay. |
+| `tests.html` | MODIFY — two new imports. |
 
 ## Migration / cleanup
 
@@ -265,3 +431,8 @@ Manual smoke flow (Phill, in a browser):
   deterministic per-epoch too — bonus alignment, no extra work.
 - No backwards compat needed (no existing user state depends on the
   random seed).
+- Future-aligned: when on-chain mining lands, `minedStore` becomes a
+  cache layer in front of the chain (read the chain for authoritative
+  state, write-through to localStorage for offline / fast-read). The
+  position-keyed map shape carries over directly. No data migration
+  needed when the on-chain version ships.
