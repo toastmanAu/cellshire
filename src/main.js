@@ -16,6 +16,7 @@ import { isWalkable } from './grid/walkability.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
 import { safeStorage } from './lib/safeStorage.js';
 import { installCharacterPicker } from './ui/CharacterPicker.js';
+import { getProcgenSeed } from './chain/epochSeed.js';
 
 async function main() {
     const fill = document.getElementById('loading-fill');
@@ -75,9 +76,17 @@ async function main() {
         game._centerCamera();
     }
 
-    // Always procedurally generate. Skip save restore so we measure
-    // cold-gen perf every reload — surfaced via PerfHUD, not console.
-    const seed = Math.floor(Math.random() * 1e9);
+    // Procgen seed is derived from the CKB chain's current epoch hash
+    // so every player loading inside the same epoch window sees the
+    // same world. Source ladder is live → cached → random; see
+    // src/chain/epochSeed.js for the full path. Loading screen stays
+    // visible during the fetch (~200ms on a healthy RPC).
+    const { seed, source: seedSource, epoch } = await getProcgenSeed({
+        url: params.get('node'),
+        storage: safeStorage,
+        fetch: window.fetch.bind(window),
+        defaultUrl: 'https://testnet.ckb.dev',
+    });
     const t0 = performance.now();
     const stats = generateWorld(game.tileMap, seed);
     const genMs = performance.now() - t0;
@@ -120,7 +129,7 @@ async function main() {
         }
     }
 
-    installPerfHUD(game, { seed, genMs, ...stats });
+    installPerfHUD(game, { seed, genMs, source: seedSource, epoch, ...stats });
 
     loadingScreen.classList.add('hidden');
     app.classList.remove('hidden');

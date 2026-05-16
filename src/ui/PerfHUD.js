@@ -63,8 +63,15 @@ export function installPerfHUD(game, genStats) {
         const W = game.tileMap.width;
         const H = game.tileMap.height;
 
+        const epochLine = genStats.source === 'live'
+            ? `epoch ${genStats.epoch} (live)`
+            : genStats.source === 'cached'
+                ? `epoch ${genStats.epoch} (cached — node unreachable)`
+                : 'random — no chain';
+
         el.textContent =
-              `grid ${W}×${H}   seed ${genStats.seed}   gen ${genStats.genMs.toFixed(0)} ms\n`
+              `${epochLine}\n`
+            + `grid ${W}×${H}   seed ${genStats.seed}   gen ${genStats.genMs.toFixed(0)} ms\n`
             + `terrain ${genStats.total} (${genStats.water}w ${genStats.sand}s `
             + `${genStats.grass}g ${genStats.stone}r)\n`
             + `ores ${genStats.oresPlaced}   trees ${genStats.treesPlaced}   `
