@@ -27,3 +27,35 @@ export function getAvailableCharacters() {
 export function isEnabled(character) {
     return character.tier !== 'locked';
 }
+
+/**
+ * Resolve which character to spawn as, given a URL param value and a
+ * safeStorage instance. Precedence:
+ *
+ *     URL (?character=...)  >  storage  >  null (caller shows picker)
+ *
+ * Accepts the short form ('miner') or the full id ('player_miner').
+ * Returns null when nothing valid is available. Pure — does not write
+ * to storage; the picker is the only thing that writes.
+ */
+export function resolveCharacterChoice({
+    url, storage, catalog = getAvailableCharacters(),
+}) {
+    const validIds = new Set(
+        catalog.filter(isEnabled).map(c => c.id),
+    );
+
+    if (url) {
+        const candidate = url.startsWith('player_') ? url : `player_${url}`;
+        if (validIds.has(candidate)) return candidate;
+        console.warn('[cellshire] unknown ?character=', url,
+            '— ignoring. Valid:', [...validIds].join(' | '));
+    }
+
+    if (storage) {
+        const stored = storage.get('cellshire:character');
+        if (stored && validIds.has(stored)) return stored;
+    }
+
+    return null;
+}
