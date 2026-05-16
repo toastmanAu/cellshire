@@ -16,7 +16,7 @@ describe('Player.facing', () => {
     it('flips back to right when the next step heads east or north', () => {
         const p = new Player({ gx: 5, gy: 5 });
         p.setPath([{ gx: 4, gy: 5 }]);   // west — facing becomes left
-        p.gx = 4;                         // simulate arrival
+        while (p.isMoving()) p.tick(0.1); // tick to real arrival at (4, 5)
         p.setPath([{ gx: 5, gy: 4 }]);   // north step — should flip right
         expect(p.facing).toBe('right');
     });

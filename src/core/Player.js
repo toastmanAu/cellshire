@@ -132,8 +132,9 @@ export class Player {
         // Derive screen-x heading from the grid step. In iso projection
         // screenX = (gx - gy) * (TW/2), so sign(dgx - dgy) is the screen-x
         // sign of the move. Cardinals map: east/north → right, west/south
-        // → left. dgx === dgy is the no-op case (same cell) — guard
-        // against clobbering facing with a meaningless update.
+        // → left. dgx === dgy catches the (0,0) same-cell no-op and the
+        // NW/SE diagonals (±1,±1) — the latter are impossible today (A* is
+        // 4-neighbour) but would need a proper formula if 8-dir lands.
         const dgx = next.gx - this.gx;
         const dgy = next.gy - this.gy;
         if (dgx !== dgy) {
