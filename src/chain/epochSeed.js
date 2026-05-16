@@ -32,10 +32,21 @@ export function resolveNodeEndpoint({ url, storage, defaultUrl }) {
 /**
  * Derive a uint32 procgen seed from a 0x-prefixed hex hash. Takes the
  * first 8 hex chars (32 bits) after the optional prefix.
+ *
+ * Throws on degenerate input (empty / non-hex first 8 chars). Throwing
+ * lets `getProcgenSeed`'s existing catch handle a malformed RPC
+ * response the same way a network error is handled — fall through to
+ * cached / random. Silent NaN→0 here would otherwise bias world
+ * generation toward seed 0 with no diagnostic.
  */
 export function seedFromHash(hash) {
     const hex = hash.startsWith('0x') ? hash.slice(2) : hash;
-    return parseInt(hex.slice(0, 8), 16) >>> 0;
+    const chunk = hex.slice(0, 8);
+    const n = parseInt(chunk, 16);
+    if (Number.isNaN(n)) {
+        throw new Error(`seedFromHash: invalid hex chunk "${chunk}" from "${hash}"`);
+    }
+    return n >>> 0;
 }
 
 /**
@@ -80,8 +91,12 @@ export async function getProcgenSeed({ url, storage, fetch, defaultUrl }) {
 
     try {
         const { hash, number } = await getCurrentEpochHash(endpoint, { fetch });
+        // Derive seed BEFORE caching so a malformed-hash response from a
+        // buggy node throws here and the catch falls through cleanly
+        // instead of poisoning the cache.
+        const seed = seedFromHash(hash);
         storage.set(LAST_EPOCH_KEY, JSON.stringify({ hash, number }));
-        return { seed: seedFromHash(hash), source: 'live', epoch: number };
+        return { seed, source: 'live', epoch: number };
     } catch (err) {
         console.warn('[cellshire] live epoch fetch failed:', err.message);
     }

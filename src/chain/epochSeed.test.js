@@ -61,6 +61,14 @@ describe('seedFromHash', () => {
         const b = seedFromHash('0x1234567890abcdef');
         expect(a).toBe(b);
     });
+
+    it('throws on empty / non-hex input rather than silently returning 0', () => {
+        let threw = 0;
+        try { seedFromHash('0x'); } catch { threw++; }
+        try { seedFromHash(''); } catch { threw++; }
+        try { seedFromHash('0xZZZZZZZZ'); } catch { threw++; }
+        expect(threw).toBe(3);
+    });
 });
 
 function makeFakeFetch(responses) {
