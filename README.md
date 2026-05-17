@@ -25,13 +25,19 @@ were structurally sound, so we kept the engine and built the game on top.
 - ✅ **World-size adaptive cache renderer**
   `CACHE_SCALE` auto-degrades to keep the cache canvas under the browser's
   Canvas2D dimension cap, allowing 300×300+ worlds without engine rewrite.
-- ⏳ Gameplay loop (movement, click-to-walk, click-to-interact, collision)
-- ⏳ CKB epoch integration (epoch hash → procgen seed, ore-as-cell)
+- ✅ **Playable local mining loop**
+  Click-to-walk, click-to-interact, collision, local ore capacity,
+  per-ore drops, inventory HUD, and per-epoch reload-safe mined-state.
+- ✅ **CKB epoch procgen seed**
+  Live RPC → cached → random fallback; PerfHUD surfaces epoch/source.
+- ⏳ Ore-as-cell mining transactions
 - ⏳ Player property zone + expansion mechanics
 - ⏳ Three-store marketplace layer
 - ⏳ Open asset standard + mint-to-game pipeline
 
 See **[docs/DESIGN.md](docs/DESIGN.md)** for the full game design.
+See **[docs/superpowers/kanban.md](docs/superpowers/kanban.md)** for the
+current implementation backlog.
 See **[docs/ASSET-PROMPTS.md](docs/ASSET-PROMPTS.md)** for the prompt cookbook
 used to generate the asset pack via Wyltek Studio / HiDream-O1.
 

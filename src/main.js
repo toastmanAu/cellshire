@@ -11,13 +11,16 @@ import { UIManager } from './ui/UIManager.js';
 import { loadUiAudio } from './ui/Audio.js';
 import { generateWorld } from './worldgen/procgen.js';
 import { installPerfHUD } from './ui/PerfHUD.js';
+import { installEpochHUD } from './ui/EpochHUD.js';
+import { installWalletHUD } from './ui/WalletHUD.js';
 import { installInventoryHUD } from './ui/InventoryHUD.js';
 import { isWalkable } from './grid/walkability.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
 import { safeStorage } from './lib/safeStorage.js';
 import { installCharacterPicker } from './ui/CharacterPicker.js';
 import { getProcgenSeed } from './chain/epochSeed.js';
-import { loadMinedState } from './mining/minedStore.js';
+import { loadMinedState, pruneStaleMinedState } from './mining/minedStore.js';
+import { walletFeatureEnabled } from './wallet/walletIdentity.js';
 
 async function main() {
     const fill = document.getElementById('loading-fill');
@@ -82,7 +85,7 @@ async function main() {
     // same world. Source ladder is live → cached → random; see
     // src/chain/epochSeed.js for the full path. Loading screen stays
     // visible during the fetch (~200ms on a healthy RPC).
-    const { seed, source: seedSource, epoch } = await getProcgenSeed({
+    const { seed, source: seedSource, epoch, epochInfo } = await getProcgenSeed({
         url: params.get('node'),
         storage: safeStorage,
         fetch: window.fetch.bind(window),
@@ -110,9 +113,7 @@ async function main() {
     // Note: this removal path intentionally bypasses _pendingDepletions
     // because that map is always empty at boot (no animations have
     // been spawned yet). The crumble anim is purely a runtime affordance.
-    // TODO: GC stale `cellshire:mined:*` keys (other epochs) on boot.
-    // Spec acknowledges this as a future task; ~100B–1KB per stale
-    // entry is negligible today but worth a sweep when convenient.
+    pruneStaleMinedState(safeStorage, epoch);
     const minedState = loadMinedState(safeStorage, epoch);
     for (const [posKey, remaining] of Object.entries(minedState)) {
         const [gx, gy] = posKey.split(',').map(Number);
@@ -161,7 +162,15 @@ async function main() {
         }
     }
 
-    installPerfHUD(game, { seed, genMs, source: seedSource, epoch, ...stats });
+    const genStats = { seed, genMs, source: seedSource, epoch, epochInfo, ...stats };
+    installPerfHUD(game, genStats);
+    installEpochHUD(game, genStats);
+    if (walletFeatureEnabled(params)) {
+        installWalletHUD({
+            storage: safeStorage,
+            shouldFail: params.get('walletFail') === '1',
+        });
+    }
 
     loadingScreen.classList.add('hidden');
     app.classList.remove('hidden');

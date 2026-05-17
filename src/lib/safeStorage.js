@@ -10,6 +10,8 @@ function makeMemoryBackend() {
         getItem: k => (m.has(k) ? m.get(k) : null),
         setItem: (k, v) => m.set(k, String(v)),
         removeItem: k => m.delete(k),
+        key: i => Array.from(m.keys())[i] ?? null,
+        get length() { return m.size; },
     };
 }
 
@@ -35,6 +37,17 @@ export function makeSafeStorage(
         get(key) { return tryWith(b => b.getItem(key)); },
         set(key, value) { tryWith(b => b.setItem(key, value)); },
         remove(key) { tryWith(b => b.removeItem(key)); },
+        keys() {
+            return tryWith((b) => {
+                if (typeof b.key !== 'function' || typeof b.length !== 'number') return [];
+                const out = [];
+                for (let i = 0; i < b.length; i++) {
+                    const key = b.key(i);
+                    if (key !== null) out.push(key);
+                }
+                return out;
+            }) || [];
+        },
     };
 }
 

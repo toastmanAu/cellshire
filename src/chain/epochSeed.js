@@ -10,6 +10,13 @@
 
 const NODE_KEY = 'cellshire:node';
 const LAST_EPOCH_KEY = 'cellshire:lastEpoch';
+const DEFAULT_RPC_TIMEOUT_MS = 3000;
+
+function parseHexNumber(hex) {
+    if (typeof hex !== 'string') return null;
+    const n = parseInt(hex, 16);
+    return Number.isFinite(n) ? n : null;
+}
 
 /**
  * Resolve which RPC endpoint to call.
@@ -63,31 +70,60 @@ export function seedFromHash(hash) {
  *   1. get_current_epoch → { number, start_number, ... }
  *   2. get_block_hash(start_number) → '0x...'
  *
- * Returns { hash, number } where number is the decimal-string form of
- * the hex epoch number (e.g. "0x3877" → "14455"). Throws on network
- * error, HTTP non-2xx, or RPC error body.
+ * Returns { hash, number, epochInfo } where number is the decimal-string
+ * form of the hex epoch number (e.g. "0x3877" → "14455"). epochInfo is
+ * best-effort progress metadata for the player-facing countdown.
+ * Throws on network error, HTTP non-2xx, or RPC error body for the seed
+ * critical calls.
  */
-export async function getCurrentEpochHash(endpoint, { fetch }) {
-    const epoch = await rpc(endpoint, fetch, 'get_current_epoch', []);
+export async function getCurrentEpochHash(endpoint, { fetch, timeoutMs = DEFAULT_RPC_TIMEOUT_MS } = {}) {
+    const epoch = await rpc(endpoint, fetch, 'get_current_epoch', [], { timeoutMs });
     const startNumberHex = epoch.start_number;
-    const hash = await rpc(endpoint, fetch, 'get_block_hash', [startNumberHex]);
+    const hash = await rpc(endpoint, fetch, 'get_block_hash', [startNumberHex], { timeoutMs });
+    const number = String(parseInt(epoch.number, 16));
+    const epochInfo = {
+        number,
+        startNumber: parseHexNumber(epoch.start_number),
+        length: parseHexNumber(epoch.length),
+        tipNumber: null,
+        fetchedAtMs: Date.now(),
+    };
+
+    if (epochInfo.length !== null) {
+        try {
+            const tip = await rpc(endpoint, fetch, 'get_tip_header', [], { timeoutMs });
+            epochInfo.tipNumber = parseHexNumber(tip?.number);
+        } catch {
+            // Countdown progress is useful, but not seed-critical.
+        }
+    }
+
     return {
         hash,
-        number: String(parseInt(epoch.number, 16)),
+        number,
+        epochInfo,
     };
 }
 
-async function rpc(endpoint, fetch, method, params) {
-    // TODO: wrap with AbortController + ~3s timeout so a stalled RPC
-    // (TCP-reachable but HTTP-slow, e.g. a syncing node) doesn't hang
-    // the loading screen indefinitely. Spec acknowledges this as a v0
-    // deferral. See docs/superpowers/specs/2026-05-16-epoch-seed-design.md
-    // §"Edge cases" — "Network slow (5s+)".
-    const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-    });
+async function rpc(endpoint, fetch, method, params, { timeoutMs }) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+        res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+            signal: controller.signal,
+        });
+    } catch (err) {
+        if (controller.signal.aborted) {
+            throw new Error(`RPC timeout after ${timeoutMs}ms from ${method}`);
+        }
+        throw err;
+    } finally {
+        clearTimeout(timeoutId);
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status} from ${method}`);
     const body = await res.json();
     if (body.error) {
@@ -98,19 +134,19 @@ async function rpc(endpoint, fetch, method, params) {
 
 /**
  * Top-level coordinator. Tries live → cached → random. Always succeeds.
- * Returns { seed, source: 'live'|'cached'|'random', epoch: string|null }.
+ * Returns { seed, source: 'live'|'cached'|'random', epoch: string|null, epochInfo }.
  */
 export async function getProcgenSeed({ url, storage, fetch, defaultUrl }) {
     const endpoint = resolveNodeEndpoint({ url, storage, defaultUrl });
 
     try {
-        const { hash, number } = await getCurrentEpochHash(endpoint, { fetch });
+        const { hash, number, epochInfo } = await getCurrentEpochHash(endpoint, { fetch });
         // Derive seed BEFORE caching so a malformed-hash response from a
         // buggy node throws here and the catch falls through cleanly
         // instead of poisoning the cache.
         const seed = seedFromHash(hash);
-        storage.set(LAST_EPOCH_KEY, JSON.stringify({ hash, number }));
-        return { seed, source: 'live', epoch: number };
+        storage.set(LAST_EPOCH_KEY, JSON.stringify({ hash, number, epochInfo }));
+        return { seed, source: 'live', epoch: number, epochInfo };
     } catch (err) {
         console.warn('[cellshire] live epoch fetch failed:', err.message);
     }
@@ -121,7 +157,12 @@ export async function getProcgenSeed({ url, storage, fetch, defaultUrl }) {
             const cached = JSON.parse(cachedRaw);
             if (cached && typeof cached.hash === 'string') {
                 console.warn('[cellshire] using cached epoch', cached.number);
-                return { seed: seedFromHash(cached.hash), source: 'cached', epoch: cached.number };
+                return {
+                    seed: seedFromHash(cached.hash),
+                    source: 'cached',
+                    epoch: cached.number,
+                    epochInfo: cached.epochInfo ?? null,
+                };
             }
         } catch {
             console.warn('[cellshire] cached epoch malformed; discarding');
@@ -133,5 +174,6 @@ export async function getProcgenSeed({ url, storage, fetch, defaultUrl }) {
         seed: Math.floor(Math.random() * 1e9),
         source: 'random',
         epoch: null,
+        epochInfo: null,
     };
 }

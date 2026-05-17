@@ -96,6 +96,19 @@ describe('getCurrentEpochHash', () => {
         expect(out.number).toBe('14455');  // 0x3877 = 14455 decimal
     });
 
+    it('returns best-effort epoch progress when the RPC has length and tip', async () => {
+        const fetch = makeFakeFetch([
+            { json: { result: { number: '0x3877', start_number: '0x64', length: '0x64' } } },
+            { json: { result: '0xabcdef1234567890' } },
+            { json: { result: { number: '0x96' } } },
+        ]);
+        const out = await getCurrentEpochHash(DEFAULT, { fetch });
+        expect(out.epochInfo.number).toBe('14455');
+        expect(out.epochInfo.startNumber).toBe(100);
+        expect(out.epochInfo.length).toBe(100);
+        expect(out.epochInfo.tipNumber).toBe(150);
+    });
+
     it('throws on HTTP non-2xx', async () => {
         const fetch = makeFakeFetch([{ ok: false, status: 500, json: {} }]);
         let threw = false;
@@ -118,6 +131,19 @@ describe('getCurrentEpochHash', () => {
         try { await getCurrentEpochHash(DEFAULT, { fetch }); } catch { threw = true; }
         expect(threw).toBe(true);
     });
+
+    it('throws on slow RPC timeout', async () => {
+        const fetch = (_endpoint, init) => new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(new Error('aborted')));
+        });
+        let message = '';
+        try {
+            await getCurrentEpochHash(DEFAULT, { fetch, timeoutMs: 1 });
+        } catch (err) {
+            message = err.message;
+        }
+        expect(message).toBe('RPC timeout after 1ms from get_current_epoch');
+    });
 });
 
 describe('getProcgenSeed', () => {
@@ -135,6 +161,7 @@ describe('getProcgenSeed', () => {
         expect(out.epoch).toBe('14455');
         const cached = JSON.parse(storage.get('cellshire:lastEpoch'));
         expect(cached.hash).toBe('0xdeadbeef00000000');
+        expect(cached.number).toBe('14455');
     });
 
     it('falls back to cached when fetch fails', async () => {

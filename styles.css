@@ -444,6 +444,144 @@ html, body {
     display: none;
 }
 
+/* -- Epoch status -------------------------------------------------- */
+
+#epoch-hud {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    z-index: 18;
+    display: grid;
+    grid-template-columns: auto auto;
+    align-items: center;
+    gap: 1px 8px;
+    max-width: min(280px, calc(100vw - 24px));
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 252, 244, 0.94);
+    border: 1px solid rgba(31, 42, 55, 0.12);
+    box-shadow: var(--shadow);
+    color: var(--ink);
+    backdrop-filter: blur(8px);
+    pointer-events: auto;
+}
+#epoch-hud::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    grid-row: 1 / span 2;
+    align-self: center;
+    background: #3fb950;
+    box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.16);
+}
+#epoch-hud[data-tone="cached"]::before {
+    background: #d99a24;
+    box-shadow: 0 0 0 3px rgba(217, 154, 36, 0.18);
+}
+#epoch-hud[data-tone="warning"]::before {
+    background: #c95050;
+    box-shadow: 0 0 0 3px rgba(201, 80, 80, 0.18);
+}
+.epoch-hud__title {
+    font-size: 12px;
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+.epoch-hud__detail {
+    font-size: 10px;
+    line-height: 1.2;
+    color: var(--ink-soft);
+    white-space: nowrap;
+}
+.epoch-hud__reload {
+    grid-row: 1 / span 2;
+    grid-column: 3;
+    border: 0;
+    border-radius: 6px;
+    background: var(--cobalt);
+    color: #fff;
+    font-weight: 800;
+    font-size: 10px;
+    padding: 7px 9px;
+    cursor: pointer;
+}
+.epoch-hud__reload[hidden] { display: none; }
+.epoch-hud__reload:hover { filter: brightness(1.05); }
+
+/* -- Wallet identity ---------------------------------------------- */
+
+#wallet-hud {
+    position: fixed;
+    top: calc(70px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    z-index: 18;
+    display: grid;
+    grid-template-columns: auto auto auto;
+    align-items: center;
+    gap: 2px 8px;
+    max-width: min(300px, calc(100vw - 24px));
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 252, 244, 0.94);
+    border: 1px solid rgba(31, 42, 55, 0.12);
+    box-shadow: var(--shadow);
+    color: var(--ink);
+    backdrop-filter: blur(8px);
+    pointer-events: auto;
+}
+#wallet-hud::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    grid-row: 1 / span 2;
+    background: #a8a29a;
+    box-shadow: 0 0 0 3px rgba(168, 162, 154, 0.16);
+}
+#wallet-hud[data-state="connected"]::before {
+    background: #3fb950;
+    box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.16);
+}
+#wallet-hud[data-state="connecting"]::before {
+    background: #d99a24;
+    box-shadow: 0 0 0 3px rgba(217, 154, 36, 0.18);
+}
+#wallet-hud[data-state="failed"]::before {
+    background: #c95050;
+    box-shadow: 0 0 0 3px rgba(201, 80, 80, 0.18);
+}
+.wallet-hud__label {
+    font-size: 12px;
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+.wallet-hud__detail {
+    font-size: 10px;
+    line-height: 1.2;
+    color: var(--ink-soft);
+}
+.wallet-hud__action {
+    grid-row: 1 / span 2;
+    grid-column: 3;
+    border: 0;
+    border-radius: 6px;
+    background: var(--cobalt);
+    color: #fff;
+    font-weight: 800;
+    font-size: 10px;
+    padding: 7px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.wallet-hud__action:disabled {
+    opacity: 0.62;
+    cursor: wait;
+}
+.wallet-hud__action:not(:disabled):hover { filter: brightness(1.05); }
+
 /* ── Instructions panel ────────────────────────────────────────── */
 
 /* The controls help is a collapsible disclosure (native <details>):

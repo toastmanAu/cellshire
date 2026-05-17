@@ -12,6 +12,8 @@
  * as the read-through cache.
  */
 
+const MINED_KEY_PREFIX = 'cellshire:mined:';
+
 /**
  * Returns the storage key for an epoch's mined-state, or null when
  * epoch is missing (null, undefined, or empty string — random-seed
@@ -22,7 +24,7 @@ export function minedStoreKey(epochNumber) {
     if (epochNumber === null || epochNumber === undefined || epochNumber === '') {
         return null;
     }
-    return `cellshire:mined:${epochNumber}`;
+    return `${MINED_KEY_PREFIX}${epochNumber}`;
 }
 
 /**
@@ -57,4 +59,20 @@ export function recordMine(storage, epochNumber, gx, gy, remainingCapacity) {
         [`${gx},${gy}`]: remainingCapacity,
     };
     storage.set(key, JSON.stringify(state));
+}
+
+/**
+ * Remove stale mined-state entries from prior epochs. No-op when the
+ * current epoch is unknown (random fallback path) or storage cannot
+ * enumerate keys.
+ */
+export function pruneStaleMinedState(storage, epochNumber) {
+    const keepKey = minedStoreKey(epochNumber);
+    if (!keepKey || typeof storage.keys !== 'function') return;
+
+    for (const key of storage.keys()) {
+        if (key.startsWith(MINED_KEY_PREFIX) && key !== keepKey) {
+            storage.remove(key);
+        }
+    }
 }

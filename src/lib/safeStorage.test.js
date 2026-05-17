@@ -8,6 +8,8 @@ describe('safeStorage', () => {
             getItem: k => (m.has(k) ? m.get(k) : null),
             setItem: (k, v) => m.set(k, String(v)),
             removeItem: k => m.delete(k),
+            key: i => Array.from(m.keys())[i] ?? null,
+            get length() { return m.size; },
         };
     }
 
@@ -37,5 +39,12 @@ describe('safeStorage', () => {
         const s = makeSafeStorage(null);
         s.set('k', 'v');
         expect(s.get('k')).toBe('v');
+    });
+
+    it('lists keys from the active backend', () => {
+        const s = makeSafeStorage(fakeBackend());
+        s.set('a', '1');
+        s.set('b', '2');
+        expect(s.keys()).toEqual(['a', 'b']);
     });
 });

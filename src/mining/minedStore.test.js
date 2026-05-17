@@ -1,5 +1,10 @@
 import { describe, it, expect } from '../test/harness.js';
-import { minedStoreKey, loadMinedState, recordMine } from './minedStore.js';
+import {
+    minedStoreKey,
+    loadMinedState,
+    pruneStaleMinedState,
+    recordMine,
+} from './minedStore.js';
 
 function fakeStorage(initial = {}) {
     const m = new Map(Object.entries(initial));
@@ -7,6 +12,7 @@ function fakeStorage(initial = {}) {
         get: k => (m.has(k) ? m.get(k) : null),
         set: (k, v) => m.set(k, String(v)),
         remove: k => m.delete(k),
+        keys: () => Array.from(m.keys()),
     };
 }
 
@@ -83,5 +89,40 @@ describe('recordMine', () => {
         const s = fakeStorage();
         recordMine(s, null, 5, 5, 2);
         expect(s.get('cellshire:mined:null')).toBeNull();
+    });
+});
+
+describe('pruneStaleMinedState', () => {
+    it('removes mined-state keys from other epochs', () => {
+        const s = fakeStorage({
+            'cellshire:mined:14454': JSON.stringify({ '1,1': 0 }),
+            'cellshire:mined:14455': JSON.stringify({ '2,2': 1 }),
+            'cellshire:mined:14456': JSON.stringify({ '3,3': 2 }),
+            'cellshire:lastEpoch': JSON.stringify({ number: '14455' }),
+            'cellshire:character': 'miner',
+        });
+        pruneStaleMinedState(s, '14455');
+        expect(s.get('cellshire:mined:14454')).toBeNull();
+        expect(s.get('cellshire:mined:14455')).toBe(JSON.stringify({ '2,2': 1 }));
+        expect(s.get('cellshire:mined:14456')).toBeNull();
+        expect(s.get('cellshire:lastEpoch')).toBe(JSON.stringify({ number: '14455' }));
+        expect(s.get('cellshire:character')).toBe('miner');
+    });
+
+    it('no-ops when epoch is null', () => {
+        const s = fakeStorage({
+            'cellshire:mined:14455': JSON.stringify({ '2,2': 1 }),
+        });
+        pruneStaleMinedState(s, null);
+        expect(s.get('cellshire:mined:14455')).toBe(JSON.stringify({ '2,2': 1 }));
+    });
+
+    it('no-ops when storage cannot enumerate keys', () => {
+        const s = {
+            get: k => (k === 'cellshire:mined:14454' ? 'old' : null),
+            remove: () => { throw new Error('should not remove'); },
+        };
+        pruneStaleMinedState(s, '14455');
+        expect(s.get('cellshire:mined:14454')).toBe('old');
     });
 });
