@@ -134,7 +134,7 @@ async function rpc(endpoint, fetch, method, params, { timeoutMs }) {
 
 /**
  * Top-level coordinator. Tries live → cached → random. Always succeeds.
- * Returns { seed, source: 'live'|'cached'|'random', epoch: string|null, epochInfo }.
+ * Returns { seed, source: 'live'|'cached'|'random', epoch: string|null, hash, epochInfo }.
  */
 export async function getProcgenSeed({ url, storage, fetch, defaultUrl }) {
     const endpoint = resolveNodeEndpoint({ url, storage, defaultUrl });
@@ -146,7 +146,7 @@ export async function getProcgenSeed({ url, storage, fetch, defaultUrl }) {
         // instead of poisoning the cache.
         const seed = seedFromHash(hash);
         storage.set(LAST_EPOCH_KEY, JSON.stringify({ hash, number, epochInfo }));
-        return { seed, source: 'live', epoch: number, epochInfo };
+        return { seed, source: 'live', epoch: number, hash, epochInfo };
     } catch (err) {
         console.warn('[cellshire] live epoch fetch failed:', err.message);
     }
@@ -161,6 +161,7 @@ export async function getProcgenSeed({ url, storage, fetch, defaultUrl }) {
                     seed: seedFromHash(cached.hash),
                     source: 'cached',
                     epoch: cached.number,
+                    hash: cached.hash,
                     epochInfo: cached.epochInfo ?? null,
                 };
             }
@@ -174,6 +175,7 @@ export async function getProcgenSeed({ url, storage, fetch, defaultUrl }) {
         seed: Math.floor(Math.random() * 1e9),
         source: 'random',
         epoch: null,
+        hash: null,
         epochInfo: null,
     };
 }

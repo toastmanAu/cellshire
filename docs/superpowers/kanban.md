@@ -11,6 +11,8 @@ cards needed to turn the current prototype into the game described in
 - Local ore capacity, local inventory balances, mining FX/audio, and HUD.
 - CKB epoch hash drives procgen seed with live/cached/random fallback.
 - Per-epoch local mined-state persistence prevents reload double-mining.
+- Epoch hash modifiers produce standard/high-yield/rich shifts that
+  multiply mining yield and surface in the epoch HUD.
 - Character picker, persisted character choice, starter character PNGs,
   and directional facing.
 - Build mode remains available via `?dev=1` for property-zone tooling.
@@ -75,19 +77,15 @@ JoyID, and preserves the prototype/local adapters for offline dev. Failed
 signature or submit still bubbles through the mining adapter failure path,
 so local ore capacity is restored before yield is granted.
 
-## Next
-
 ### Epoch Modifier + High-Value Epochs
 
-**Goal:** turn epoch hashes into variable mining yield.
+**Completed:** 2026-05-17
 
-**Acceptance:**
-- Deterministic `epochModifier(hash)` function with tests.
-- High-value epoch predicate with visible HUD/banner state.
-- Ore yield ranges multiply by modifier without breaking local tests.
-- Design doc records the chosen algorithm and tuning constants.
+Added deterministic epoch modifier bucketing from the epoch hash, high-value
+HUD state/toast, and multiplier-aware ore yield. Documented the 5% `3x` /
+20% `2x` tuning constants in `docs/DESIGN.md`.
 
-## Soon
+## Next
 
 ### Property Zone MVP
 
@@ -98,6 +96,8 @@ so local ore capacity is restored before yield is granted.
 - Initial fenced zone has bounded editable cells and uses existing placement tools.
 - Only owned/allowed props can be placed in play mode.
 - Local persistence exists first; chain-backed placed prop cells come later.
+
+## Soon
 
 ### Property Expansion Tiers
 

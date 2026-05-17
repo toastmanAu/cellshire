@@ -483,6 +483,14 @@ html, body {
     background: #c95050;
     box-shadow: 0 0 0 3px rgba(201, 80, 80, 0.18);
 }
+#epoch-hud[data-tone="high-value"] {
+    border-color: rgba(168, 122, 26, 0.35);
+    background: rgba(255, 248, 219, 0.96);
+}
+#epoch-hud[data-tone="high-value"]::before {
+    background: #e0b43c;
+    box-shadow: 0 0 0 3px rgba(224, 180, 60, 0.2);
+}
 .epoch-hud__title {
     font-size: 12px;
     line-height: 1.1;

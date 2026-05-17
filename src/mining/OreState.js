@@ -45,19 +45,25 @@ export class OreState {
 
     /**
      * Attempt one mining hit. Rolls a yield in the catalog's yieldRange,
-     * decrements capacity, returns the result. Returns null if the ore
-     * is already depleted (caller should remove the cell at that point).
+     * applies the current epoch yield multiplier, decrements capacity,
+     * and returns the result. Returns null if the ore is already
+     * depleted (caller should remove the cell at that point).
      */
-    mine(rand = Math.random) {
+    mine(rand = Math.random, { yieldMultiplier = 1 } = {}) {
         if (this.isDepleted()) return null;
         const cfg = oreConfig(this.oreType);
-        const amount = cfg
+        const multiplier = Number.isFinite(yieldMultiplier) && yieldMultiplier > 1
+            ? Math.floor(yieldMultiplier)
+            : 1;
+        const baseAmount = cfg
             ? randInt(rand, cfg.yieldRange[0], cfg.yieldRange[1])
             : 1;
         this.capacityRemaining--;
         return {
             currency: this.oreType,
-            amount,
+            amount: baseAmount * multiplier,
+            baseAmount,
+            yieldMultiplier: multiplier,
             depleted: this.isDepleted(),
         };
     }

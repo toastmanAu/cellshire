@@ -24,6 +24,7 @@ import {
     cccJoyIdMiningEnabled,
     connectCccJoyId,
 } from './chain/cccJoyId.js';
+import { describeEpochModifier } from './chain/epochModifier.js';
 import { loadMinedState, pruneStaleMinedState } from './mining/minedStore.js';
 import { chainMiningEnabled, makeMiningAdapterFromParams } from './mining/miningAdapter.js';
 import { walletFeatureEnabled } from './wallet/walletIdentity.js';
@@ -96,7 +97,7 @@ async function main() {
     // same world. Source ladder is live → cached → random; see
     // src/chain/epochSeed.js for the full path. Loading screen stays
     // visible during the fetch (~200ms on a healthy RPC).
-    const { seed, source: seedSource, epoch, epochInfo } = await getProcgenSeed({
+    const { seed, source: seedSource, epoch, hash: epochHash, epochInfo } = await getProcgenSeed({
         url: params.get('node'),
         storage: safeStorage,
         fetch: window.fetch.bind(window),
@@ -115,6 +116,8 @@ async function main() {
     // correct per-epoch storage key. Null on random seed = no
     // persistence (see minedStore.recordMine).
     game.currentEpoch = epoch;
+    const epochModifierState = describeEpochModifier(epochHash);
+    game.epochYieldModifier = epochModifierState.multiplier;
 
     // Restore any mined-ore state from a prior session in the same
     // epoch. Positions with remainingCapacity > 0 update their
@@ -173,7 +176,16 @@ async function main() {
         }
     }
 
-    const genStats = { seed, genMs, source: seedSource, epoch, epochInfo, ...stats };
+    const genStats = {
+        seed,
+        genMs,
+        source: seedSource,
+        epoch,
+        epochHash,
+        epochInfo,
+        epochModifier: epochModifierState,
+        ...stats,
+    };
     installPerfHUD(game, genStats);
     installEpochHUD(game, genStats);
     if (walletFeatureEnabled(params) || chainMiningEnabled(params) || cccJoyIdEnabled(params)) {

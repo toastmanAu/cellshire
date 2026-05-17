@@ -57,6 +57,24 @@ describe('buildEpochStatus', () => {
         expect(out.canReloadForNewShift).toBe(false);
     });
 
+    it('surfaces high-value epoch modifier state', () => {
+        const out = buildEpochStatus({
+            source: 'live',
+            epoch: '14455',
+            epochInfo: null,
+            epochModifier: {
+                multiplier: 2,
+                isHighValue: true,
+                label: 'High-yield shift',
+                detail: '2x ore yield',
+            },
+        });
+        expect(out.tone).toBe('high-value');
+        expect(out.title).toBe('Epoch 14455 x2');
+        expect(out.detail).toBe('live - rollover unknown - high-yield shift');
+        expect(out.isHighValueEpoch).toBe(true);
+    });
+
     it('marks reload available when the estimated epoch has rolled', () => {
         const out = buildEpochStatus({
             source: 'live',

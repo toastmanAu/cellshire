@@ -78,13 +78,14 @@ lo, hi = bounds_for_ore_type * epoch_modifier
 
 - `bounds_for_ore_type` is a static table per ore (coal = low, gold =
   mid, diamond/ckb_cluster = high).
-- `epoch_modifier` is derived from an on-chain value per epoch — possibly
-  the low N bits of the epoch block hash, possibly a separate oracle cell.
-  **(TBD)** — algorithm to be brainstormed.
-- Some epochs are **"high value" epochs** where the modifier spikes
-  (think: cosmic event, jackpot week). Mechanic for picking high-value
-  epochs is **(TBD)** — could be every Nth epoch, hash-mod-bucket, or
-  governance-driven.
+- `epoch_modifier` is derived from the epoch block hash using the 16-bit
+  bucket at hash nibbles 8-11. The first 32 bits still drive procgen seed;
+  this next word drives yield so map shape and payout tier are separated.
+- Tuning constants: bucket < 5% gives `3x` ("Rich shift"), bucket < 20%
+  gives `2x` ("High-yield shift"), and all other epochs give `1x`.
+- A **"high value" epoch** is any epoch where `epoch_modifier > 1`.
+  The HUD surfaces these shifts and local mining yield ranges are
+  multiplied before the result is credited.
 
 ### Currency types per ore
 

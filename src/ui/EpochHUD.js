@@ -24,12 +24,19 @@ export function installEpochHUD(game, epochStats) {
     document.body.appendChild(root);
 
     let warned = false;
+    let highValueAnnounced = false;
     function render() {
         const status = buildEpochStatus({ ...epochStats });
         root.dataset.tone = status.tone;
+        root.dataset.highValue = status.isHighValueEpoch ? '1' : '0';
         title.textContent = status.title;
         detail.textContent = status.detail;
         reload.hidden = !status.canReloadForNewShift;
+
+        if (status.isHighValueEpoch && !highValueAnnounced) {
+            highValueAnnounced = true;
+            game.ui?.showToast(`${status.epochModifier.label}: ${status.epochModifier.detail}`, 5000);
+        }
 
         if (status.canReloadForNewShift && !warned) {
             warned = true;

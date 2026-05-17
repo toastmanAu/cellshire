@@ -159,6 +159,7 @@ describe('getProcgenSeed', () => {
         expect(out.source).toBe('live');
         expect(out.seed).toBe(0xdeadbeef >>> 0);
         expect(out.epoch).toBe('14455');
+        expect(out.hash).toBe('0xdeadbeef00000000');
         const cached = JSON.parse(storage.get('cellshire:lastEpoch'));
         expect(cached.hash).toBe('0xdeadbeef00000000');
         expect(cached.number).toBe('14455');
@@ -177,6 +178,7 @@ describe('getProcgenSeed', () => {
         expect(out.source).toBe('cached');
         expect(out.seed).toBe(0xcafef00d >>> 0);
         expect(out.epoch).toBe('14400');
+        expect(out.hash).toBe('0xcafef00d00000000');
     });
 
     it('falls back to random when fetch fails AND cache is cold', async () => {
@@ -187,6 +189,7 @@ describe('getProcgenSeed', () => {
         });
         expect(out.source).toBe('random');
         expect(out.epoch).toBeNull();
+        expect(out.hash).toBeNull();
         expect(typeof out.seed).toBe('number');
     });
 

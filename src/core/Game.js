@@ -59,6 +59,7 @@ export class Game {
         // recordMine no-ops because persistence is meaningless on a
         // non-deterministic world.
         this.currentEpoch = null;
+        this.epochYieldModifier = 1;
 
         this.miningAdapter = new LocalMiningAdapter();
         this._pendingChainMines = new Set();
@@ -405,7 +406,7 @@ export class Game {
         // is already 0 and we don't want to double-process.
         if (this._pendingDepletions.has(obj.id)) return;
         if (this._pendingChainMines.has(obj.id)) return;
-        const result = state.mine();
+        const result = state.mine(Math.random, { yieldMultiplier: this.epochYieldModifier });
         if (!result) return;
 
         if (this.miningAdapter?.canHandle?.(obj)) {

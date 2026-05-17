@@ -71,6 +71,14 @@ describe('mining dispatch (frame-loop simulation)', () => {
         expect(state.capacityRemaining).toBe(before - 1);
     });
 
+    it('multiplies ore yield by the current epoch modifier', () => {
+        const state = OreState.fromAsset('iron_ore', () => 0.5);
+        const result = state.mine(() => 0, { yieldMultiplier: 3 });
+        expect(result.amount).toBe(3);
+        expect(result.baseAmount).toBe(1);
+        expect(result.yieldMultiplier).toBe(3);
+    });
+
     it('full pipeline: one click → one mine → capacity drops by exactly one', () => {
         const player = new Player({ gx: 3, gy: 3 });
         const state = OreState.fromAsset('iron_ore', () => 0.5);

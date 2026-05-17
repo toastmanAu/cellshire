@@ -37,6 +37,7 @@ export function buildEpochStatus({
     source,
     epoch,
     epochInfo,
+    epochModifier,
     nowMs = Date.now(),
     blockMs = DEFAULT_BLOCK_MS,
 }) {
@@ -47,16 +48,21 @@ export function buildEpochStatus({
             detail: 'random local map',
             remainingMs: null,
             canReloadForNewShift: false,
+            isHighValueEpoch: false,
+            epochModifier: null,
         };
     }
 
     const remainingMs = estimateEpochRemainingMs(epochInfo, { nowMs, blockMs });
     const live = source === 'live';
+    const modifier = epochModifier?.multiplier > 1 ? epochModifier : null;
     return {
-        tone: live ? 'live' : 'cached',
-        title: `Epoch ${epoch}`,
-        detail: `${live ? 'live' : 'cached'} - ${formatRemaining(remainingMs)}`,
+        tone: modifier ? 'high-value' : live ? 'live' : 'cached',
+        title: modifier ? `Epoch ${epoch} x${modifier.multiplier}` : `Epoch ${epoch}`,
+        detail: `${live ? 'live' : 'cached'} - ${formatRemaining(remainingMs)}${modifier ? ` - ${modifier.label.toLowerCase()}` : ''}`,
         remainingMs,
         canReloadForNewShift: remainingMs === 0,
+        isHighValueEpoch: Boolean(modifier),
+        epochModifier: epochModifier ?? null,
     };
 }
