@@ -48,12 +48,16 @@ cd ~/cellshire
 python3 -m http.server 8766
 # open http://127.0.0.1:8766/
 # optional: ?size=200 to procgen a bigger world
+# optional: ?wallet=joyid&chainMining=1&chainMiningSubmit=ccc for CCC/JoyID testnet signing
 ```
 
 There's no build step — vanilla ES modules, no bundler, no transpiler, no
 `node_modules`. Drop a PNG into `assets/raw_pending/`, run
 `python3 tools/process_assets.py --pending`, add a line to `assetManifest.js`,
 and it's live on next page load.
+
+The real CCC/JoyID path loads `@ckb-ccc/ccc` from an ESM CDN at runtime so the
+offline prototype remains available without adding a package manager step.
 
 ## License
 

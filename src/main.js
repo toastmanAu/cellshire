@@ -19,7 +19,13 @@ import { getAvailableCharacters, resolveCharacterChoice } from './characters/cat
 import { safeStorage } from './lib/safeStorage.js';
 import { installCharacterPicker } from './ui/CharacterPicker.js';
 import { getProcgenSeed } from './chain/epochSeed.js';
+import {
+    cccJoyIdEnabled,
+    cccJoyIdMiningEnabled,
+    connectCccJoyId,
+} from './chain/cccJoyId.js';
 import { loadMinedState, pruneStaleMinedState } from './mining/minedStore.js';
+import { chainMiningEnabled, makeMiningAdapterFromParams } from './mining/miningAdapter.js';
 import { walletFeatureEnabled } from './wallet/walletIdentity.js';
 
 async function main() {
@@ -52,6 +58,11 @@ async function main() {
     const params = new URLSearchParams(location.search);
     const devMode = params.get('dev') === '1';
     game.mode = devMode ? 'build' : 'play';
+    game.miningAdapter = makeMiningAdapterFromParams({
+        params,
+        storage: safeStorage,
+        location: window.location,
+    });
     document.body.classList.add(devMode ? 'mode-build' : 'mode-play');
 
     const ui = new UIManager(game);
@@ -165,10 +176,17 @@ async function main() {
     const genStats = { seed, genMs, source: seedSource, epoch, epochInfo, ...stats };
     installPerfHUD(game, genStats);
     installEpochHUD(game, genStats);
-    if (walletFeatureEnabled(params)) {
+    if (walletFeatureEnabled(params) || chainMiningEnabled(params) || cccJoyIdEnabled(params)) {
+        const useRealJoyId = cccJoyIdEnabled(params) || cccJoyIdMiningEnabled(params);
         installWalletHUD({
             storage: safeStorage,
             shouldFail: params.get('walletFail') === '1',
+            connector: useRealJoyId
+                ? ({ shouldFail }) => {
+                    if (shouldFail) throw new Error('JoyID connection cancelled');
+                    return connectCccJoyId({ params, location: window.location });
+                }
+                : undefined,
         });
     }
 

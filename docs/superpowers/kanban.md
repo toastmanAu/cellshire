@@ -43,28 +43,39 @@ JoyID-labeled connect/disconnect UI stub behind `?wallet=1`. Covered
 disconnected, connecting, connected, and failed states with tests. Mining
 and economy behavior remain independent of wallet state.
 
-## Next
-
 ### On-Chain Mining Architecture Spec
 
-**Goal:** define the exact cell model before coding transaction paths.
+**Completed:** 2026-05-17
 
-**Acceptance:**
-- Specify ore cell data: ore type, map id/epoch, position, capacity remaining.
-- Specify mine tx: inputs, outputs, capacity decrement/depletion, yield credit.
-- Decide whether the first live version uses testnet cells, mock cells, or a local dev index.
-- Document reconciliation between optimistic local mining and chain truth.
+Captured in
+[`2026-05-17-on-chain-mining-design.md`](specs/2026-05-17-on-chain-mining-design.md).
+The spec defines ore cell data, mine tx inputs/outputs, validation
+rules, optimistic UX, stale-chain reconciliation, testnet-first feature
+flags, and the first implementation slice.
 
 ### Mining Transaction Prototype
 
-**Goal:** replace local-only mining for one ore type with a signed testnet
-transaction path.
+**Completed:** 2026-05-17
 
-**Acceptance:**
-- Player can connect wallet, mine a supported ore, sign a tx, and see success/failure.
-- Local `OreState` updates only optimistically and reconciles after tx result.
-- Failed/cancelled signatures leave ore capacity unchanged.
-- Existing local mode remains available for dev and offline fallback.
+Added deterministic ore identity, tx-shaped ore/yield cell builders,
+and a feature-flagged mining adapter boundary. `?chainMining=1` routes
+`coal_seam` through a prototype JoyID/testnet-style adapter; unsupported
+ores remain local. Failed/cancelled prototype submissions restore local
+ore capacity and grant no yield.
+
+### Real JoyID + CCC Mining Submit
+
+**Completed:** 2026-05-17
+
+Added optional `?wallet=joyid` / `?chainMiningSubmit=ccc` runtime wiring
+for CCC-backed JoyID connection and CKB testnet mining submit. The real
+path loads `@ckb-ccc/ccc` from an ESM CDN, prepares a CCC transaction
+with a compact Cellshire mining receipt witness, signs/submits through
+JoyID, and preserves the prototype/local adapters for offline dev. Failed
+signature or submit still bubbles through the mining adapter failure path,
+so local ore capacity is restored before yield is granted.
+
+## Next
 
 ### Epoch Modifier + High-Value Epochs
 

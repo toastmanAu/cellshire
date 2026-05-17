@@ -22,6 +22,7 @@ import { OreState } from '../mining/OreState.js';
 import { isOre, oreConfig, oreDisplayName } from '../mining/oreCatalog.js';
 import { playPlacementFor, playMineHit, playMineDeplete } from '../ui/Audio.js';
 import { recordMine } from '../mining/minedStore.js';
+import { LocalMiningAdapter } from '../mining/miningAdapter.js';
 import { safeStorage } from '../lib/safeStorage.js';
 
 export class Game {
@@ -58,6 +59,9 @@ export class Game {
         // recordMine no-ops because persistence is meaningless on a
         // non-deterministic world.
         this.currentEpoch = null;
+
+        this.miningAdapter = new LocalMiningAdapter();
+        this._pendingChainMines = new Set();
 
         // Ores currently mid-depletion. Entry value is the absolute ms
         // timestamp at which the obj should actually be removed from
@@ -400,9 +404,55 @@ export class Game {
         // OreState still exists until the anim finishes, but capacity
         // is already 0 and we don't want to double-process.
         if (this._pendingDepletions.has(obj.id)) return;
+        if (this._pendingChainMines.has(obj.id)) return;
         const result = state.mine();
         if (!result) return;
 
+        if (this.miningAdapter?.canHandle?.(obj)) {
+            this._mineOreViaChain(obj, state, result);
+            return;
+        }
+
+        this._commitMinedOre(obj, state, result);
+    }
+
+    async _mineOreViaChain(obj, state, result) {
+        const beforeCapacity = state.capacityRemaining + 1;
+        this._pendingChainMines.add(obj.id);
+        this.ui?.showToast?.('Preparing mining transaction', 1800);
+        try {
+            let out;
+            try {
+                out = await this.miningAdapter.mine({
+                    game: this,
+                    epoch: this.currentEpoch,
+                    obj,
+                    state,
+                    result,
+                });
+            } catch (err) {
+                out = {
+                    ok: false,
+                    message: err?.message || 'Mining transaction failed',
+                };
+            }
+            if (!out.ok) {
+                state.restoreCapacity(beforeCapacity);
+                this.ui?.showToast?.(out.message || 'Mining transaction cancelled', 2400);
+                this.renderer.markDirty();
+                return;
+            }
+            this.ui?.showToast?.(
+                out.txHash ? `Mining tx ${out.txHash.slice(0, 12)}...` : 'Mining transaction submitted',
+                2200,
+            );
+            this._commitMinedOre(obj, state, result);
+        } finally {
+            this._pendingChainMines.delete(obj.id);
+        }
+    }
+
+    _commitMinedOre(obj, state, result) {
         this.player?.inventory.add(result.currency, result.amount);
         // Persist remaining capacity per (epoch, position) so a reload
         // mid-epoch can't reset the ore. No-op when currentEpoch is

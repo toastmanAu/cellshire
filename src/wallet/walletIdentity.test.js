@@ -47,6 +47,9 @@ describe('wallet identity persistence', () => {
             address: 'ckt1qyq9xabcdefghijklmnopqrstuvwxyz',
             label: 'JoyID Dev',
             connectedAt: 123,
+            signer: 'ccc-joyid',
+            network: 'testnet',
+            pubkey: '0xpublic',
             token: 'must-not-persist',
         });
         const raw = JSON.parse(s.get('cellshire:walletIdentity'));
@@ -54,6 +57,9 @@ describe('wallet identity persistence', () => {
         expect(raw.address).toBe('ckt1qyq9xabcdefghijklmnopqrstuvwxyz');
         expect(raw.label).toBe('JoyID Dev');
         expect(raw.connectedAt).toBe(123);
+        expect(raw.signer).toBe('ccc-joyid');
+        expect(raw.network).toBe('testnet');
+        expect(raw.pubkey).toBe('0xpublic');
         expect(raw.token).toBe(undefined);
 
         const loaded = loadWalletIdentity(s);

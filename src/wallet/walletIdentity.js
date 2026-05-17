@@ -18,12 +18,18 @@ export function sanitizeAccount(account) {
     if (!account || typeof account !== 'object') return null;
     if (typeof account.provider !== 'string' || typeof account.address !== 'string') return null;
     if (account.provider === '' || account.address === '') return null;
-    return {
+    const safe = {
         provider: account.provider,
         address: account.address,
         label: typeof account.label === 'string' ? account.label : '',
         connectedAt: typeof account.connectedAt === 'number' ? account.connectedAt : Date.now(),
     };
+    if (typeof account.signer === 'string') safe.signer = account.signer;
+    if (account.network === 'mainnet' || account.network === 'testnet') safe.network = account.network;
+    if (typeof account.pubkey === 'string') safe.pubkey = account.pubkey;
+    if (typeof account.ethAddress === 'string') safe.ethAddress = account.ethAddress;
+    if (typeof account.keyType === 'string') safe.keyType = account.keyType;
+    return safe;
 }
 
 export function loadWalletIdentity(storage) {
