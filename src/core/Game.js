@@ -81,6 +81,7 @@ export class Game {
         // non-deterministic world.
         this.currentEpoch = null;
         this.epochYieldModifier = 1;
+        this.priceSnapshot = null;
 
         this.miningAdapter = new LocalMiningAdapter();
         this._pendingChainMines = new Set();
@@ -530,11 +531,11 @@ export class Game {
      * deterministically against the supplied rand fn so the same seed
      * always produces the same per-ore lifespan.
      */
-    populateOreStates(rand = Math.random) {
+    populateOreStates(rand = Math.random, opts = {}) {
         this.oreStates.clear();
         for (const obj of this.tileMap.objects) {
             if (!isOre(obj.assetId)) continue;
-            const state = OreState.fromAsset(obj.assetId, rand);
+            const state = OreState.fromAsset(obj.assetId, rand, opts);
             if (state) this.oreStates.set(obj.id, state);
         }
     }
@@ -578,7 +579,10 @@ export class Game {
         // is already 0 and we don't want to double-process.
         if (this._pendingDepletions.has(obj.id)) return;
         if (this._pendingChainMines.has(obj.id)) return;
-        const result = state.mine(Math.random, { yieldMultiplier: this.epochYieldModifier });
+        const result = state.mine(Math.random, {
+            yieldMultiplier: this.epochYieldModifier,
+            priceSnapshot: this.priceSnapshot,
+        });
         if (!result) return;
 
         if (this.miningAdapter?.canHandle?.(obj)) {
@@ -784,6 +788,7 @@ export class Game {
         this._pendingInteract = null;
         this._pendingDepletions.clear();
         this.currentEpoch = null;
+        this.priceSnapshot = null;
         this.mapKind = 'property';
         this.mode = 'property';
         this.selectedAssetId = isStarterPropertyAsset(this.selectedAssetId)
@@ -819,6 +824,7 @@ export class Game {
             playerCell: this.player ? { gx: this.player.gx, gy: this.player.gy } : null,
             currentEpoch: this.currentEpoch,
             epochYieldModifier: this.epochYieldModifier,
+            priceSnapshot: this.priceSnapshot,
             mode: this.mode,
             mapKind: this.mapKind,
             oreStates: Array.from(this.oreStates.entries()).map(([id, state]) => ({
@@ -826,6 +832,8 @@ export class Game {
                 oreType: state.oreType,
                 capacityRemaining: state.capacityRemaining,
                 maxCapacity: state.maxCapacity,
+                totalValueUsd: state.totalValueUsd,
+                remainingValueUsd: state.remainingValueUsd,
             })),
         };
     }
@@ -837,6 +845,7 @@ export class Game {
         this.camera.zoom = runtime.camera.zoom;
         this.currentEpoch = runtime.currentEpoch;
         this.epochYieldModifier = runtime.epochYieldModifier ?? 1;
+        this.priceSnapshot = runtime.priceSnapshot ?? null;
         this.mode = runtime.mode;
         this.mapKind = runtime.mapKind;
         this.oreStates.clear();
@@ -845,6 +854,10 @@ export class Game {
                 entry.oreType,
                 entry.capacityRemaining,
                 entry.maxCapacity,
+                {
+                    totalValueUsd: entry.totalValueUsd,
+                    remainingValueUsd: entry.remainingValueUsd,
+                },
             ));
         }
         this._pendingInteract = null;

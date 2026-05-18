@@ -2,11 +2,12 @@ import { describe, it, expect } from '../test/harness.js';
 import {
     CURRENCY_CATALOG,
     ORE_CURRENCY_MAP,
-    amountForBaseYield,
+    amountForUsdValue,
     currencyDisplayName,
     currencySymbol,
     formatCurrencyAmount,
     rewardCurrencyForOre,
+    rollOreValueUsd,
 } from './cryptoEconomy.js';
 import { ORE_CATALOG } from './oreCatalog.js';
 
@@ -39,9 +40,15 @@ describe('crypto economy mapping', () => {
     });
 
     it('scales mined quantity by fixed USD value and coin price', () => {
-        expect(amountForBaseYield('btc', 1)).toBe(0.00001301);
-        expect(amountForBaseYield('ckb', 1)).toBe(696.58741824);
-        expect(amountForBaseYield('erg', 3)).toBe(10.63920334);
+        expect(amountForUsdValue('btc', 100)).toBe(0.00130129);
+        expect(amountForUsdValue('ckb', 100)).toBe(69658.74182381);
+        expect(amountForUsdValue('erg', 75)).toBe(265.98008341);
+    });
+
+    it('rolls deterministic per-ore USD value budgets in the target range', () => {
+        expect(rollOreValueUsd(() => 0)).toBe(50);
+        expect(rollOreValueUsd(() => 0.5)).toBe(125);
+        expect(rollOreValueUsd(() => 1)).toBe(200);
     });
 
     it('formats small and large balances for the inventory HUD', () => {

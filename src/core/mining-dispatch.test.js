@@ -75,9 +75,9 @@ describe('mining dispatch (frame-loop simulation)', () => {
         const state = OreState.fromAsset('iron_ore', () => 0.5);
         const result = state.mine(() => 0, { yieldMultiplier: 3 });
         expect(result.currency).toBe('erg');
-        expect(result.valueUnits).toBe(3);
-        expect(result.amount).toBe(10.63920334);
-        expect(result.baseAmount).toBe(1);
+        expect(result.baseValueUsd).toBe(25);
+        expect(result.valueUsd).toBe(75);
+        expect(result.amount).toBe(265.98008341);
         expect(result.yieldMultiplier).toBe(3);
     });
 

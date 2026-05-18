@@ -28,6 +28,7 @@ import {
 import { describeEpochModifier } from './chain/epochModifier.js';
 import { loadMinedState, pruneStaleMinedState } from './mining/minedStore.js';
 import { chainMiningEnabled, makeMiningAdapterFromParams } from './mining/miningAdapter.js';
+import { getEpochPriceSnapshot } from './mining/priceSnapshot.js';
 import { walletFeatureEnabled } from './wallet/walletIdentity.js';
 
 async function main() {
@@ -104,19 +105,27 @@ async function main() {
         fetch: window.fetch.bind(window),
         defaultUrl: 'https://testnet.ckb.dev',
     });
+    const priceSnapshot = await getEpochPriceSnapshot({
+        epoch,
+        storage: safeStorage,
+        fetch: window.fetch.bind(window),
+        allowLive: params.get('prices') !== 'fixed',
+    });
     const t0 = performance.now();
     const stats = generateWorld(game.tileMap, seed);
     const genMs = performance.now() - t0;
     game.renderer.markDirty();
 
     // Build mining state from the procgen output. Same `seed` is mixed
-    // in so per-ore capacity is deterministic across reloads.
+    // in so per-ore capacity and USD value budgets are deterministic
+    // across reloads.
     game.populateOreStates(makeSeededRand(seed ^ 0x70F0));
 
     // Tag the Game with the epoch so _mineOre can persist hits to the
     // correct per-epoch storage key. Null on random seed = no
     // persistence (see minedStore.recordMine).
     game.currentEpoch = epoch;
+    game.priceSnapshot = priceSnapshot;
     const epochModifierState = describeEpochModifier(epochHash);
     game.epochYieldModifier = epochModifierState.multiplier;
 
@@ -185,6 +194,7 @@ async function main() {
         epoch,
         epochHash,
         epochInfo,
+        priceSnapshot,
         epochModifier: epochModifierState,
         ...stats,
     };

@@ -97,6 +97,7 @@ export function miningReceiptPayload(miningTx) {
         capacity_after: next?.capacity_remaining || 0,
         yield_currency: output.currency,
         yield_amount: output.amount,
+        yield_usd_value: output.usd_value,
     };
 }
 

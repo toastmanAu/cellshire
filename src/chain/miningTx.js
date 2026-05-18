@@ -25,6 +25,7 @@ export function buildYieldCell({ walletAccount, oreCell, result }) {
         lock: walletAccount.address,
         currency: result.currency,
         amount: result.amount,
+        usd_value: result.valueUsd ?? null,
         source_ore_type: oreCell.ore_type,
         source_ore_id: oreCell.ore_id,
         mined_at_epoch: oreCell.epoch,

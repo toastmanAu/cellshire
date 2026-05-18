@@ -117,17 +117,16 @@ Target direction:
   ore-like, but HUD, inventory, rewards, and Trader copy speak in the
   crypto symbol/name.
 - Internal currencies are not live tokens at first. On testnet they are
-  local/game balances with a fixed price snapshot seeded from CoinGecko on
-  2026-05-18 at 14:06:32 UTC.
-- Per-epoch value snapshots can later be fetched through a price adapter,
-  likely CoinGecko first. The adapter should run near the existing epoch
-  procgen seed fetch, cache the result by epoch, and fall back to the last
-  known or fixed testnet table when offline.
-- Mined amount should be value-normalized. Expensive crypto associations
-  yield tiny decimal amounts; cheaper associations yield larger amounts.
-  The tuning should target a per-hit USD-value band by rarity/tier, then
-  compute token amount as `target_usd / epoch_price_usd` before applying
-  the epoch modifier.
+  local/game balances with an epoch price snapshot fetched from CoinGecko,
+  cached by epoch, and backed by the fixed 2026-05-18 14:06:32 UTC table
+  when offline.
+- Each spawned mineable receives a deterministic USD value budget in the
+  `$50-$200` range. Mining splits the remaining value across the remaining
+  hits, applies the existing epoch yield modifier, and converts the USD
+  payout to token amount as `payout_usd / epoch_price_usd`.
+- Expensive crypto associations yield tiny decimal amounts; cheaper
+  associations yield larger amounts. The debug overlay surfaces whether
+  prices came from live CoinGecko, epoch cache, or the fixed table.
 - Later mainnet path: mint or update real Nervos UDT/sUDT cells
   programmatically for the chosen currencies. Until then, the same
   currency adapter boundary should keep local/testnet balances and real

@@ -12,7 +12,7 @@ export const TESTNET_PRICE_SNAPSHOT = {
     vsCurrency: 'usd',
 };
 
-export const TESTNET_USD_PER_YIELD_UNIT = 1;
+export const DEFAULT_ORE_VALUE_USD_RANGE = [50, 200];
 
 export const CURRENCY_CATALOG = {
     btc:  { symbol: 'BTC',  displayName: 'Bitcoin',      coingeckoId: 'bitcoin',        pow: true, priceUsd: 76847 },
@@ -60,15 +60,49 @@ export function currencySymbol(currencyId) {
     return CURRENCY_CATALOG[currencyId]?.symbol ?? currencyId;
 }
 
-export function amountForBaseYield(currencyId, baseAmount, {
-    usdPerUnit = TESTNET_USD_PER_YIELD_UNIT,
+export function fixedPriceSnapshot() {
+    const prices = {};
+    for (const [currencyId, cfg] of Object.entries(CURRENCY_CATALOG)) {
+        prices[currencyId] = cfg.priceUsd;
+    }
+    return {
+        ...TESTNET_PRICE_SNAPSHOT,
+        prices,
+        fallback: true,
+    };
+}
+
+export function priceUsdForCurrency(currencyId, priceSnapshot = null) {
+    const snapshotPrice = priceSnapshot?.prices?.[currencyId];
+    if (Number.isFinite(snapshotPrice) && snapshotPrice > 0) return snapshotPrice;
+    const catalogPrice = CURRENCY_CATALOG[currencyId]?.priceUsd;
+    return Number.isFinite(catalogPrice) && catalogPrice > 0 ? catalogPrice : null;
+}
+
+export function amountForUsdValue(currencyId, usdValue, {
+    priceSnapshot = null,
     decimals = 8,
 } = {}) {
-    const cfg = currencyConfig(currencyId);
-    const priceUsd = cfg?.priceUsd;
-    if (!Number.isFinite(priceUsd) || priceUsd <= 0) return baseAmount;
-    const amount = (baseAmount * usdPerUnit) / priceUsd;
+    const priceUsd = priceUsdForCurrency(currencyId, priceSnapshot);
+    if (!Number.isFinite(priceUsd) || priceUsd <= 0) return usdValue;
+    const amount = usdValue / priceUsd;
     return Number(amount.toFixed(decimals));
+}
+
+export function amountForBaseYield(currencyId, baseAmount, {
+    usdPerUnit = 1,
+    priceSnapshot = null,
+    decimals = 8,
+} = {}) {
+    return amountForUsdValue(currencyId, baseAmount * usdPerUnit, {
+        priceSnapshot,
+        decimals,
+    });
+}
+
+export function rollOreValueUsd(rand = Math.random, range = DEFAULT_ORE_VALUE_USD_RANGE) {
+    const [lo, hi] = range;
+    return Number((lo + rand() * (hi - lo)).toFixed(2));
 }
 
 export function formatCurrencyAmount(currencyId, amount) {

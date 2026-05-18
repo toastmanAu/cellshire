@@ -28,12 +28,13 @@ describe('buildMiningTransaction', () => {
         const tx = buildMiningTransaction({
             walletAccount,
             oreCell,
-            result: { oreType: 'coal_seam', currency: 'zec', amount: 0.00381869, depleted: false },
+            result: { oreType: 'coal_seam', currency: 'zec', amount: 0.00381869, valueUsd: 2, depleted: false },
             txNonce: 'test',
         });
         expect(tx.outputs.ore_cell.capacity_remaining).toBe(2);
         expect(tx.outputs.yield_cell.currency).toBe('zec');
         expect(tx.outputs.yield_cell.amount).toBe(0.00381869);
+        expect(tx.outputs.yield_cell.usd_value).toBe(2);
         expect(tx.outputs.yield_cell.source_ore_type).toBe('coal_seam');
         expect(tx.witness.signature).toBe('pending');
     });
