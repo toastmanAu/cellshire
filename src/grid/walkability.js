@@ -13,6 +13,8 @@
  * additions automatically flow to pathfinding and click handling.
  */
 
+import { isOre } from '../mining/oreCatalog.js';
+
 const WALKABLE_TERRAIN = new Set([
     'sand',
     'dirt',
@@ -23,15 +25,8 @@ const WALKABLE_TERRAIN = new Set([
 ]);
 
 const INTERACTABLE_OBJECTS = new Set([
-    'coal_seam',
-    'iron_ore',
-    'copper_ore',
-    'gold_ore',
-    'amethyst_geode',
-    'diamond_ore',
-    'ckb_cluster',
-    // Boulders block movement and do nothing on click yet — leave out
-    // until they get a real interaction (rubble drop? terrain reshape?).
+    // Non-ore object IDs with direct interactions go here. Mineable deposits
+    // are sourced from oreCatalog so the click path cannot drift behind it.
 ]);
 
 const INTERACTABLE_ROLES = new Set([
@@ -53,7 +48,7 @@ export function isInteractable(tileMap, gx, gy) {
     const obj = tileMap.objectAt(gx, gy);
     if (!obj) return false;
     if (INTERACTABLE_ROLES.has(obj.role)) return true;
-    return INTERACTABLE_OBJECTS.has(obj.assetId);
+    return isOre(obj.assetId) || INTERACTABLE_OBJECTS.has(obj.assetId);
 }
 
 /**
