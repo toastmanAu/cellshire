@@ -151,13 +151,28 @@ export const ASSET_MANIFEST = [
         sizeScale: 0.5, flatBase: true,
     },
     {
+        id: 'player_miner_back', name: 'Miner Back', category: 'character', kind: 'object',
+        footprint: { w: 1, d: 1 }, filename: 'player_miner_back.png',
+        sizeScale: 0.5, flatBase: true,
+    },
+    {
         id: 'player_seeker', name: 'Seeker', category: 'character', kind: 'object',
         footprint: { w: 1, d: 1 }, filename: 'player_seeker.png',
         sizeScale: 0.5, flatBase: true,
     },
     {
+        id: 'player_seeker_back', name: 'Seeker Back', category: 'character', kind: 'object',
+        footprint: { w: 1, d: 1 }, filename: 'player_seeker_back.png',
+        sizeScale: 0.5, flatBase: true,
+    },
+    {
         id: 'player_tinker', name: 'Tinker', category: 'character', kind: 'object',
         footprint: { w: 1, d: 1 }, filename: 'player_tinker.png',
+        sizeScale: 0.5, flatBase: true,
+    },
+    {
+        id: 'player_tinker_back', name: 'Tinker Back', category: 'character', kind: 'object',
+        footprint: { w: 1, d: 1 }, filename: 'player_tinker_back.png',
         sizeScale: 0.5, flatBase: true,
     },
 ];

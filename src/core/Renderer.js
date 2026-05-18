@@ -35,7 +35,7 @@
 
 import { CONFIG } from '../config.js';
 import { cellToScreen } from '../grid/IsoGrid.js';
-import { getAsset } from '../assets/assetLoader.js';
+import { allAssets, getAsset } from '../assets/assetLoader.js';
 import { ASSET_INDEX } from '../assets/assetManifest.js';
 
 const TW = CONFIG.tile.w;
@@ -990,7 +990,7 @@ export class Renderer {
         // bottom edge lands at the diamond's front-corner row, centred
         // horizontally on the interpolated player position.
         if (player.assetId) {
-            const asset = getAsset(player.assetId);
+            const asset = this._playerAssetForFacing(player);
             if (asset) {
                 const feetY = player.y + TH / 2;
                 // Contact shadow first (under the feet, scales with sprite).
@@ -1073,6 +1073,15 @@ export class Renderer {
         ctx.strokeRect(box.x + 0.5, bodyY + 0.5, box.w - 1, bodyH - 1);
         ctx.strokeRect(box.x + headPad + 0.5, box.y + 0.5, box.w - headPad * 2 - 1, headH - 1);
         ctx.restore();
+    }
+
+    _playerAssetForFacing(player) {
+        const assets = allAssets();
+        const backId = `${player.assetId}_back`;
+        const assetId = player.facing.startsWith('up') && assets[backId]
+            ? backId
+            : player.assetId;
+        return assets[assetId] || getAsset(player.assetId);
     }
 
     _drawMiningHitObject(obj, t) {

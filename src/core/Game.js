@@ -772,6 +772,7 @@ export class Game {
     }
 
     isAssetVisibleInPalette(assetId) {
+        if (assetId.startsWith('player_') && assetId.endsWith('_back')) return false;
         return this.mapKind !== 'property' || isStarterPropertyAsset(assetId);
     }
 

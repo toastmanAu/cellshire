@@ -1,6 +1,6 @@
 import { describe, it, expect } from '../test/harness.js';
 import { getAvailableCharacters, resolveCharacterChoice, TIERS } from './catalog.js';
-import { PLAYER_SKIN_IDS } from '../assets/assetManifest.js';
+import { ASSET_INDEX, PLAYER_SKIN_IDS } from '../assets/assetManifest.js';
 
 describe('getAvailableCharacters', () => {
     it('returns three default characters', () => {
@@ -20,6 +20,12 @@ describe('getAvailableCharacters', () => {
     it('all default ids exist in PLAYER_SKIN_IDS', () => {
         for (const c of getAvailableCharacters()) {
             expect(PLAYER_SKIN_IDS.includes(c.id)).toBe(true);
+        }
+    });
+
+    it('has a hidden back-facing asset slot for each default character', () => {
+        for (const id of PLAYER_SKIN_IDS) {
+            expect(!!ASSET_INDEX[`${id}_back`]).toBe(true);
         }
     });
 
