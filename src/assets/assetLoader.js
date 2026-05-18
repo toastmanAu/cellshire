@@ -194,6 +194,13 @@ export async function loadAssets(onProgress = () => {}) {
     const total = ASSET_MANIFEST.length;
     let imageCount = 0;
     let fallbackCount = 0;
+    const imageLoads = new Map();
+
+    for (const entry of ASSET_MANIFEST) {
+        if (entry.filename) {
+            imageLoads.set(entry.id, loadImageElement(`assets/${entry.filename}`));
+        }
+    }
 
     for (let i = 0; i < total; i++) {
         const entry = ASSET_MANIFEST[i];
@@ -213,7 +220,7 @@ export async function loadAssets(onProgress = () => {}) {
 
         if (entry.filename) {
             try {
-                const img = await loadImageElement(`assets/${entry.filename}`);
+                const img = await imageLoads.get(entry.id);
                 record = imageToAsset(img, entry.footprint, entry.kind, {
                     sizeScale: entry.sizeScale ?? 1,
                     tileLike:  entry.tileLike === true,

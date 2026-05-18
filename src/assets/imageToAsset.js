@@ -542,11 +542,16 @@ export function imageToAsset(image, footprint, kind, options = {}) {
 }
 
 /**
- * Promise-based image loader. Appends a per-session cache buster to bypass
- * the browser's aggressive image cache when an asset PNG is replaced on
- * disk while the dev server is running.
+ * Promise-based image loader. Keep the cache key stable so a normal reload
+ * can reuse the generated PNG pack. When replacing art during development,
+ * append `?assetBust=<token>` to the page URL to force a one-off refresh.
  */
-const SESSION_BUST = Date.now().toString(36);
+const ASSET_PACK_VERSION = 'asset-pack-20260518';
+
+function assetCacheToken() {
+    if (typeof location === 'undefined') return ASSET_PACK_VERSION;
+    return new URLSearchParams(location.search).get('assetBust') || ASSET_PACK_VERSION;
+}
 
 export function loadImageElement(src) {
     return new Promise((resolve, reject) => {
@@ -555,6 +560,6 @@ export function loadImageElement(src) {
         img.onerror = () => reject(new Error(`Image not found: ${src}`));
         img.decoding = 'async';
         const sep = src.includes('?') ? '&' : '?';
-        img.src = `${src}${sep}v=${SESSION_BUST}`;
+        img.src = `${src}${sep}v=${encodeURIComponent(assetCacheToken())}`;
     });
 }
