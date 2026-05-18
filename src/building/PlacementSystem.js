@@ -44,6 +44,7 @@ export class PlacementSystem {
             footprint: asset.footprint,
             flipH: !!opts.flipH,
             flipV: !!opts.flipV,
+            role: opts.role ?? null,
         });
         this.tileMap.addObject(obj);
         return { kind: 'object', object: obj };

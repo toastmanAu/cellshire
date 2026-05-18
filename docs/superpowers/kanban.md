@@ -13,6 +13,8 @@ cards needed to turn the current prototype into the game described in
 - Per-epoch local mined-state persistence prevents reload double-mining.
 - Epoch hash modifiers produce standard/high-yield/rich shifts that
   multiply mining yield and surface in the epoch HUD.
+- Local-first property zone with a fenced starter claim, mine/home travel,
+  bounded placement, starter owned-asset allow-list, and local persistence.
 - Character picker, persisted character choice, starter character PNGs,
   and directional facing.
 - Build mode remains available via `?dev=1` for property-zone tooling.
@@ -85,19 +87,18 @@ Added deterministic epoch modifier bucketing from the epoch hash, high-value
 HUD state/toast, and multiplier-aware ore yield. Documented the 5% `3x` /
 20% `2x` tuning constants in `docs/DESIGN.md`.
 
-## Next
-
 ### Property Zone MVP
 
-**Goal:** give each player a home/base map distinct from the public mine.
+**Completed:** 2026-05-18
 
-**Acceptance:**
-- Add a property-zone mode/map reachable from the mine.
-- Initial fenced zone has bounded editable cells and uses existing placement tools.
-- Only owned/allowed props can be placed in play mode.
-- Local persistence exists first; chain-backed placed prop cells come later.
+Added a home/property map reachable from the mine through the property HUD
+or mine-side signpost. The starter claim is fenced, uses the existing
+placement toolbar/palette with a starter owned-asset allow-list, rejects
+placement outside the editable bounds, and autosaves locally through a
+property-specific storage key. Chain-backed placed prop cells remain a
+later integration.
 
-## Soon
+## Next
 
 ### Property Expansion Tiers
 
@@ -108,6 +109,8 @@ HUD state/toast, and multiplier-aware ore yield. Documented the 5% `3x` /
 - UI previews locked/unlocked expansion cells.
 - Spending local currency unlocks the next tier.
 - Expansion state is stored in the same resume-state model planned for chain save.
+
+## Soon
 
 ### Resume State Cell Spec
 

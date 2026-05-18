@@ -40,7 +40,8 @@ export class AssetPalette {
     _renderGrid() {
         this.gridEl.innerHTML = '';
         const generated = allAssets();
-        const items = ASSET_MANIFEST.filter(a => a.category === this.game.category);
+        const items = ASSET_MANIFEST.filter(a => a.category === this.game.category
+            && (this.game.isAssetVisibleInPalette?.(a.id) ?? true));
         for (const def of items) {
             const swatch = document.createElement('button');
             swatch.type = 'button';
@@ -83,7 +84,8 @@ export class AssetPalette {
         const visibleIds = Array.from(this.gridEl.querySelectorAll('.swatch'))
             .map(el => el.dataset.assetId);
         const expectedIds = ASSET_MANIFEST
-            .filter(a => a.category === this.game.category)
+            .filter(a => a.category === this.game.category
+                && (this.game.isAssetVisibleInPalette?.(a.id) ?? true))
             .map(a => a.id);
         const sameSet = visibleIds.length === expectedIds.length
             && visibleIds.every((id, i) => id === expectedIds[i]);

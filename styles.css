@@ -518,6 +518,57 @@ html, body {
 .epoch-hud__reload[hidden] { display: none; }
 .epoch-hud__reload:hover { filter: brightness(1.05); }
 
+/* -- Property travel ---------------------------------------------- */
+
+#property-hud {
+    position: fixed;
+    top: calc(78px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    z-index: 18;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1px 8px;
+    width: min(280px, calc(100vw - 24px));
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 252, 244, 0.94);
+    border: 1px solid rgba(31, 42, 55, 0.12);
+    box-shadow: var(--shadow);
+    color: var(--ink);
+    backdrop-filter: blur(8px);
+}
+.property-hud__label {
+    font-size: 12px;
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+.property-hud__detail {
+    grid-column: 1;
+    font-size: 10px;
+    line-height: 1.2;
+    color: var(--ink-soft);
+    white-space: nowrap;
+}
+.property-hud__action {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+    border: 0;
+    border-radius: 6px;
+    background: var(--leaf);
+    color: #fff;
+    font-weight: 800;
+    font-size: 10px;
+    padding: 7px 9px;
+    cursor: pointer;
+}
+.property-hud__action:hover { filter: brightness(1.05); }
+body.mode-property #property-hud {
+    border-color: rgba(61, 115, 85, 0.28);
+    background: rgba(244, 251, 237, 0.96);
+}
+
 /* -- Wallet identity ---------------------------------------------- */
 
 #wallet-hud {

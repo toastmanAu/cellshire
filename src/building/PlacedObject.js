@@ -5,7 +5,7 @@
  */
 
 export class PlacedObject {
-    constructor({ id, assetId, gx, gy, footprint, flipH = false, flipV = false }) {
+    constructor({ id, assetId, gx, gy, footprint, flipH = false, flipV = false, role = null }) {
         this.id = id;             // unique runtime id
         this.assetId = assetId;   // asset manifest key
         this.gx = gx;             // grid x of footprint origin (back-left)
@@ -13,6 +13,7 @@ export class PlacedObject {
         this.footprint = footprint; // { w, d }
         this.flipH = !!flipH;     // mirrored horizontally on the screen
         this.flipV = !!flipV;     // mirrored vertically on the screen
+        this.role = role;         // optional gameplay role (portal, vendor, etc.)
     }
 
     occupies(gx, gy) {
@@ -46,6 +47,7 @@ export class PlacedObject {
             footprint: { ...this.footprint },
             flipH: this.flipH,
             flipV: this.flipV,
+            role: this.role,
         };
     }
 }

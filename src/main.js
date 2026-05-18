@@ -13,6 +13,7 @@ import { generateWorld } from './worldgen/procgen.js';
 import { installPerfHUD } from './ui/PerfHUD.js';
 import { installEpochHUD } from './ui/EpochHUD.js';
 import { installWalletHUD } from './ui/WalletHUD.js';
+import { installPropertyHUD } from './ui/PropertyHUD.js';
 import { installInventoryHUD } from './ui/InventoryHUD.js';
 import { isWalkable } from './grid/walkability.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
@@ -157,6 +158,7 @@ async function main() {
                 catalog,
             });
             game.spawnPlayer(spawn.gx, spawn.gy, { assetId: chosen });
+            game.ensureMinePropertyPortal(spawn);
             installInventoryHUD(game.player);
 
             // No stored / URL choice — show the first-load gate. World
@@ -188,6 +190,7 @@ async function main() {
     };
     installPerfHUD(game, genStats);
     installEpochHUD(game, genStats);
+    installPropertyHUD(game);
     if (walletFeatureEnabled(params) || chainMiningEnabled(params) || cccJoyIdEnabled(params)) {
         const useRealJoyId = cccJoyIdEnabled(params) || cccJoyIdMiningEnabled(params);
         installWalletHUD({

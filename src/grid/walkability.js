@@ -34,6 +34,11 @@ const INTERACTABLE_OBJECTS = new Set([
     // until they get a real interaction (rubble drop? terrain reshape?).
 ]);
 
+const INTERACTABLE_ROLES = new Set([
+    'property_portal',
+    'mine_portal',
+]);
+
 /** True if a cell can be walked into (in-bounds, walkable terrain, no object). */
 export function isWalkable(tileMap, gx, gy) {
     if (!tileMap.inBounds(gx, gy)) return false;
@@ -47,6 +52,7 @@ export function isWalkable(tileMap, gx, gy) {
 export function isInteractable(tileMap, gx, gy) {
     const obj = tileMap.objectAt(gx, gy);
     if (!obj) return false;
+    if (INTERACTABLE_ROLES.has(obj.role)) return true;
     return INTERACTABLE_OBJECTS.has(obj.assetId);
 }
 

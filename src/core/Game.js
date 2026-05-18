@@ -13,6 +13,7 @@ import { InputManager } from './InputManager.js';
 import { Player } from './Player.js';
 import { TileMap } from '../grid/TileMap.js';
 import { PlacementSystem } from '../building/PlacementSystem.js';
+import { PlacedObject } from '../building/PlacedObject.js';
 import { ASSET_INDEX, ASSET_MANIFEST } from '../assets/assetManifest.js';
 import { SaveSystem } from '../storage/SaveSystem.js';
 import { cellToScreen } from '../grid/IsoGrid.js';
@@ -24,6 +25,21 @@ import { playPlacementFor, playMineHit, playMineDeplete } from '../ui/Audio.js';
 import { recordMine } from '../mining/minedStore.js';
 import { LocalMiningAdapter } from '../mining/miningAdapter.js';
 import { safeStorage } from '../lib/safeStorage.js';
+import {
+    addMinePropertyPortal,
+    canEditPropertyCell,
+    canPlacePropertyAsset,
+    createStarterPropertyMap,
+    MINE_PROPERTY_PORTAL_ROLE,
+    PROPERTY_MINE_PORTAL_ROLE,
+    PROPERTY_SPAWN,
+    isStarterPropertyAsset,
+} from '../property/propertyZone.js';
+import {
+    clearPropertyZone,
+    loadPropertyZone,
+    savePropertyZone,
+} from '../property/propertyStore.js';
 
 export class Game {
     constructor(canvas, ui = null) {
@@ -42,6 +58,9 @@ export class Game {
         // 'build' = legacy Mykonos builder, kept for property-zone work.
         // Main.js flips to 'build' when ?dev=1 is set.
         this.mode = 'play';
+        this.mapKind = 'mine';
+        this._mapRuntime = new Map();
+        this._mapListeners = new Set();
 
         // Player avatar — created lazily by main.js once procgen has run
         // and a walkable spawn cell exists. Game still functions without
@@ -100,6 +119,12 @@ export class Game {
         this.camera.centerOn(c.x, c.y, w, h);
     }
 
+    _centerCameraOnCell(gx, gy) {
+        const c = cellToScreen(gx + 0.5, gy + 0.5);
+        const { innerWidth: w, innerHeight: h } = window;
+        this.camera.centerOn(c.x, c.y, w, h);
+    }
+
     /**
      * Place the player at (gx, gy) with an optional skin assetId. The
      * renderer will draw the asset PNG when loaded and fall back to
@@ -117,6 +142,19 @@ export class Game {
         const c = cellToScreen(gx + 0.5, gy + 0.5);
         const { innerWidth: w, innerHeight: h } = window;
         this.camera.centerOn(c.x, c.y, w, h);
+        return true;
+    }
+
+    movePlayerTo(gx, gy) {
+        if (!this.player || !isWalkable(this.tileMap, gx, gy)) return false;
+        const c = cellToScreen(gx + 0.5, gy + 0.5);
+        this.player.gx = gx;
+        this.player.gy = gy;
+        this.player.x = c.x;
+        this.player.y = c.y;
+        this.player.setPath([]);
+        this.renderer.markDirty();
+        this._centerCameraOnCell(gx, gy);
         return true;
     }
 
@@ -191,8 +229,14 @@ export class Game {
     }
 
     save() {
+        if (this.mapKind === 'property') {
+            const ok = savePropertyZone(safeStorage, this.tileMap, this.camera);
+            this.ui?.showToast(ok ? 'Saved your property' : 'Property save failed');
+            return ok;
+        }
         const ok = SaveSystem.save(this.tileMap, this.camera);
         this.ui?.showToast(ok ? 'Saved your island' : 'Save failed');
+        return ok;
     }
 
     load() {
@@ -202,6 +246,12 @@ export class Game {
     }
 
     reset() {
+        if (this.mapKind === 'property') {
+            clearPropertyZone(safeStorage);
+            this._loadPropertyMap(null);
+            this.ui?.showToast('Property reset');
+            return;
+        }
         this.tileMap.clearAll();
         SaveSystem.clear();
         this._centerCamera();
@@ -252,11 +302,15 @@ export class Game {
         this.renderer.hoverCell = cell;
         if (this.tool === 'erase') {
             this.renderer.previewAssetId = null;
-            this.renderer.previewValid = !!this.tileMap.objectAt(cell.gx, cell.gy)
-                || !!this.tileMap.getTerrain(cell.gx, cell.gy);
+            this.renderer.previewValid = this.mapKind === 'property'
+                ? this._canErasePropertyAt(cell.gx, cell.gy)
+                : !!this.tileMap.objectAt(cell.gx, cell.gy)
+                    || !!this.tileMap.getTerrain(cell.gx, cell.gy);
         } else if (this.tool === 'place') {
             this.renderer.previewAssetId = this.selectedAssetId;
-            this.renderer.previewValid = this.placement.canPlace(this.selectedAssetId, cell.gx, cell.gy);
+            this.renderer.previewValid = this.mapKind === 'property'
+                ? this._canPlacePropertyAt(this.selectedAssetId, cell.gx, cell.gy)
+                : this.placement.canPlace(this.selectedAssetId, cell.gx, cell.gy);
         } else {
             this.renderer.previewAssetId = null;
             this.renderer.previewValid = true;
@@ -269,6 +323,11 @@ export class Game {
 
     onPrimaryClick(gx, gy) {
         if (!this.tileMap.inBounds(gx, gy)) return;
+
+        if (this.mapKind === 'property') {
+            this._handlePropertyClick(gx, gy);
+            return;
+        }
 
         if (this.mode === 'play') {
             this._handlePlayClick(gx, gy);
@@ -319,6 +378,7 @@ export class Game {
 
         // Right click always erases.
         if (!this.tileMap.inBounds(gx, gy)) return;
+        if (this.mapKind === 'property' && !this._canErasePropertyAt(gx, gy)) return;
         const objHere = this.tileMap.objectAt(gx, gy);
         const terrainHere = this.tileMap.getTerrain(gx, gy);
         const targetId = objHere ? objHere.assetId : terrainHere;
@@ -360,6 +420,73 @@ export class Game {
         this.renderer.markDirty();
     }
 
+    _handlePropertyClick(gx, gy) {
+        if (this.tool === 'pan') {
+            this._handlePlayClick(gx, gy);
+            return;
+        }
+        if (this.tool === 'erase') {
+            if (!this._canErasePropertyAt(gx, gy)) return;
+            const objHere = this.tileMap.objectAt(gx, gy);
+            const terrainHere = this.tileMap.getTerrain(gx, gy);
+            const targetId = objHere ? objHere.assetId : terrainHere;
+            if (this.placement.erase(gx, gy)) {
+                this.renderer.markDirty();
+                playPlacementFor(targetId);
+                this._autosaveProperty();
+            }
+            return;
+        }
+
+        if (!this._canPlacePropertyAt(this.selectedAssetId, gx, gy)) {
+            this.ui?.showToast?.('That spot is outside your starter plot');
+            return;
+        }
+        const result = this.placement.place(this.selectedAssetId, gx, gy, {
+            flipH: this.flipH,
+            flipV: this.flipV,
+        });
+        if (result?.kind === 'object') {
+            const o = result.object;
+            this.renderer.spawnAnim(`obj-${o.id}`, {
+                gx: o.gx,
+                gy: o.gy,
+                w: o.footprint?.w ?? 1,
+                d: o.footprint?.d ?? 1,
+            });
+            playPlacementFor(o.assetId);
+            this._autosaveProperty();
+        } else if (result?.kind === 'terrain') {
+            this.renderer.spawnAnim(`t-${result.gx},${result.gy}`, {
+                gx: result.gx,
+                gy: result.gy,
+                w: 1,
+                d: 1,
+            });
+            playPlacementFor(result.assetId);
+            this._autosaveProperty();
+        }
+    }
+
+    _canPlacePropertyAt(assetId, gx, gy) {
+        return canPlacePropertyAsset(assetId, gx, gy)
+            && this.placement.canPlace(assetId, gx, gy);
+    }
+
+    _canErasePropertyAt(gx, gy) {
+        const obj = this.tileMap.objectAt(gx, gy);
+        if (obj?.role) return false;
+        if (obj) {
+            const fp = obj.footprint || { w: 1, d: 1 };
+            for (let ix = 0; ix < fp.w; ix++)
+            for (let iy = 0; iy < fp.d; iy++) {
+                if (!canEditPropertyCell(obj.gx + ix, obj.gy + iy)) return false;
+            }
+            return true;
+        }
+        return canEditPropertyCell(gx, gy) && !!this.tileMap.getTerrain(gx, gy);
+    }
+
     /**
      * Build an OreState for every ore PlacedObject currently in the
      * tileMap. Call once after procgen — capacity values are rolled
@@ -382,6 +509,14 @@ export class Game {
      */
     onInteract(gx, gy) {
         const obj = this.tileMap.objectAt(gx, gy);
+        if (obj?.role === MINE_PROPERTY_PORTAL_ROLE) {
+            this.travelToProperty();
+            return;
+        }
+        if (obj?.role === PROPERTY_MINE_PORTAL_ROLE) {
+            this.travelToMine();
+            return;
+        }
         if (obj && isOre(obj.assetId)) {
             this._mineOre(obj);
             return;
@@ -547,6 +682,144 @@ export class Game {
             }, duration, startAt);
         }
         return result;
+    }
+
+    ensureMinePropertyPortal(nearCell) {
+        if (this.tileMap.objects.some(o => o.role === MINE_PROPERTY_PORTAL_ROLE)) return null;
+        const obj = addMinePropertyPortal(this.tileMap, nearCell);
+        if (obj) {
+            this.renderer.spawnAnim(`obj-${obj.id}`, {
+                gx: obj.gx,
+                gy: obj.gy,
+                w: obj.footprint?.w ?? 1,
+                d: obj.footprint?.d ?? 1,
+            }, 520);
+            this.renderer.markDirty();
+        }
+        return obj;
+    }
+
+    travelToProperty() {
+        if (this.mapKind === 'property') return;
+        this._mapRuntime.set('mine', this._captureRuntime());
+        const saved = loadPropertyZone(safeStorage);
+        this._loadPropertyMap(saved);
+        this.ui?.showToast?.('Welcome home', 1800);
+    }
+
+    travelToMine() {
+        if (this.mapKind !== 'property') return;
+        this._autosaveProperty();
+        const mine = this._mapRuntime.get('mine');
+        if (!mine) {
+            this.ui?.showToast?.('Mine map is not loaded');
+            return;
+        }
+        this._restoreRuntime(mine);
+        this.mapKind = 'mine';
+        this.mode = 'play';
+        this._syncBodyModeClass();
+        this._emitMapChange();
+        this.ui?.showToast?.('Back to the mine', 1600);
+    }
+
+    isAssetVisibleInPalette(assetId) {
+        return this.mapKind !== 'property' || isStarterPropertyAsset(assetId);
+    }
+
+    onMapChange(cb) {
+        this._mapListeners.add(cb);
+        return () => this._mapListeners.delete(cb);
+    }
+
+    _loadPropertyMap(saved) {
+        const starter = saved ? null : createStarterPropertyMap();
+        const tileMapData = saved?.tileMap ?? starter.serialize();
+        this.tileMap.deserialize(tileMapData, d => new PlacedObject(d));
+        this.oreStates.clear();
+        this._pendingInteract = null;
+        this._pendingDepletions.clear();
+        this.currentEpoch = null;
+        this.mapKind = 'property';
+        this.mode = 'property';
+        this.selectedAssetId = isStarterPropertyAsset(this.selectedAssetId)
+            ? this.selectedAssetId
+            : 'path';
+        this.category = ASSET_INDEX[this.selectedAssetId]?.category ?? 'terrain';
+        this.tool = 'place';
+        this._resetFlip();
+        this.renderer.markDirty();
+        this.movePlayerTo(PROPERTY_SPAWN.gx, PROPERTY_SPAWN.gy);
+        if (saved?.camera) {
+            this.camera.offsetX = saved.camera.offsetX;
+            this.camera.offsetY = saved.camera.offsetY;
+            this.camera.zoom = saved.camera.zoom;
+        }
+        this._syncBodyModeClass();
+        this.ui?.update();
+        this._emitMapChange();
+    }
+
+    _autosaveProperty() {
+        if (this.mapKind === 'property') savePropertyZone(safeStorage, this.tileMap, this.camera);
+    }
+
+    _captureRuntime() {
+        return {
+            tileMap: this.tileMap.serialize(),
+            camera: {
+                offsetX: this.camera.offsetX,
+                offsetY: this.camera.offsetY,
+                zoom: this.camera.zoom,
+            },
+            playerCell: this.player ? { gx: this.player.gx, gy: this.player.gy } : null,
+            currentEpoch: this.currentEpoch,
+            epochYieldModifier: this.epochYieldModifier,
+            mode: this.mode,
+            mapKind: this.mapKind,
+            oreStates: Array.from(this.oreStates.entries()).map(([id, state]) => ({
+                id,
+                oreType: state.oreType,
+                capacityRemaining: state.capacityRemaining,
+                maxCapacity: state.maxCapacity,
+            })),
+        };
+    }
+
+    _restoreRuntime(runtime) {
+        this.tileMap.deserialize(runtime.tileMap, d => new PlacedObject(d));
+        this.camera.offsetX = runtime.camera.offsetX;
+        this.camera.offsetY = runtime.camera.offsetY;
+        this.camera.zoom = runtime.camera.zoom;
+        this.currentEpoch = runtime.currentEpoch;
+        this.epochYieldModifier = runtime.epochYieldModifier ?? 1;
+        this.mode = runtime.mode;
+        this.mapKind = runtime.mapKind;
+        this.oreStates.clear();
+        for (const entry of runtime.oreStates ?? []) {
+            this.oreStates.set(entry.id, new OreState(
+                entry.oreType,
+                entry.capacityRemaining,
+                entry.maxCapacity,
+            ));
+        }
+        this._pendingInteract = null;
+        this._pendingDepletions.clear();
+        this.renderer.markDirty();
+        if (runtime.playerCell) this.movePlayerTo(runtime.playerCell.gx, runtime.playerCell.gy);
+        this.ui?.update();
+    }
+
+    _syncBodyModeClass() {
+        if (typeof document === 'undefined') return;
+        document.body.classList.toggle('mode-play', this.mode === 'play');
+        document.body.classList.toggle('mode-build', this.mode === 'build');
+        document.body.classList.toggle('mode-property', this.mode === 'property');
+    }
+
+    _emitMapChange() {
+        const state = { mapKind: this.mapKind, mode: this.mode };
+        for (const cb of this._mapListeners) cb(state);
     }
 
     /* ── Frame loop ───────────────────────────────────────────── */
