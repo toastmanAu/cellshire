@@ -87,23 +87,51 @@ lo, hi = bounds_for_ore_type * epoch_modifier
   The HUD surfaces these shifts and local mining yield ranges are
   multiplied before the result is credited.
 
-### Currency types per ore
+### Crypto-denominated internal currencies
 
-**(TBD — placeholder mapping)**
-| Ore           | Currency yielded            |
-|---------------|-----------------------------|
-| coal_seam     | base game currency / coin   |
-| copper_ore    | base game currency          |
-| iron_ore      | base game currency          |
-| gold_ore      | mid-tier game token         |
-| amethyst_geode| crafting reagent token      |
-| diamond_ore   | premium token               |
-| ckb_cluster   | real CKB (small drips)      |
+Mineable deposits should present as crypto currencies rather than generic
+ore currencies. The current implementation has 7 mineable deposit types:
 
-The "real CKB" drip from `ckb_cluster` is the visceral on-chain hook —
-finding one and mining it means you actually receive CKB to your wallet.
-Everything else is in-game currency, with on-chain swap routes between
-them through the trader store.
+| Current deposit id | Current display |
+|--------------------|-----------------|
+| `coal_seam`        | Coal            |
+| `iron_ore`         | Iron            |
+| `copper_ore`       | Copper          |
+| `gold_ore`         | Gold            |
+| `amethyst_geode`   | Amethyst        |
+| `diamond_ore`      | Diamond         |
+| `ckb_cluster`      | CKB Cluster     |
+
+Target direction:
+
+- Expand the mineable set to 10 total deposits before locking the first
+  economy table.
+- Each deposit maps to an internal currency with a crypto association
+  chosen by design, e.g. BTC/ETH/CKB/etc. The visual deposit can stay
+  ore-like, but HUD, inventory, rewards, and Trader copy should speak in
+  the crypto symbol/name.
+- Internal currencies are not live tokens at first. On testnet they are
+  local/game balances with a fixed price snapshot seeded from real-world
+  values at the time the mapping is chosen.
+- Per-epoch value snapshots can later be fetched through a price adapter,
+  likely CoinGecko first. The adapter should run near the existing epoch
+  procgen seed fetch, cache the result by epoch, and fall back to the last
+  known or fixed testnet table when offline.
+- Mined amount should be value-normalized. Expensive crypto associations
+  yield tiny decimal amounts; cheaper associations yield larger amounts.
+  The tuning should target a per-hit USD-value band by rarity/tier, then
+  compute token amount as `target_usd / epoch_price_usd` before applying
+  the epoch modifier.
+- Later mainnet path: mint or update real Nervos UDT/sUDT cells
+  programmatically for the chosen currencies. Until then, the same
+  currency adapter boundary should keep local/testnet balances and real
+  UDT issuance interchangeable.
+
+The "real CKB" drip remains the visceral on-chain hook once live issuance
+lands: finding a CKB-associated deposit and mining it can eventually credit
+actual CKB or a CKB-denominated cell to the wallet. Everything else can
+start as internal currency, with on-chain swap routes through the Trader
+store later.
 
 ### Supply cap + respawn
 

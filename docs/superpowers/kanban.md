@@ -112,6 +112,27 @@ blocked states.
 
 ## Next
 
+### Crypto Ore Economy Mapping
+
+**Goal:** replace generic ore names/rewards with crypto-denominated internal
+currencies and prepare the value model for future market-driven pricing.
+
+**Current mineables:** 7 (`coal_seam`, `iron_ore`, `copper_ore`,
+`gold_ore`, `amethyst_geode`, `diamond_ore`, `ckb_cluster`).
+
+**Acceptance:**
+- Choose 10 total mineable deposit/currency associations.
+- Add three new mineable deposit ids/assets or temporary visual variants.
+- Separate deposit visual id from rewarded currency id/symbol/display name.
+- Add fixed testnet price table based on real-world values at the chosen
+  mapping date.
+- Add a price adapter boundary with CoinGecko as the likely first source;
+  fetch/cache one price snapshot alongside the epoch procgen seed path.
+- Compute mined token amounts from target USD-value bands per tier, coin
+  price, and the existing epoch modifier.
+- Keep all balances internal/local first; document the future Nervos
+  UDT/sUDT issuance path as a mainnet integration.
+
 ## Soon
 
 ### Property Expansion Tiers
