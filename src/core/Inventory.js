@@ -1,10 +1,10 @@
 /**
  * Inventory.js
  *
- * Player's currency balances. Keys are ore asset IDs for now (per the
- * ore-as-currency design choice — Trader store converts between them
- * later). The on-chain version will mirror this 1:1 by replacing each
- * Map entry with an sUDT cell of the same type.
+ * Player's currency balances. Keys are internal crypto currency IDs
+ * from `cryptoEconomy.js` (btc, ckb, rvn, etc.). The on-chain version
+ * will mirror this 1:1 by replacing each Map entry with a UDT cell of
+ * the same type.
  *
  * Subscribers (HUD, toast) can listen via `onChange(cb)` and get a
  * compact `{currency, delta, total}` payload on every mutation.

@@ -2,10 +2,10 @@
  * oreCatalog.js
  *
  * Tunable per-ore-type mining config. Each entry says how many mining
- * hits an ore takes (capacity) and how much currency drops per hit
- * (yield). Currency keys are the ore asset IDs themselves — the Trader
- * store will convert between them later, so we don't need to invent
- * token names yet.
+ * hits an ore takes (capacity) and how much USD-value yield units it
+ * drops per hit. `cryptoEconomy.js` maps ore visuals to internal
+ * proof-of-work currencies and converts those value units into coin
+ * quantities using the fixed testnet price table.
  *
  * Design intent (DESIGN.md §72): common ores have moderate capacity and
  * small per-hit drops (the bread-and-butter grind); rare ores have

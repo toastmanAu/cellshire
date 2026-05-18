@@ -103,8 +103,9 @@ function miningTx() {
         outputs: {
             ore_cell: { capacity_remaining: 2 },
             yield_cell: {
-                currency: 'coal_seam',
-                amount: 1,
+                currency: 'zec',
+                amount: 0.00190934,
+                source_ore_type: 'coal_seam',
             },
         },
         witness: {
@@ -157,6 +158,7 @@ describe('CCC mining submit', () => {
         expect(payload.ore_id).toBe('ore:mine:14455:5:7:coal_seam');
         expect(payload.capacity_before).toBe(3);
         expect(payload.capacity_after).toBe(2);
+        expect(payload.yield_currency).toBe('zec');
     });
 
     it('prepares a CCC transaction with a receipt witness', async () => {
@@ -176,6 +178,7 @@ describe('CCC mining submit', () => {
         expect(prepared.tx.witnesses[0]).toBe('0x');
         expect(prepared.tx.witnesses.length).toBe(2);
         expect(prepared.payload.ore_type).toBe('coal_seam');
+        expect(prepared.payload.yield_currency).toBe('zec');
     });
 
     it('signs and submits through CCC JoyID', async () => {

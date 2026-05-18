@@ -121,26 +121,33 @@ Generated and integrated five new mineable deposit blocks: `silver_ore`,
 now has 12 mineable catalog entries, procgen includes the new deposits, and
 tests assert the mineable set.
 
-## Next
-
 ### Crypto Ore Economy Mapping
 
-**Goal:** replace generic ore names/rewards with crypto-denominated internal
-currencies and prepare the value model for future market-driven pricing.
+**Completed:** 2026-05-18
+
+Mapped all 12 mineable deposits to proof-of-work internal currencies:
+BTC, LTC, DOGE, DASH, XMR, ZEC, CKB, KAS, ERG, BCH, DGB, and RVN. Mining now
+credits crypto currency IDs instead of ore asset IDs, inventory displays
+crypto labels/symbols, and mined amounts are value-normalized through the
+fixed CoinGecko testnet price snapshot captured on 2026-05-18 at 14:06:32 UTC.
+
+## Next
+
+### Epoch Price Snapshot Adapter
+
+**Goal:** refresh the fixed crypto price table near epoch rollover without
+blocking offline/local play.
 
 **Current mineables:** 12 (`coal_seam`, `iron_ore`, `copper_ore`,
 `silver_ore`, `gold_ore`, `lithium_ore`, `cobalt_ore`, `silicon_quartz`,
 `amethyst_geode`, `bismuth_ore`, `diamond_ore`, `ckb_cluster`).
 
 **Acceptance:**
-- Choose crypto currency associations for all 12 mineable deposits.
-- Separate deposit visual id from rewarded currency id/symbol/display name.
-- Add fixed testnet price table based on real-world values at the chosen
-  mapping date.
 - Add a price adapter boundary with CoinGecko as the likely first source;
   fetch/cache one price snapshot alongside the epoch procgen seed path.
-- Compute mined token amounts from target USD-value bands per tier, coin
-  price, and the existing epoch modifier.
+- Keep the fixed 2026-05-18 testnet table as the deterministic offline
+  fallback.
+- Surface snapshot source/time in debug or economy HUD.
 - Keep all balances internal/local first; document the future Nervos
   UDT/sUDT issuance path as a mainnet integration.
 

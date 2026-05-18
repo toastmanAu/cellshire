@@ -20,7 +20,8 @@ import { cellToScreen } from '../grid/IsoGrid.js';
 import { findPath } from '../grid/Pathfinder.js';
 import { isWalkable, isInteractable, findAdjacentWalkable } from '../grid/walkability.js';
 import { OreState } from '../mining/OreState.js';
-import { isOre, oreConfig, oreDisplayName } from '../mining/oreCatalog.js';
+import { formatCurrencyAmount } from '../mining/cryptoEconomy.js';
+import { isOre, oreConfig } from '../mining/oreCatalog.js';
 import { playPlacementFor, playMineHit, playMineDeplete } from '../ui/Audio.js';
 import { CELL_CURSORS } from '../ui/cursors.js';
 import { recordMine } from '../mining/minedStore.js';
@@ -631,14 +632,15 @@ export class Game {
         // null (random seed path — non-deterministic world).
         recordMine(safeStorage, this.currentEpoch, obj.gx, obj.gy, state.capacityRemaining);
 
-        const cfg = oreConfig(result.currency);
+        const cfg = oreConfig(result.oreType);
         const dustColor = cfg?.dustColor ?? '#9d8e74';
         const textColor = cfg?.textColor ?? '#1b5ba8';
+        const rewardText = `+${formatCurrencyAmount(result.currency, result.amount)}`;
         const c = cellToScreen(obj.gx + 0.5, obj.gy + 0.5);
 
         if (result.depleted) {
             // Bigger burst + the staggered double-thud for the crumble.
-            this.renderer.spawnFloatingText(c.x, c.y - 12, `+${result.amount}`, {
+            this.renderer.spawnFloatingText(c.x, c.y - 12, rewardText, {
                 color: textColor,
                 durationMs: 1000,
                 rise: 36,
@@ -660,7 +662,7 @@ export class Game {
                 w: obj.footprint?.w ?? 1,
                 d: obj.footprint?.d ?? 1,
             }, 260);
-            this.renderer.spawnFloatingText(c.x, c.y - 8, `+${result.amount}`, {
+            this.renderer.spawnFloatingText(c.x, c.y - 8, rewardText, {
                 color: textColor,
             });
             this.renderer.spawnDustPuff(c.x, c.y, { color: dustColor });

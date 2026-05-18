@@ -56,7 +56,7 @@ describe('ChainMiningAdapter', () => {
             epoch: '14455',
             obj: { gx: 5, gy: 7, assetId: 'coal_seam' },
             state,
-            result: { currency: 'coal_seam', amount: 1, depleted: false },
+            result: { oreType: 'coal_seam', currency: 'zec', amount: 0.00190934, depleted: false },
         });
         expect(out.ok).toBe(false);
         expect(out.reason).toBe('wallet-disconnected');
@@ -78,12 +78,13 @@ describe('ChainMiningAdapter', () => {
             epoch: '14455',
             obj: { gx: 5, gy: 7, assetId: 'coal_seam' },
             state: new OreState('coal_seam', 2, 3),
-            result: { currency: 'coal_seam', amount: 1, depleted: false },
+            result: { oreType: 'coal_seam', currency: 'zec', amount: 0.00190934, depleted: false },
         });
         expect(out.ok).toBe(true);
         expect(out.txHash).toBe('0xabc');
         expect(submitted.outputs.ore_cell.capacity_remaining).toBe(2);
         expect(submitted.outputs.yield_cell.lock).toBe(account.address);
+        expect(submitted.outputs.yield_cell.currency).toBe('zec');
     });
 
     it('surfaces submit failure without success', async () => {
@@ -98,7 +99,7 @@ describe('ChainMiningAdapter', () => {
             epoch: '14455',
             obj: { gx: 5, gy: 7, assetId: 'coal_seam' },
             state: new OreState('coal_seam', 2, 3),
-            result: { currency: 'coal_seam', amount: 1, depleted: false },
+            result: { oreType: 'coal_seam', currency: 'zec', amount: 0.00190934, depleted: false },
         });
         expect(out.ok).toBe(false);
         expect(out.reason).toBe('signature-cancelled');

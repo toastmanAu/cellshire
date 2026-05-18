@@ -11,6 +11,7 @@
  * for whether the ore is now depleted, or null if already empty.
  */
 
+import { amountForBaseYield, rewardCurrencyForOre } from './cryptoEconomy.js';
 import { oreConfig, randInt } from './oreCatalog.js';
 
 export class OreState {
@@ -58,11 +59,15 @@ export class OreState {
         const baseAmount = cfg
             ? randInt(rand, cfg.yieldRange[0], cfg.yieldRange[1])
             : 1;
+        const valueUnits = baseAmount * multiplier;
+        const currency = rewardCurrencyForOre(this.oreType);
         this.capacityRemaining--;
         return {
-            currency: this.oreType,
-            amount: baseAmount * multiplier,
+            oreType: this.oreType,
+            currency,
+            amount: amountForBaseYield(currency, valueUnits),
             baseAmount,
+            valueUnits,
             yieldMultiplier: multiplier,
             depleted: this.isDepleted(),
         };

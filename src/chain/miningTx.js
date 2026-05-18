@@ -25,6 +25,7 @@ export function buildYieldCell({ walletAccount, oreCell, result }) {
         lock: walletAccount.address,
         currency: result.currency,
         amount: result.amount,
+        source_ore_type: oreCell.ore_type,
         source_ore_id: oreCell.ore_id,
         mined_at_epoch: oreCell.epoch,
     };
@@ -40,8 +41,8 @@ export function buildMiningTransaction({
     if (!oreCell?.ore_id) throw new Error('ore cell required');
     if (!result) throw new Error('mining result required');
     if (oreCell.capacity_remaining <= 0) throw new Error('ore cell is depleted');
-    if (result.currency !== oreCell.ore_type) {
-        throw new Error(`yield currency ${result.currency} does not match ore ${oreCell.ore_type}`);
+    if (result.oreType && result.oreType !== oreCell.ore_type) {
+        throw new Error(`yield source ore ${result.oreType} does not match ore ${oreCell.ore_type}`);
     }
 
     const nextCapacity = oreCell.capacity_remaining - 1;

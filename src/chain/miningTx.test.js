@@ -28,11 +28,13 @@ describe('buildMiningTransaction', () => {
         const tx = buildMiningTransaction({
             walletAccount,
             oreCell,
-            result: { currency: 'coal_seam', amount: 2, depleted: false },
+            result: { oreType: 'coal_seam', currency: 'zec', amount: 0.00381869, depleted: false },
             txNonce: 'test',
         });
         expect(tx.outputs.ore_cell.capacity_remaining).toBe(2);
-        expect(tx.outputs.yield_cell.amount).toBe(2);
+        expect(tx.outputs.yield_cell.currency).toBe('zec');
+        expect(tx.outputs.yield_cell.amount).toBe(0.00381869);
+        expect(tx.outputs.yield_cell.source_ore_type).toBe('coal_seam');
         expect(tx.witness.signature).toBe('pending');
     });
 
@@ -45,12 +47,26 @@ describe('buildMiningTransaction', () => {
         const tx = buildMiningTransaction({
             walletAccount,
             oreCell,
-            result: { currency: 'coal_seam', amount: 1, depleted: true },
+            result: { oreType: 'coal_seam', currency: 'zec', amount: 0.00190934, depleted: true },
         });
         expect(tx.outputs.ore_cell).toBeNull();
     });
 
-    it('throws when yield currency does not match the ore type', () => {
+    it('allows mapped crypto currency when the source ore matches', () => {
+        const oreCell = buildOreCell({
+            epoch: '14455',
+            obj: { gx: 5, gy: 7, assetId: 'coal_seam' },
+            state: new OreState('coal_seam', 3, 5),
+        });
+        const tx = buildMiningTransaction({
+            walletAccount,
+            oreCell,
+            result: { oreType: 'coal_seam', currency: 'zec', amount: 0.00190934, depleted: false },
+        });
+        expect(tx.outputs.yield_cell.currency).toBe('zec');
+    });
+
+    it('throws when result source ore does not match the ore cell', () => {
         const oreCell = buildOreCell({
             epoch: '14455',
             obj: { gx: 5, gy: 7, assetId: 'coal_seam' },
@@ -61,7 +77,7 @@ describe('buildMiningTransaction', () => {
             buildMiningTransaction({
                 walletAccount,
                 oreCell,
-                result: { currency: 'iron_ore', amount: 1, depleted: false },
+                result: { oreType: 'iron_ore', currency: 'erg', amount: 3.5462829, depleted: false },
             });
         } catch {
             threw = true;

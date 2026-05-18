@@ -89,36 +89,36 @@ lo, hi = bounds_for_ore_type * epoch_modifier
 
 ### Crypto-denominated internal currencies
 
-Mineable deposits should present as crypto currencies rather than generic
-ore currencies. The current implementation has 12 mineable deposit types:
+Mineable deposits present as crypto currencies rather than generic ore
+currencies. The current implementation has 12 mineable deposit types mapped
+to proof-of-work internal currencies:
 
-| Current deposit id | Current display |
-|--------------------|-----------------|
-| `coal_seam`        | Coal            |
-| `iron_ore`         | Iron            |
-| `copper_ore`       | Copper          |
-| `silver_ore`       | Silver          |
-| `gold_ore`         | Gold            |
-| `lithium_ore`      | Lithium         |
-| `cobalt_ore`       | Cobalt          |
-| `silicon_quartz`   | Silicon Quartz  |
-| `amethyst_geode`   | Amethyst        |
-| `bismuth_ore`      | Bismuth         |
-| `diamond_ore`      | Diamond         |
-| `ckb_cluster`      | CKB Cluster     |
+| Deposit id         | Deposit display | Currency |
+|--------------------|-----------------|----------|
+| `gold_ore`         | Gold            | BTC      |
+| `silver_ore`       | Silver          | LTC      |
+| `diamond_ore`      | Diamond         | DOGE     |
+| `cobalt_ore`       | Cobalt          | DASH     |
+| `copper_ore`       | Copper          | XMR      |
+| `coal_seam`        | Coal            | ZEC      |
+| `ckb_cluster`      | CKB Cluster     | CKB      |
+| `amethyst_geode`   | Amethyst        | KAS      |
+| `iron_ore`         | Iron            | ERG      |
+| `silicon_quartz`   | Silicon Quartz  | BCH      |
+| `lithium_ore`      | Lithium         | DGB      |
+| `bismuth_ore`      | Bismuth         | RVN      |
 
 Target direction:
 
 - The current 12-deposit set is large enough for the first economy table;
   future deposits should be added only when they create a distinct visual,
   rarity, or crypto-economy role.
-- Each deposit maps to an internal currency with a crypto association
-  chosen by design, e.g. BTC/ETH/CKB/etc. The visual deposit can stay
-  ore-like, but HUD, inventory, rewards, and Trader copy should speak in
-  the crypto symbol/name.
+- Each deposit maps to an internal currency. The visual deposit stays
+  ore-like, but HUD, inventory, rewards, and Trader copy speak in the
+  crypto symbol/name.
 - Internal currencies are not live tokens at first. On testnet they are
-  local/game balances with a fixed price snapshot seeded from real-world
-  values at the time the mapping is chosen.
+  local/game balances with a fixed price snapshot seeded from CoinGecko on
+  2026-05-18 at 14:06:32 UTC.
 - Per-epoch value snapshots can later be fetched through a price adapter,
   likely CoinGecko first. The adapter should run near the existing epoch
   procgen seed fetch, cache the result by epoch, and fall back to the last

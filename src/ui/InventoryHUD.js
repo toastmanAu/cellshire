@@ -11,7 +11,7 @@
  * markup even if currency names ever come from user input later.
  */
 
-import { oreDisplayName } from '../mining/oreCatalog.js';
+import { currencyDisplayName, formatCurrencyAmount } from '../mining/cryptoEconomy.js';
 
 const MAX_ROWS = 6;
 
@@ -43,7 +43,7 @@ export function installInventoryHUD(player) {
         const left = document.createElement('span');
         left.textContent = label;
         const right = document.createElement('strong');
-        right.textContent = String(value);
+        right.textContent = value;
         row.appendChild(left);
         row.appendChild(right);
         return row;
@@ -72,7 +72,10 @@ export function installInventoryHUD(player) {
         card.appendChild(title);
 
         for (const [currency, amount] of entries) {
-            card.appendChild(makeRow(oreDisplayName(currency), amount));
+            card.appendChild(makeRow(
+                currencyDisplayName(currency),
+                formatCurrencyAmount(currency, amount),
+            ));
         }
     }
 
