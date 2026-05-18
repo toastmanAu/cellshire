@@ -38,7 +38,7 @@ async function main() {
 
     await loadAssets((p, label) => {
         fill.style.width = `${Math.round(p * 100)}%`;
-        status.textContent = `crafting ${label}…`;
+        status.textContent = `packing ${label}...`;
     });
 
     // Kick off the UI sound effect download in parallel — it's tiny and
@@ -46,7 +46,7 @@ async function main() {
     loadUiAudio();
 
     fill.style.width = '100%';
-    status.textContent = 'arriving at the harbor';
+    status.textContent = 'entering the quarry';
 
     // Tiny delay for the bar to finish its sweep — feels nicer.
     await new Promise(r => setTimeout(r, 250));

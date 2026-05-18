@@ -97,7 +97,8 @@ export class InputManager {
         this._lastY = sy;
         this._pressedButton = e.button;
 
-        const canBrush = this.game.tool !== 'pan'
+        const canBrush = this.game.mode !== 'play'
+            && this.game.tool !== 'pan'
             && (e.button === 0 || e.button === 2)
             && !e.shiftKey;
         if (canBrush) {

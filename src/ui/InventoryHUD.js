@@ -1,7 +1,7 @@
 /**
  * InventoryHUD.js
  *
- * Floating top-right card listing the player's current ore balances.
+ * Floating bottom-right card listing the player's current ore balances.
  * Subscribes to inventory.onChange and re-renders only when the data
  * changes, so it costs nothing at idle.
  *
@@ -20,9 +20,9 @@ export function installInventoryHUD(player) {
     card.id = 'inventory-hud';
     Object.assign(card.style, {
         position: 'fixed',
-        top: '8px',
-        right: '8px',
-        zIndex: '9998',
+        right: '12px',
+        bottom: '12px',
+        zIndex: '19',
         font: '13px/1.4 system-ui, sans-serif',
         color: '#2b2a26',
         background: 'rgba(251, 246, 236, 0.92)',

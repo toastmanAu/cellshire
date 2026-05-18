@@ -1,6 +1,6 @@
-/* Mykonos Island Voxels — UI styling.
-   The aesthetic: cream/parchment background, soft pastel cards, cobalt-blue accents,
-   warm Mediterranean light. All shapes are CSS only; in-game art is the generated pack. */
+/* Cellshire — UI styling.
+   Quarry-map panels use warm parchment, CKB cobalt, and restrained ore accents.
+   All shapes are CSS only; in-game art is the generated pack. */
 
 :root {
     --cream: #f4ede0;
@@ -20,6 +20,8 @@
     --bougainvillea: #d85b8e;
     --sand: #e8d4a8;
     --water: #6ec8e0;
+    --coal: #2f2b27;
+    --ore-gold: #d9a92f;
     --radius: 14px;
     --radius-sm: 10px;
     --radius-lg: 22px;
@@ -33,9 +35,8 @@
 
 * { box-sizing: border-box; }
 
-/* Play vs build mode. The Mykonos builder toolbar + asset palette only
-   make sense in dev mode (?dev=1); in the default play mode the player
-   walks around with click-to-walk and these panels are hidden. */
+/* Play vs build mode. The placement toolbar + asset palette are hidden in
+   the public mine and become visible in dev/property editing surfaces. */
 body.mode-play #toolbar,
 body.mode-play #palette {
     display: none !important;
@@ -111,7 +112,8 @@ html, body {
     height: 72px;
     margin: 0 auto 12px;
     background:
-        radial-gradient(circle at 50% 40%, var(--cobalt) 0 18%, transparent 19%),
+        radial-gradient(circle at 50% 40%, var(--ore-gold) 0 16%, transparent 17%),
+        linear-gradient(135deg, transparent 42%, var(--coal) 43% 53%, transparent 54%),
         linear-gradient(180deg, #fff 60%, #efe7d3 100%);
     border-radius: 16px;
     box-shadow: inset 0 -6px 0 rgba(0,0,0,0.04);
@@ -121,7 +123,7 @@ html, body {
     content: '';
     position: absolute;
     bottom: 8px; left: 50%; transform: translateX(-50%);
-    width: 30px; height: 4px; background: var(--cobalt);
+    width: 30px; height: 4px; background: var(--coal);
     border-radius: 2px;
 }
 .loading-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
@@ -158,8 +160,9 @@ html, body {
     align-items: center;
     gap: 12px;
     padding: 12px 18px 12px 12px;
-    background: var(--paper);
-    border-radius: var(--radius);
+    background: rgba(251, 246, 236, 0.96);
+    border: 1px solid rgba(47, 43, 39, 0.10);
+    border-radius: var(--radius-sm);
     box-shadow: var(--shadow);
     z-index: 10;
     user-select: none;
@@ -169,6 +172,8 @@ html, body {
     height: 44px;
     border-radius: 10px;
     background:
+        radial-gradient(circle at 50% 34%, var(--ore-gold) 0 18%, transparent 19%),
+        linear-gradient(135deg, transparent 43%, var(--coal) 44% 54%, transparent 55%),
         linear-gradient(180deg, #fff, #f0e6cf);
     position: relative;
     box-shadow: inset 0 -4px 0 rgba(0,0,0,0.04);
@@ -185,7 +190,7 @@ html, body {
     content: '';
     position: absolute;
     width: 4px; height: 14px;
-    background: var(--cobalt);
+    background: var(--coal);
     border-radius: 2px;
     left: 50%; top: 22px; transform: translateX(-50%);
 }
@@ -360,22 +365,23 @@ html, body {
     overflow: hidden;
 }
 
-/* ── HUD (right side) ─────────────────────────────────────────── */
+/* ── HUD (desktop top-right controls) ─────────────────────────── */
 
 #hud {
     position: fixed;
     right: 12px;
-    bottom: 12px;
-    width: 168px;
+    top: calc(12px + env(safe-area-inset-top));
+    width: 280px;
     display: flex;
     flex-direction: row;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px 8px;
-    background: var(--paper);
+    background: rgba(251, 246, 236, 0.96);
+    border: 1px solid rgba(47, 43, 39, 0.10);
     border-radius: var(--radius-sm);
     box-shadow: var(--shadow);
-    padding: 6px 8px;
+    padding: 8px 10px;
     z-index: 10;
     font-size: 11px;
 }
@@ -385,7 +391,7 @@ html, body {
     align-items: center;
     gap: 5px;
     font-weight: 700;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--ink);
 }
 .sun-icon {
@@ -402,10 +408,12 @@ html, body {
     flex-direction: row;
     flex-wrap: wrap;
     gap: 4px 8px;
-    width: 100%;
-    margin-top: 4px;
-    padding-top: 5px;
-    border-top: 1px solid var(--line);
+    width: auto;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+    flex: 1 1 auto;
+    justify-content: flex-end;
 }
 .toggle {
     display: flex;
@@ -449,15 +457,16 @@ html, body {
 #epoch-hud {
     position: fixed;
     top: calc(12px + env(safe-area-inset-top));
-    right: calc(12px + env(safe-area-inset-right));
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 18;
     display: grid;
     grid-template-columns: auto auto;
     align-items: center;
     gap: 1px 8px;
-    max-width: min(280px, calc(100vw - 24px));
+    max-width: min(320px, calc(100vw - 24px));
     padding: 8px 10px;
-    border-radius: var(--radius-sm);
+    border-radius: 8px;
     background: rgba(255, 252, 244, 0.94);
     border: 1px solid rgba(31, 42, 55, 0.12);
     box-shadow: var(--shadow);
@@ -522,7 +531,7 @@ html, body {
 
 #property-hud {
     position: fixed;
-    top: calc(78px + env(safe-area-inset-top));
+    top: calc(66px + env(safe-area-inset-top));
     right: calc(12px + env(safe-area-inset-right));
     z-index: 18;
     display: grid;
@@ -531,7 +540,7 @@ html, body {
     gap: 1px 8px;
     width: min(280px, calc(100vw - 24px));
     padding: 8px 10px;
-    border-radius: var(--radius-sm);
+    border-radius: 8px;
     background: rgba(255, 252, 244, 0.94);
     border: 1px solid rgba(31, 42, 55, 0.12);
     box-shadow: var(--shadow);
@@ -573,7 +582,7 @@ body.mode-property #property-hud {
 
 #wallet-hud {
     position: fixed;
-    top: calc(70px + env(safe-area-inset-top));
+    top: calc(120px + env(safe-area-inset-top));
     right: calc(12px + env(safe-area-inset-right));
     z-index: 18;
     display: grid;
@@ -582,7 +591,7 @@ body.mode-property #property-hud {
     gap: 2px 8px;
     max-width: min(300px, calc(100vw - 24px));
     padding: 8px 10px;
-    border-radius: var(--radius-sm);
+    border-radius: 8px;
     background: rgba(255, 252, 244, 0.94);
     border: 1px solid rgba(31, 42, 55, 0.12);
     box-shadow: var(--shadow);

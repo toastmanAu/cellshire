@@ -177,6 +177,10 @@ export class Renderer {
             if (!Number.isNaN(id)) this._animObjectIds.add(id);
             // The animating object is no longer part of the static cache.
             this._objectsVersion = -1;
+        } else if (key.startsWith('mine-')) {
+            const id = +key.slice('mine-'.length);
+            if (!Number.isNaN(id)) this._animObjectIds.add(id);
+            this._objectsVersion = -1;
         } else if (key.startsWith('deplete-')) {
             // Mining deplete anim — same set-membership as a pop anim so
             // the static cache skips this obj while it fades; the live
@@ -206,6 +210,10 @@ export class Renderer {
                 this._anims.delete(key);
                 if (key.startsWith('obj-')) {
                     const id = +key.slice(4);
+                    if (!Number.isNaN(id)) this._animObjectIds.delete(id);
+                    removedObj = true;
+                } else if (key.startsWith('mine-')) {
+                    const id = +key.slice('mine-'.length);
                     if (!Number.isNaN(id)) this._animObjectIds.delete(id);
                     removedObj = true;
                 } else if (key.startsWith('deplete-')) {
@@ -827,6 +835,7 @@ export class Renderer {
         for (const obj of this.tileMap.objects) {
             if (!this._animObjectIds.has(obj.id)) continue;
             const popT     = this._animT(`obj-${obj.id}`);
+            const hitT     = this._animT(`mine-${obj.id}`);
             const depleteT = this._animT(`deplete-${obj.id}`);
             const asset = getAsset(obj.assetId);
             if (!asset) continue;
@@ -849,6 +858,25 @@ export class Renderer {
                 items.push({
                     key: obj.sortKey(),
                     draw: () => this._drawAnimatingObject(obj, popT),
+                });
+            } else if (hitT != null) {
+                if (this._castsShadow(asset)) {
+                    items.push({
+                        key: obj.sortKey() - 0.5,
+                        draw: () => {
+                            const prev = ctx.globalAlpha;
+                            ctx.globalAlpha = prev * SHADOW_ALPHA;
+                            this._drawShadowFor(ctx, asset, obj.gx, obj.gy, obj.footprint, {
+                                flipH: obj.flipH,
+                                flipV: obj.flipV,
+                            });
+                            ctx.globalAlpha = prev;
+                        },
+                    });
+                }
+                items.push({
+                    key: obj.sortKey(),
+                    draw: () => this._drawMiningHitObject(obj, hitT),
                 });
             } else if (depleteT != null) {
                 // Mining crumble: shrink + fade. Shadow fades alongside.
@@ -945,6 +973,10 @@ export class Renderer {
      */
     _drawPlayer(player) {
         const ctx = this.ctx;
+        const walking = player.isMoving();
+        const stepPhase = walking ? performance.now() / 115 : 0;
+        const bob = walking ? Math.abs(Math.sin(stepPhase)) * 3 : 0;
+        const shadowSquash = walking ? 1 - Math.abs(Math.sin(stepPhase)) * 0.10 : 1;
 
         // Asset path: if the player has a skin asset id AND it's loaded
         // (PNG present + processed), draw the sprite instead of the cube.
@@ -956,14 +988,14 @@ export class Renderer {
             if (asset) {
                 const feetY = player.y + TH / 2;
                 const drawX = player.x - asset.anchorX;
-                const drawY = feetY - asset.height;
+                const drawY = feetY - asset.height - bob;
                 // Contact shadow first (under the feet, scales with sprite).
                 // The shadow is symmetric so it doesn't flip with facing.
                 ctx.save();
                 ctx.globalAlpha *= 0.32;
                 ctx.fillStyle = 'rgba(30, 22, 8, 1)';
                 ctx.beginPath();
-                ctx.ellipse(player.x, feetY, asset.width * 0.32, TH * 0.18, 0, 0, Math.PI * 2);
+                ctx.ellipse(player.x, feetY, asset.width * 0.32 * shadowSquash, TH * 0.18, 0, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
                 const src = asset.displayCanvas || asset.canvas;
@@ -1002,10 +1034,12 @@ export class Renderer {
         ctx.globalAlpha *= 0.32;
         ctx.fillStyle = 'rgba(30, 22, 8, 1)';
         ctx.beginPath();
-        ctx.ellipse(box.x + box.w / 2, box.y + box.h, box.w * 0.42, box.h * 0.06, 0, 0, Math.PI * 2);
+        ctx.ellipse(box.x + box.w / 2, box.y + box.h, box.w * 0.42 * shadowSquash, box.h * 0.06, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
 
+        ctx.save();
+        ctx.translate(0, -bob);
         // Body block (3 voxels tall) with a subtle vertical gradient so
         // the cube faces read.
         const bodyH = Math.round(box.h * 0.7);
@@ -1033,6 +1067,39 @@ export class Renderer {
         ctx.lineWidth = 1;
         ctx.strokeRect(box.x + 0.5, bodyY + 0.5, box.w - 1, bodyH - 1);
         ctx.strokeRect(box.x + headPad + 0.5, box.y + 0.5, box.w - headPad * 2 - 1, headH - 1);
+        ctx.restore();
+    }
+
+    _drawMiningHitObject(obj, t) {
+        const ctx = this.ctx;
+        const asset = getAsset(obj.assetId);
+        if (!asset) return;
+        const { x, y } = cellToScreen(obj.gx, obj.gy);
+        const dx = x - asset.anchorX;
+        const dy = y - asset.anchorY;
+        const impact = Math.sin(t * Math.PI);
+        const recoil = -5 * impact;
+        const squashX = 1 + 0.06 * impact;
+        const squashY = 1 - 0.04 * impact;
+        const pivot = cellToScreen(obj.gx + obj.footprint.w / 2, obj.gy + obj.footprint.d / 2);
+        if (asset.flatBase) {
+            pivot.y += (obj.footprint.w + obj.footprint.d) * TH / 4;
+        }
+        ctx.save();
+        ctx.translate(pivot.x, pivot.y);
+        ctx.scale(squashX, squashY);
+        ctx.translate(-pivot.x, -pivot.y + recoil);
+        this._drawAssetImage(ctx, asset, dx, dy, obj.gx, obj.gy, obj.footprint, {
+            flipH: obj.flipH,
+            flipV: obj.flipV,
+        });
+        ctx.globalAlpha *= 0.22 * (1 - t);
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fillStyle = '#ffe08a';
+        ctx.beginPath();
+        ctx.ellipse(pivot.x, pivot.y - 12, asset.width * 0.35, TH * 0.35, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 
     _drawAnimatingObject(obj, t) {

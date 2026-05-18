@@ -98,7 +98,21 @@ placement outside the editable bounds, and autosaves locally through a
 property-specific storage key. Chain-backed placed prop cells remain a
 later integration.
 
+### HUD Layout + Cellshire Polish
+
+**Completed:** 2026-05-18
+
+Reworked the desktop HUD stack: inventory bottom-right, time/toggles
+top-right, epoch top-middle, map label under time, and debug overlay under
+the Cellshire title block. Replaced first-load Mykonos copy with Cellshire
+language. Fixed play-mode desktop clicks so walking/mining are not consumed
+by builder brush input, added visible walk bob and mining hit pulse, and
+added contextual cursors for walk, mining, POI, build, erase, pan, and
+blocked states.
+
 ## Next
+
+## Soon
 
 ### Property Expansion Tiers
 
@@ -109,8 +123,6 @@ later integration.
 - UI previews locked/unlocked expansion cells.
 - Spending local currency unlocks the next tier.
 - Expansion state is stored in the same resume-state model planned for chain save.
-
-## Soon
 
 ### Resume State Cell Spec
 

@@ -22,6 +22,7 @@ import { isWalkable, isInteractable, findAdjacentWalkable } from '../grid/walkab
 import { OreState } from '../mining/OreState.js';
 import { isOre, oreConfig, oreDisplayName } from '../mining/oreCatalog.js';
 import { playPlacementFor, playMineHit, playMineDeplete } from '../ui/Audio.js';
+import { CELL_CURSORS } from '../ui/cursors.js';
 import { recordMine } from '../mining/minedStore.js';
 import { LocalMiningAdapter } from '../mining/miningAdapter.js';
 import { safeStorage } from '../lib/safeStorage.js';
@@ -163,9 +164,9 @@ export class Game {
     setTool(t) {
         this.tool = t;
         this.renderer.eraseMode = (t === 'erase');
-        this.canvas.style.cursor = t === 'pan' ? 'grab'
-                                  : t === 'erase' ? 'crosshair'
-                                  : 'crosshair';
+        this.canvas.style.cursor = t === 'pan' ? CELL_CURSORS.pan
+                                  : t === 'erase' ? CELL_CURSORS.erase
+                                  : CELL_CURSORS.place;
         this.renderer.markDirty();
         this.ui?.update();
     }
@@ -235,7 +236,7 @@ export class Game {
             return ok;
         }
         const ok = SaveSystem.save(this.tileMap, this.camera);
-        this.ui?.showToast(ok ? 'Saved your island' : 'Save failed');
+        this.ui?.showToast(ok ? 'Saved your map' : 'Save failed');
         return ok;
     }
 
@@ -289,7 +290,7 @@ export class Game {
             playPlacementFor('grass');
             this.ui?.showToast(`Filled ${filled} ${filled === 1 ? 'tile' : 'tiles'} with grass`);
         } else {
-            this.ui?.showToast('Grid already covered');
+            this.ui?.showToast('Claim already covered');
         }
         return filled;
     }
@@ -315,6 +316,7 @@ export class Game {
             this.renderer.previewAssetId = null;
             this.renderer.previewValid = true;
         }
+        this._syncCursorForCell(cell);
         // Only invalidate the next frame when the highlighted cell or its
         // validity actually changed. Hover events fire on every mousemove
         // pixel, so this matters.
@@ -487,6 +489,40 @@ export class Game {
         return canEditPropertyCell(gx, gy) && !!this.tileMap.getTerrain(gx, gy);
     }
 
+    _syncCursorForCell(cell) {
+        if (!this.tileMap.inBounds(cell.gx, cell.gy)) {
+            this.canvas.style.cursor = CELL_CURSORS.blocked;
+            return;
+        }
+        if (this.tool === 'pan') {
+            this.canvas.style.cursor = CELL_CURSORS.pan;
+            return;
+        }
+        if (this.mapKind === 'property') {
+            if (this.tool === 'erase') {
+                this.canvas.style.cursor = this._canErasePropertyAt(cell.gx, cell.gy)
+                    ? CELL_CURSORS.erase
+                    : CELL_CURSORS.blocked;
+                return;
+            }
+            this.canvas.style.cursor = this._canPlacePropertyAt(this.selectedAssetId, cell.gx, cell.gy)
+                ? CELL_CURSORS.place
+                : CELL_CURSORS.blocked;
+            return;
+        }
+
+        const obj = this.tileMap.objectAt(cell.gx, cell.gy);
+        if (obj && isOre(obj.assetId)) {
+            this.canvas.style.cursor = CELL_CURSORS.mine;
+        } else if (isInteractable(this.tileMap, cell.gx, cell.gy)) {
+            this.canvas.style.cursor = CELL_CURSORS.interact;
+        } else if (isWalkable(this.tileMap, cell.gx, cell.gy)) {
+            this.canvas.style.cursor = CELL_CURSORS.walk;
+        } else {
+            this.canvas.style.cursor = CELL_CURSORS.blocked;
+        }
+    }
+
     /**
      * Build an OreState for every ore PlacedObject currently in the
      * tileMap. Call once after procgen — capacity values are rolled
@@ -618,6 +654,12 @@ export class Game {
             playMineDeplete();
             this._startDepletion(obj);
         } else {
+            this.renderer.spawnAnim(`mine-${obj.id}`, {
+                gx: obj.gx,
+                gy: obj.gy,
+                w: obj.footprint?.w ?? 1,
+                d: obj.footprint?.d ?? 1,
+            }, 260);
             this.renderer.spawnFloatingText(c.x, c.y - 8, `+${result.amount}`, {
                 color: textColor,
             });
