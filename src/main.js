@@ -14,7 +14,7 @@ import { installPerfHUD } from './ui/PerfHUD.js';
 import { installEpochHUD } from './ui/EpochHUD.js';
 import { installWalletHUD } from './ui/WalletHUD.js';
 import { installPropertyHUD } from './ui/PropertyHUD.js';
-import { installInventoryHUD } from './ui/InventoryHUD.js';
+import { installEconomyHUD } from './ui/EconomyHUD.js';
 import { isWalkable } from './grid/walkability.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
 import { safeStorage } from './lib/safeStorage.js';
@@ -172,7 +172,11 @@ async function main() {
             });
             game.spawnPlayer(spawn.gx, spawn.gy, { assetId: chosen });
             game.ensureMinePropertyPortal(spawn);
-            installInventoryHUD(game.player);
+            installEconomyHUD({
+                player: game.player,
+                game,
+                priceSnapshot,
+            });
 
             // No stored / URL choice — show the first-load gate. World
             // is already rendering, so the picker overlays on top of it.

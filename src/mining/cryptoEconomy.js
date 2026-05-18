@@ -113,3 +113,21 @@ export function formatCurrencyAmount(currencyId, amount) {
     if (abs >= 1) return `${amount.toFixed(4)} ${symbol}`;
     return `${amount.toFixed(8).replace(/0+$/, '').replace(/\.$/, '')} ${symbol}`;
 }
+
+export function usdValueForAmount(currencyId, amount, priceSnapshot = null) {
+    const priceUsd = priceUsdForCurrency(currencyId, priceSnapshot);
+    if (!Number.isFinite(priceUsd)) return null;
+    return amount * priceUsd;
+}
+
+export function formatUsd(value) {
+    if (!Number.isFinite(value)) return 'n/a';
+    const abs = Math.abs(value);
+    if (abs >= 1000) {
+        return `$${value.toLocaleString(undefined, {
+            maximumFractionDigits: 0,
+        })}`;
+    }
+    if (abs >= 1) return `$${value.toFixed(2)}`;
+    return `$${value.toFixed(4)}`;
+}
