@@ -22,19 +22,25 @@ import { CONFIG } from '../config.js';
 
 const TW = CONFIG.tile.w;
 const TH = CONFIG.tile.h;
+const MAX_PREPROCESS_EDGE = 768;
 
 /**
  * Crop transparent borders off an HTMLImageElement and return a canvas
  * containing just the visible pixels.
  */
 export function trimTransparent(image) {
-    const w0 = image.naturalWidth || image.width;
-    const h0 = image.naturalHeight || image.height;
+    const srcW = image.naturalWidth || image.width;
+    const srcH = image.naturalHeight || image.height;
+    const scale = Math.min(1, MAX_PREPROCESS_EDGE / Math.max(srcW, srcH));
+    const w0 = Math.max(1, Math.round(srcW * scale));
+    const h0 = Math.max(1, Math.round(srcH * scale));
     const tmp = document.createElement('canvas');
     tmp.width = w0;
     tmp.height = h0;
     const tctx = tmp.getContext('2d');
-    tctx.drawImage(image, 0, 0);
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = 'high';
+    tctx.drawImage(image, 0, 0, w0, h0);
 
     let data;
     try {
@@ -546,7 +552,7 @@ export function imageToAsset(image, footprint, kind, options = {}) {
  * can reuse the generated PNG pack. When replacing art during development,
  * append `?assetBust=<token>` to the page URL to force a one-off refresh.
  */
-const ASSET_PACK_VERSION = 'asset-pack-20260518';
+const ASSET_PACK_VERSION = 'asset-pack-20260518-fastload';
 
 function assetCacheToken() {
     if (typeof location === 'undefined') return ASSET_PACK_VERSION;

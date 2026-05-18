@@ -47,6 +47,7 @@ const MAX_ZOOM    = 3.0;
 const DISPLAY_SUPERSAMPLE = Math.max(2, Math.ceil(MAX_ZOOM * DEFAULT_DPR));
 const SHADOW_SUPERSAMPLE  = 1;
 const SHADOW_BLUR_PX      = 6;
+const IMAGE_LOAD_AHEAD    = 6;
 
 /**
  * Pre-render an asset's source canvas down to a draw-ready canvas at the
@@ -196,14 +197,21 @@ export async function loadAssets(onProgress = () => {}) {
     let fallbackCount = 0;
     const imageLoads = new Map();
 
-    for (const entry of ASSET_MANIFEST) {
-        if (entry.filename) {
+    const queueImageLoad = entry => {
+        if (!entry?.filename) return null;
+        if (!imageLoads.has(entry.id)) {
             imageLoads.set(entry.id, loadImageElement(`assets/${entry.filename}`));
         }
+        return imageLoads.get(entry.id);
+    };
+
+    for (let i = 0; i < Math.min(total, IMAGE_LOAD_AHEAD); i++) {
+        queueImageLoad(ASSET_MANIFEST[i]);
     }
 
     for (let i = 0; i < total; i++) {
         const entry = ASSET_MANIFEST[i];
+        queueImageLoad(ASSET_MANIFEST[i + IMAGE_LOAD_AHEAD]);
         const meta = {
             id: entry.id,
             name: entry.name,
@@ -220,7 +228,7 @@ export async function loadAssets(onProgress = () => {}) {
 
         if (entry.filename) {
             try {
-                const img = await imageLoads.get(entry.id);
+                const img = await queueImageLoad(entry);
                 record = imageToAsset(img, entry.footprint, entry.kind, {
                     sizeScale: entry.sizeScale ?? 1,
                     tileLike:  entry.tileLike === true,

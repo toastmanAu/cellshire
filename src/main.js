@@ -33,6 +33,7 @@ import { getEpochPriceSnapshot } from './mining/priceSnapshot.js';
 import { walletFeatureEnabled } from './wallet/walletIdentity.js';
 
 async function main() {
+    document.body.dataset.cellshireBoot = 'loading';
     const fill = document.getElementById('loading-fill');
     const status = document.getElementById('loading-status');
     const loadingScreen = document.getElementById('loading-screen');
@@ -226,6 +227,7 @@ async function main() {
 
     loadingScreen.classList.add('hidden');
     app.classList.remove('hidden');
+    document.body.dataset.cellshireBoot = 'ready';
 }
 
 /**
@@ -375,6 +377,7 @@ function makeSeededRand(seed) {
 
 main().catch(err => {
     console.error(err);
+    document.body.dataset.cellshireBoot = 'error';
     document.getElementById('loading-status').textContent =
         `Something went wrong: ${err.message}`;
 });
