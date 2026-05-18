@@ -27,10 +27,11 @@
     --radius-lg: 22px;
     --edge-gap: 16px;
     --left-rail-width: 72px;
-    /* Title card height (roughly): 12px padding + 44px logo + 12px padding ≈ 68px.
+    --brand-font: 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    /* Title card height (roughly): 12px padding + 52px logo + 12px padding ≈ 76px.
        Toolbar anchors directly under this with a single edge-gap so the title
        and toolbar read as one connected left rail rather than two floating cards. */
-    --title-card-height: 68px;
+    --title-card-height: 76px;
 }
 
 * { box-sizing: border-box; }
@@ -108,25 +109,22 @@ html, body {
     width: 360px;
 }
 .loading-logo {
-    width: 72px;
-    height: 72px;
+    width: 86px;
+    height: 86px;
     margin: 0 auto 12px;
-    background:
-        radial-gradient(circle at 50% 40%, var(--ore-gold) 0 16%, transparent 17%),
-        linear-gradient(135deg, transparent 42%, var(--coal) 43% 53%, transparent 54%),
-        linear-gradient(180deg, #fff 60%, #efe7d3 100%);
-    border-radius: 16px;
-    box-shadow: inset 0 -6px 0 rgba(0,0,0,0.04);
-    position: relative;
+    background: url('assets/cellshire_logo.png') center / contain no-repeat;
+    filter: drop-shadow(0 10px 18px rgba(43, 42, 38, 0.18));
 }
 .loading-logo::after {
-    content: '';
-    position: absolute;
-    bottom: 8px; left: 50%; transform: translateX(-50%);
-    width: 30px; height: 4px; background: var(--coal);
-    border-radius: 2px;
+    display: none;
 }
-.loading-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.loading-title {
+    font-family: var(--brand-font);
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--cobalt);
+}
 .loading-sub   { color: var(--muted); margin-top: 4px; font-size: 13px; }
 
 .loading-bar {
@@ -168,37 +166,25 @@ html, body {
     user-select: none;
 }
 .title-logo {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
-    background:
-        radial-gradient(circle at 50% 34%, var(--ore-gold) 0 18%, transparent 19%),
-        linear-gradient(135deg, transparent 43%, var(--coal) 44% 54%, transparent 55%),
-        linear-gradient(180deg, #fff, #f0e6cf);
-    position: relative;
-    box-shadow: inset 0 -4px 0 rgba(0,0,0,0.04);
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+    background: url('assets/cellshire_logo.png') center / contain no-repeat;
+    filter: drop-shadow(0 4px 8px rgba(43, 42, 38, 0.16));
 }
 .title-logo::before {
-    content: '';
-    position: absolute;
-    width: 26px; height: 14px;
-    border-radius: 13px 13px 0 0;
-    background: var(--cobalt);
-    left: 50%; top: 8px; transform: translateX(-50%);
+    display: none;
 }
 .title-logo::after {
-    content: '';
-    position: absolute;
-    width: 4px; height: 14px;
-    background: var(--coal);
-    border-radius: 2px;
-    left: 50%; top: 22px; transform: translateX(-50%);
+    display: none;
 }
 .title-text h1 {
     margin: 0;
-    font-size: 20px;
+    font-family: var(--brand-font);
+    font-size: 23px;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    line-height: 1;
+    letter-spacing: 0;
     color: var(--cobalt);
 }
 .title-text p {
@@ -839,13 +825,11 @@ body.mode-property #property-hud {
         border-radius: var(--radius-sm);
     }
     .title-logo {
-        width: 36px;
-        height: 36px;
-        border-radius: 8px;
+        width: 38px;
+        height: 38px;
+        flex-basis: 38px;
     }
-    .title-logo::before { width: 22px; height: 12px; top: 6px; }
-    .title-logo::after  { width: 3px; height: 12px; top: 18px; }
-    .title-text h1 { font-size: 15px; line-height: 1.1; }
+    .title-text h1 { font-size: 18px; line-height: 1; }
     .title-text p  { display: none; }
 
     /* Toolbar: drop the labels (icons are already self-evident at this
@@ -946,8 +930,8 @@ body.mode-property #property-hud {
     #title-card {
         padding: 6px 10px 6px 6px;
     }
-    .title-logo { width: 32px; height: 32px; }
-    .title-text h1 { font-size: 14px; }
+    .title-logo { width: 34px; height: 34px; flex-basis: 34px; }
+    .title-text h1 { font-size: 16px; }
     .title-text p  { display: none; }
 
     #toolbar {
@@ -1028,8 +1012,9 @@ body.mode-property #property-hud {
 
 .char-picker__panel h1 {
     margin: 0 0 4px;
+    font-family: var(--brand-font);
     font-size: 1.6rem;
-    letter-spacing: 0.18em;
+    letter-spacing: 0;
     color: #f5e9c8;
 }
 
