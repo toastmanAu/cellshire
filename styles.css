@@ -111,7 +111,7 @@ html, body {
 .loading-logo {
     width: 86px;
     height: 86px;
-    margin: 0 auto 12px;
+    margin: -8px auto 18px;
     display: grid;
     place-items: center;
     background: transparent;
@@ -164,6 +164,7 @@ html, body {
     position: fixed;
     top: 16px;
     left: 16px;
+    min-height: var(--title-card-height);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -179,8 +180,10 @@ html, body {
     width: 52px;
     height: 52px;
     flex: 0 0 52px;
+    align-self: center;
     display: grid;
     place-items: center;
+    margin-block: auto;
     background: transparent;
     filter: drop-shadow(0 4px 8px rgba(43, 42, 38, 0.16));
 }
@@ -189,6 +192,12 @@ html, body {
 }
 .title-logo::after {
     display: none;
+}
+.title-text {
+    min-height: 52px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 .title-text h1 {
     margin: 0;
@@ -841,6 +850,7 @@ body.mode-property #property-hud {
         height: 38px;
         flex-basis: 38px;
     }
+    .title-text { min-height: 38px; }
     .title-text h1 { font-size: 18px; line-height: 1; }
     .title-text p  { display: none; }
 
