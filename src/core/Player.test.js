@@ -30,4 +30,14 @@ describe('Player.facing', () => {
         p.setPath([]);                    // stop
         expect(p.facing).toBe('left');
     });
+
+    it('advances the walk cycle only while moving', () => {
+        const p = new Player({ gx: 5, gy: 5 });
+        expect(p.walkCycle).toBe(0);
+        p.tick(0.1);
+        expect(p.walkCycle).toBe(0);
+        p.setPath([{ gx: 6, gy: 5 }]);
+        p.tick(0.1);
+        expect(p.walkCycle > 0).toBe(true);
+    });
 });

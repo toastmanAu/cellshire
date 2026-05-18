@@ -974,9 +974,15 @@ export class Renderer {
     _drawPlayer(player) {
         const ctx = this.ctx;
         const walking = player.isMoving();
-        const stepPhase = walking ? performance.now() / 115 : 0;
-        const bob = walking ? Math.abs(Math.sin(stepPhase)) * 3 : 0;
-        const shadowSquash = walking ? 1 - Math.abs(Math.sin(stepPhase)) * 0.10 : 1;
+        const stepPhase = walking ? player.walkCycle : 0;
+        const stride = walking ? Math.sin(stepPhase) : 0;
+        const lift = walking ? Math.abs(stride) : 0;
+        const bob = lift * 4;
+        const sway = walking ? Math.sin(stepPhase * 0.5) * 1.4 : 0;
+        const lean = walking ? stride * 0.035 : 0;
+        const squashX = walking ? 1 - lift * 0.025 : 1;
+        const squashY = walking ? 1 + lift * 0.025 : 1;
+        const shadowSquash = walking ? 1 - lift * 0.12 : 1;
 
         // Asset path: if the player has a skin asset id AND it's loaded
         // (PNG present + processed), draw the sprite instead of the cube.
@@ -987,8 +993,6 @@ export class Renderer {
             const asset = getAsset(player.assetId);
             if (asset) {
                 const feetY = player.y + TH / 2;
-                const drawX = player.x - asset.anchorX;
-                const drawY = feetY - asset.height - bob;
                 // Contact shadow first (under the feet, scales with sprite).
                 // The shadow is symmetric so it doesn't flip with facing.
                 ctx.save();
@@ -997,28 +1001,24 @@ export class Renderer {
                 ctx.beginPath();
                 ctx.ellipse(player.x, feetY, asset.width * 0.32 * shadowSquash, TH * 0.18, 0, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.restore();
-                const src = asset.displayCanvas || asset.canvas;
-                if (player.facing === 'left') {
-                    // Mirror around player.x. After scale(-1,1), drawing at
-                    // x_arg places pixels such that the image's anchor pixel
-                    // (originally anchorX from the source's left) lands at
-                    // screen x = -x_arg - anchorX. Setting that = player.x
-                    // gives x_arg = -(player.x + anchorX). Note: this is
-                    // symmetric with the unflipped drawX = player.x - anchorX.
-                    ctx.save();
-                    ctx.scale(-1, 1);
-                    ctx.drawImage(
-                        src,
-                        -(player.x + asset.anchorX),
-                        drawY,
-                        asset.width,
-                        asset.height,
-                    );
-                    ctx.restore();
-                } else {
-                    ctx.drawImage(src, drawX, drawY, asset.width, asset.height);
+                if (walking) {
+                    const footGap = Math.max(5, asset.width * 0.12);
+                    const lead = stride >= 0 ? 1 : -1;
+                    ctx.globalAlpha *= 0.65;
+                    ctx.beginPath();
+                    ctx.ellipse(player.x + lead * footGap, feetY + 1, asset.width * 0.11, TH * 0.055, 0, 0, Math.PI * 2);
+                    ctx.ellipse(player.x - lead * footGap * 0.75, feetY + 2, asset.width * 0.08, TH * 0.045, 0, 0, Math.PI * 2);
+                    ctx.fill();
                 }
+                ctx.restore();
+
+                const src = asset.displayCanvas || asset.canvas;
+                const facing = player.facing === 'left' ? -1 : 1;
+                ctx.save();
+                ctx.translate(player.x + sway * facing, feetY - bob);
+                ctx.transform(facing * squashX, 0, lean * facing, squashY, 0, 0);
+                ctx.drawImage(src, -asset.anchorX, -asset.height, asset.width, asset.height);
+                ctx.restore();
                 return;
             }
             // Asset id set but PNG not loaded → drop through to the cube

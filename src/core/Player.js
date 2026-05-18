@@ -48,6 +48,10 @@ export class Player {
         // canonical PNG orientation; 'left' triggers a horizontal flip
         // in the renderer. Updated once per step in _advanceTarget.
         this.facing = 'right';
+        // Continuous movement clock in radians. Advanced only by `tick`
+        // while the avatar actually travels, so visual stride is tied to
+        // path motion rather than wall-clock time.
+        this.walkCycle = 0;
     }
 
     /** Replace the current path. Empty array stops the player on the spot. */
@@ -92,6 +96,7 @@ export class Player {
         const ratio = stepPx / remainingPx;
         this.x += (this._target.x - this.x) * ratio;
         this.y += (this._target.y - this.y) * ratio;
+        this.walkCycle = (this.walkCycle + dtSec * this.speed * Math.PI * 2.2) % (Math.PI * 2);
         return true;
     }
 
