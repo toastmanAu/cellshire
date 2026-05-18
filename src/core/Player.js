@@ -44,10 +44,11 @@ export class Player {
         // back to the cobalt-cube placeholder. Lets us wire all three
         // character slots before the PNGs land.
         this.assetId = assetId;
-        // Two-way facing for the PNG render path. 'right' is the
-        // canonical PNG orientation; 'left' triggers a horizontal flip
-        // in the renderer. Updated once per step in _advanceTarget.
-        this.facing = 'right';
+        // Screen-direction facing for the PNG render path. The current
+        // character art is one diagonal view, so the renderer uses the
+        // left/right component immediately and keeps the up/down component
+        // available for future directional sprites.
+        this.facing = 'down-right';
         // Continuous movement clock in radians. Advanced only by `tick`
         // while the avatar actually travels, so visual stride is tied to
         // path motion rather than wall-clock time.
@@ -78,6 +79,7 @@ export class Player {
      */
     tick(dtSec) {
         if (!this._target) return false;
+        this._faceToward(this._target.x - this.x, this._target.y - this.y);
         const speedPx = this._stepLengthPx() * this.speed;
         const remainingPx = Math.hypot(
             this._target.x - this.x,
@@ -134,18 +136,15 @@ export class Player {
         }
         const next = this.path.shift();
         const c = cellCenter(next.gx, next.gy);
-        // Derive screen-x heading from the grid step. In iso projection
-        // screenX = (gx - gy) * (TW/2), so sign(dgx - dgy) is the screen-x
-        // sign of the move. Cardinals map: east/north → right, west/south
-        // → left. dgx === dgy catches the (0,0) same-cell no-op and the
-        // NW/SE diagonals (±1,±1) — the latter are impossible today (A* is
-        // 4-neighbour) but would need a proper formula if 8-dir lands.
-        const dgx = next.gx - this.gx;
-        const dgy = next.gy - this.gy;
-        if (dgx !== dgy) {
-            this.facing = (dgx - dgy) >= 0 ? 'right' : 'left';
-        }
         this._target = { gx: next.gx, gy: next.gy, x: c.x, y: c.y };
+        this._faceToward(this._target.x - this.x, this._target.y - this.y);
+    }
+
+    _faceToward(dx, dy) {
+        if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return;
+        const vertical = dy < 0 ? 'up' : 'down';
+        const horizontal = dx < 0 ? 'left' : 'right';
+        this.facing = `${vertical}-${horizontal}`;
     }
 
     _stepLengthPx() {

@@ -1013,10 +1013,12 @@ export class Renderer {
                 ctx.restore();
 
                 const src = asset.displayCanvas || asset.canvas;
-                const facing = player.facing === 'left' ? -1 : 1;
+                const facing = player.facing.endsWith('left') ? -1 : 1;
+                const facingUp = player.facing.startsWith('up');
+                const backLean = facingUp ? -0.018 : 0;
                 ctx.save();
                 ctx.translate(player.x + sway * facing, feetY - bob);
-                ctx.transform(facing * squashX, 0, lean * facing, squashY, 0, 0);
+                ctx.transform(facing * squashX, 0, (lean + backLean) * facing, squashY, 0, 0);
                 ctx.drawImage(src, -asset.anchorX, -asset.height, asset.width, asset.height);
                 ctx.restore();
                 return;
