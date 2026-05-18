@@ -1013,7 +1013,10 @@ export class Renderer {
                 ctx.restore();
 
                 const src = asset.displayCanvas || asset.canvas;
-                const facing = player.facing.endsWith('left') ? -1 : 1;
+                // The character PNGs are drawn facing screen-left in their
+                // native orientation. Mirror only when the movement direction
+                // needs a screen-right facing.
+                const facing = player.facing.endsWith('left') ? 1 : -1;
                 const facingUp = player.facing.startsWith('up');
                 const backLean = facingUp ? -0.018 : 0;
                 ctx.save();
