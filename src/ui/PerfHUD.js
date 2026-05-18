@@ -17,7 +17,7 @@ export function installPerfHUD(game, genStats) {
     el.id = 'perf-hud';
     Object.assign(el.style, {
         position: 'fixed',
-        top: '96px',
+        top: '112px',
         left: '16px',
         zIndex: '9',
         font: '12px/1.35 monospace',

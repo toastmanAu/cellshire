@@ -578,6 +578,20 @@ body.mode-property #property-hud {
     background: rgba(244, 251, 237, 0.96);
 }
 
+#inventory-hud {
+    top: auto !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    left: auto !important;
+}
+
+#perf-hud {
+    top: calc(16px + var(--title-card-height) + 28px) !important;
+    left: 16px !important;
+    right: auto !important;
+    bottom: auto !important;
+}
+
 /* -- Wallet identity ---------------------------------------------- */
 
 #wallet-hud {

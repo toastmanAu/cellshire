@@ -20,6 +20,7 @@ export function installInventoryHUD(player) {
     card.id = 'inventory-hud';
     Object.assign(card.style, {
         position: 'fixed',
+        top: 'auto',
         right: '12px',
         bottom: '12px',
         zIndex: '19',
