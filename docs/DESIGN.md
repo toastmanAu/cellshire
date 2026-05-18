@@ -90,22 +90,28 @@ lo, hi = bounds_for_ore_type * epoch_modifier
 ### Crypto-denominated internal currencies
 
 Mineable deposits should present as crypto currencies rather than generic
-ore currencies. The current implementation has 7 mineable deposit types:
+ore currencies. The current implementation has 12 mineable deposit types:
 
 | Current deposit id | Current display |
 |--------------------|-----------------|
 | `coal_seam`        | Coal            |
 | `iron_ore`         | Iron            |
 | `copper_ore`       | Copper          |
+| `silver_ore`       | Silver          |
 | `gold_ore`         | Gold            |
+| `lithium_ore`      | Lithium         |
+| `cobalt_ore`       | Cobalt          |
+| `silicon_quartz`   | Silicon Quartz  |
 | `amethyst_geode`   | Amethyst        |
+| `bismuth_ore`      | Bismuth         |
 | `diamond_ore`      | Diamond         |
 | `ckb_cluster`      | CKB Cluster     |
 
 Target direction:
 
-- Expand the mineable set to 10 total deposits before locking the first
-  economy table.
+- The current 12-deposit set is large enough for the first economy table;
+  future deposits should be added only when they create a distinct visual,
+  rarity, or crypto-economy role.
 - Each deposit maps to an internal currency with a crypto association
   chosen by design, e.g. BTC/ETH/CKB/etc. The visual deposit can stay
   ore-like, but HUD, inventory, rewards, and Trader copy should speak in

@@ -105,8 +105,13 @@ export const ASSET_MANIFEST = [
     { ...P('coal_seam',       'Coal Seam',       { w: 1, d: 1 }, 0.80), builder: A.boulder },
     { ...P('copper_ore',      'Copper Ore',      { w: 1, d: 1 }, 0.75), builder: A.largeRock },
     { ...P('iron_ore',        'Iron Ore',        { w: 1, d: 1 }, 0.80), builder: A.boulder },
+    { ...P('silver_ore',      'Silver Ore',      { w: 1, d: 1 }, 0.72), builder: A.largeRock },
     { ...P('gold_ore',        'Gold Ore',        { w: 1, d: 1 }, 0.75), builder: A.largeRock },
+    { ...P('lithium_ore',     'Lithium Ore',     { w: 1, d: 1 }, 0.70), builder: A.mossyStone },
+    { ...P('cobalt_ore',      'Cobalt Ore',      { w: 1, d: 1 }, 0.72), builder: A.boulder },
+    { ...P('silicon_quartz',  'Silicon Quartz',  { w: 1, d: 1 }, 0.72), builder: A.largeRock },
     { ...P('amethyst_geode',  'Amethyst Geode',  { w: 1, d: 1 }, 0.65), builder: A.mossyStone },
+    { ...P('bismuth_ore',     'Bismuth Ore',     { w: 1, d: 1 }, 0.68), builder: A.mossyStone },
     { ...P('ckb_cluster',     'CKB Cluster',     { w: 1, d: 1 }, 0.55), builder: A.stonePile },
     { ...P('diamond_ore',     'Diamond Ore',     { w: 1, d: 1 }, 0.75), builder: A.largeRock },
 

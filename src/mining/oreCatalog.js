@@ -31,8 +31,13 @@ const ORE_CATALOG = {
     coal_seam:      { capacityRange: [4, 7], yieldRange: [1, 3], displayName: 'Coal',        dustColor: '#2a2520', textColor: '#1b5ba8' },
     iron_ore:       { capacityRange: [3, 6], yieldRange: [1, 3], displayName: 'Iron',        dustColor: '#7a5a3c', textColor: '#c4622e' },
     copper_ore:     { capacityRange: [3, 5], yieldRange: [1, 2], displayName: 'Copper',      dustColor: '#b56a3a', textColor: '#c4622e' },
+    silver_ore:     { capacityRange: [2, 4], yieldRange: [1, 2], displayName: 'Silver',      dustColor: '#c7c9c9', textColor: '#6a7882' },
     gold_ore:       { capacityRange: [2, 3], yieldRange: [1, 2], displayName: 'Gold',        dustColor: '#e5c065', textColor: '#a87a1a' },
+    lithium_ore:    { capacityRange: [2, 4], yieldRange: [1, 2], displayName: 'Lithium',     dustColor: '#e7d5e8', textColor: '#9b6a9d' },
+    cobalt_ore:     { capacityRange: [2, 4], yieldRange: [1, 2], displayName: 'Cobalt',      dustColor: '#214fc7', textColor: '#1b5ba8' },
+    silicon_quartz: { capacityRange: [2, 4], yieldRange: [1, 2], displayName: 'Silicon',     dustColor: '#d7dde0', textColor: '#6a7882' },
     amethyst_geode: { capacityRange: [1, 2], yieldRange: [1, 2], displayName: 'Amethyst',    dustColor: '#8a6cb8', textColor: '#6a3aa8' },
+    bismuth_ore:    { capacityRange: [1, 2], yieldRange: [1, 2], displayName: 'Bismuth',     dustColor: '#35bfc2', textColor: '#a87a1a' },
     diamond_ore:    { capacityRange: [1, 2], yieldRange: [1, 1], displayName: 'Diamond',     dustColor: '#cfe6f4', textColor: '#1b5ba8' },
     ckb_cluster:    { capacityRange: [1, 3], yieldRange: [1, 2], displayName: 'CKB Cluster', dustColor: '#4cc6e8', textColor: '#1b5ba8' },
 };

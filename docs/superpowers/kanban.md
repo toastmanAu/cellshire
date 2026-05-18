@@ -15,6 +15,8 @@ cards needed to turn the current prototype into the game described in
   multiply mining yield and surface in the epoch HUD.
 - Local-first property zone with a fenced starter claim, mine/home travel,
   bounded placement, starter owned-asset allow-list, and local persistence.
+- Twelve mineable deposit visuals/catalog entries, including silver,
+  lithium, bismuth, cobalt, and silicon quartz.
 - Character picker, persisted character choice, starter character PNGs,
   and directional facing.
 - Build mode remains available via `?dev=1` for property-zone tooling.
@@ -110,6 +112,15 @@ by builder brush input, added visible walk bob and mining hit pulse, and
 added contextual cursors for walk, mining, POI, build, erase, pan, and
 blocked states.
 
+### Mineable Asset Expansion
+
+**Completed:** 2026-05-18
+
+Generated and integrated five new mineable deposit blocks: `silver_ore`,
+`lithium_ore`, `bismuth_ore`, `cobalt_ore`, and `silicon_quartz`. The game
+now has 12 mineable catalog entries, procgen includes the new deposits, and
+tests assert the mineable set.
+
 ## Next
 
 ### Crypto Ore Economy Mapping
@@ -117,12 +128,12 @@ blocked states.
 **Goal:** replace generic ore names/rewards with crypto-denominated internal
 currencies and prepare the value model for future market-driven pricing.
 
-**Current mineables:** 7 (`coal_seam`, `iron_ore`, `copper_ore`,
-`gold_ore`, `amethyst_geode`, `diamond_ore`, `ckb_cluster`).
+**Current mineables:** 12 (`coal_seam`, `iron_ore`, `copper_ore`,
+`silver_ore`, `gold_ore`, `lithium_ore`, `cobalt_ore`, `silicon_quartz`,
+`amethyst_geode`, `bismuth_ore`, `diamond_ore`, `ckb_cluster`).
 
 **Acceptance:**
-- Choose 10 total mineable deposit/currency associations.
-- Add three new mineable deposit ids/assets or temporary visual variants.
+- Choose crypto currency associations for all 12 mineable deposits.
 - Separate deposit visual id from rewarded currency id/symbol/display name.
 - Add fixed testnet price table based on real-world values at the chosen
   mapping date.

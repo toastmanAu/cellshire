@@ -110,14 +110,20 @@ export function generateWorld(tileMap, seed = 1337) {
     // Pool of asset ids that read as "mineable resource". Each ore id maps
     // to a CKB cell type in the game design (capacity = remaining ore).
     // Repetitions in the pool weight rarity: common ores appear many times,
-    // rare ores once. Roughly: coal/iron most common, copper uncommon,
-    // gold/amethyst/diamond rare, ckb_cluster a rare signature landmark.
+    // rare ores once. Coal/iron are most common, tech metals and copper
+    // are uncommon, precious/crystal deposits are rare, and ckb_cluster is
+    // a rare signature landmark.
     const oreAssets = [
         'coal_seam',  'coal_seam',  'coal_seam',  'coal_seam',   // common
         'iron_ore',   'iron_ore',   'iron_ore',   'iron_ore',    // common
         'copper_ore', 'copper_ore', 'copper_ore',                // uncommon
+        'silver_ore', 'silver_ore',                              // uncommon
+        'lithium_ore', 'lithium_ore',                             // uncommon
+        'cobalt_ore', 'cobalt_ore',                               // uncommon
+        'silicon_quartz', 'silicon_quartz',                       // uncommon
         'gold_ore',   'gold_ore',                                 // rare
         'amethyst_geode',                                         // rare
+        'bismuth_ore',                                            // rare
         'diamond_ore',                                            // rare
         'ckb_cluster',                                            // rare signature
         'boulder',    'boulder',                                  // non-ore filler
