@@ -72,10 +72,15 @@ export function installPerfHUD(game, genStats) {
         const priceLine = price
             ? `prices ${price.mode || price.source} ${price.capturedAt || 'unknown'}`
             : 'prices fixed';
+        const valueRange = genStats.epochValueRange;
+        const valueLine = valueRange
+            ? `ore value ${valueRange.label} (${valueRange.source})`
+            : 'ore value fixed';
 
         el.textContent =
               `${epochLine}\n`
             + `${priceLine}\n`
+            + `${valueLine}\n`
             + `grid ${W}×${H}   seed ${genStats.seed}   gen ${genStats.genMs.toFixed(0)} ms\n`
             + `terrain ${genStats.total} (${genStats.water}w ${genStats.sand}s `
             + `${genStats.grass}g ${genStats.stone}r)\n`

@@ -141,6 +141,16 @@ the debug overlay surfaces snapshot source/time, and each spawned mineable
 receives a deterministic `$50-$200` USD value budget that is converted into
 the mapped crypto quantity as it is mined.
 
+### Epoch-Deterministic Ore Value Bands
+
+**Completed:** 2026-05-19
+
+Added a two-word epoch hash value-band derivation. Each epoch now rolls a
+lower bound from `$1-$100` and a spread from `$20-$200`, allowing lean
+`$1-$21` epochs through rich `$100-$300` epochs. Individual mineables still
+roll deterministically inside the epoch band, so all players see the same
+ore values for the same epoch/world seed.
+
 ## Next
 
 ### Economy HUD + Token Detail

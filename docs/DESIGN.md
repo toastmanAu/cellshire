@@ -120,8 +120,12 @@ Target direction:
   local/game balances with an epoch price snapshot fetched from CoinGecko,
   cached by epoch, and backed by the fixed 2026-05-18 14:06:32 UTC table
   when offline.
-- Each spawned mineable receives a deterministic USD value budget in the
-  `$50-$200` range. Mining splits the remaining value across the remaining
+- Each epoch derives a deterministic ore-value band from two independent
+  32-bit words in the epoch anchor hash. The first word rolls the lower
+  bound from `$1-$100`; the second rolls the spread from `$20-$200`, giving
+  possible epoch bands from `$1-$21` through `$100-$300`.
+- Each spawned mineable receives a deterministic USD value budget inside
+  that epoch band. Mining splits the remaining value across the remaining
   hits, applies the existing epoch yield modifier, and converts the USD
   payout to token amount as `payout_usd / epoch_price_usd`.
 - Expensive crypto associations yield tiny decimal amounts; cheaper

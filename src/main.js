@@ -26,6 +26,7 @@ import {
     connectCccJoyId,
 } from './chain/cccJoyId.js';
 import { describeEpochModifier } from './chain/epochModifier.js';
+import { describeEpochValueRange } from './mining/epochValueRange.js';
 import { loadMinedState, pruneStaleMinedState } from './mining/minedStore.js';
 import { chainMiningEnabled, makeMiningAdapterFromParams } from './mining/miningAdapter.js';
 import { getEpochPriceSnapshot } from './mining/priceSnapshot.js';
@@ -119,7 +120,10 @@ async function main() {
     // Build mining state from the procgen output. Same `seed` is mixed
     // in so per-ore capacity and USD value budgets are deterministic
     // across reloads.
-    game.populateOreStates(makeSeededRand(seed ^ 0x70F0));
+    const epochValueRange = describeEpochValueRange(epochHash);
+    game.populateOreStates(makeSeededRand(seed ^ 0x70F0), {
+        valueRangeUsd: epochValueRange.range,
+    });
 
     // Tag the Game with the epoch so _mineOre can persist hits to the
     // correct per-epoch storage key. Null on random seed = no
@@ -195,6 +199,7 @@ async function main() {
         epochHash,
         epochInfo,
         priceSnapshot,
+        epochValueRange,
         epochModifier: epochModifierState,
         ...stats,
     };
