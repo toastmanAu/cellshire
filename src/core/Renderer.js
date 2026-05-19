@@ -414,11 +414,9 @@ export class Renderer {
         dx /= len;
         dy /= len;
 
-        const windup = Math.max(0, 1 - Math.abs(t - 0.16) / 0.16);
         const hit = Math.max(0, 1 - Math.abs(t - 0.42) / 0.22);
-        const recover = Math.max(0, 1 - Math.abs(t - 0.72) / 0.28);
         const lunge = hit * hit;
-        const pullback = windup * 1.5;
+        const armSweep = Math.max(0, 1 - Math.abs(t - 0.34) / 0.34);
 
         return {
             t,
@@ -427,13 +425,75 @@ export class Renderer {
             targetY: strike.targetY,
             dirX: dx,
             dirY: dy,
-            lungeX: dx * (6 * lunge - pullback),
-            lungeY: dy * (5 * lunge - pullback),
-            lean: dx * (0.11 * lunge - 0.06 * windup) - dx * 0.025 * recover,
-            squashX: 1 + 0.045 * lunge,
-            squashY: 1 - 0.035 * lunge,
+            bumpX: dx * 2.2 * lunge,
+            bumpY: dy * 1.6 * lunge,
+            armSweep,
             glint: Math.max(0, 1 - Math.abs(t - 0.43) / 0.16),
         };
+    }
+
+    _drawPlayerPickSwing(player, feetY, strike, facing) {
+        if (!strike || strike.armSweep <= 0) return;
+        const ctx = this.ctx;
+        const side = facing;
+        const progress = strike.t;
+        const swing = strike.armSweep;
+        const handX = player.x + side * 10 + (strike.bumpX ?? 0);
+        const handY = feetY - 38 + (strike.bumpY ?? 0);
+        const reach = 22 + swing * 7;
+        const arc = Math.sin(progress * Math.PI);
+        const headX = handX + strike.dirX * reach + side * (10 - swing * 18);
+        const headY = handY + strike.dirY * reach - 15 * (1 - swing) + arc * 6;
+        const handleBackX = handX - strike.dirX * 8 - side * 5;
+        const handleBackY = handY - strike.dirY * 8 + 9;
+        const nx = -strike.dirY;
+        const ny = strike.dirX;
+
+        ctx.save();
+        ctx.globalAlpha *= Math.min(1, swing * 1.35);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Motion trail behind the pick head.
+        ctx.globalAlpha *= 0.35;
+        ctx.strokeStyle = 'rgba(255, 232, 160, 0.85)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(headX - strike.dirX * 18 - side * 8, headY - strike.dirY * 18 - 4);
+        ctx.quadraticCurveTo(handX + side * 7, handY - 18, headX, headY);
+        ctx.stroke();
+        ctx.globalAlpha /= 0.35;
+
+        // Wooden handle.
+        ctx.strokeStyle = '#6b4426';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(handleBackX, handleBackY);
+        ctx.lineTo(headX, headY);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#2c2118';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(handleBackX, handleBackY);
+        ctx.lineTo(headX, headY);
+        ctx.stroke();
+
+        // Metal pick head.
+        ctx.strokeStyle = '#d7dde0';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(headX - nx * 9, headY - ny * 9);
+        ctx.lineTo(headX + nx * 9, headY + ny * 9);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#6f7d84';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(headX - nx * 10, headY - ny * 10);
+        ctx.lineTo(headX + nx * 10, headY + ny * 10);
+        ctx.stroke();
+        ctx.restore();
     }
 
     _drawPlayerStrikeGlint(strike) {
@@ -1140,8 +1200,6 @@ export class Renderer {
             if (asset) {
                 const feetY = player.y + TH / 2;
                 const strike = this._playerStrikePose(player, feetY);
-                const strikeSquashX = strike?.squashX ?? 1;
-                const strikeSquashY = strike?.squashY ?? 1;
                 // Contact shadow first (under the feet, scales with sprite).
                 // The shadow is symmetric so it doesn't flip with facing.
                 ctx.save();
@@ -1149,9 +1207,9 @@ export class Renderer {
                 ctx.fillStyle = 'rgba(30, 22, 8, 1)';
                 ctx.beginPath();
                 ctx.ellipse(
-                    player.x + (strike?.lungeX ?? 0) * 0.4,
-                    feetY + (strike?.lungeY ?? 0) * 0.15,
-                    asset.width * 0.32 * shadowSquash * strikeSquashX,
+                    player.x + (strike?.bumpX ?? 0) * 0.3,
+                    feetY + (strike?.bumpY ?? 0) * 0.1,
+                    asset.width * 0.32 * shadowSquash,
                     TH * 0.18,
                     0, 0, Math.PI * 2,
                 );
@@ -1176,19 +1234,20 @@ export class Renderer {
                 const backLean = facingUp ? -0.018 : 0;
                 ctx.save();
                 ctx.translate(
-                    player.x + sway * facing + (strike?.lungeX ?? 0),
-                    feetY - bob + (strike?.lungeY ?? 0),
+                    player.x + sway * facing + (strike?.bumpX ?? 0),
+                    feetY - bob + (strike?.bumpY ?? 0),
                 );
                 ctx.transform(
-                    facing * squashX * strikeSquashX,
+                    facing * squashX,
                     0,
-                    (lean + backLean) * facing + (strike?.lean ?? 0),
-                    squashY * strikeSquashY,
+                    (lean + backLean) * facing,
+                    squashY,
                     0,
                     0,
                 );
                 ctx.drawImage(src, -asset.anchorX, -asset.height, asset.width, asset.height);
                 ctx.restore();
+                this._drawPlayerPickSwing(player, feetY, strike, facing);
                 this._drawPlayerStrikeGlint(strike);
                 return;
             }
@@ -1201,8 +1260,6 @@ export class Renderer {
         const PAL = CONFIG.palette;
         const feetY = box.y + box.h;
         const strike = this._playerStrikePose(player, feetY);
-        const strikeSquashX = strike?.squashX ?? 1;
-        const strikeSquashY = strike?.squashY ?? 1;
 
         // Contact shadow — small flat ellipse under the feet.
         ctx.save();
@@ -1210,9 +1267,9 @@ export class Renderer {
         ctx.fillStyle = 'rgba(30, 22, 8, 1)';
         ctx.beginPath();
         ctx.ellipse(
-            box.x + box.w / 2 + (strike?.lungeX ?? 0) * 0.4,
-            box.y + box.h + (strike?.lungeY ?? 0) * 0.15,
-            box.w * 0.42 * shadowSquash * strikeSquashX,
+            box.x + box.w / 2 + (strike?.bumpX ?? 0) * 0.3,
+            box.y + box.h + (strike?.bumpY ?? 0) * 0.1,
+            box.w * 0.42 * shadowSquash,
             box.h * 0.06,
             0, 0, Math.PI * 2,
         );
@@ -1220,9 +1277,7 @@ export class Renderer {
         ctx.restore();
 
         ctx.save();
-        ctx.translate(box.x + box.w / 2 + (strike?.lungeX ?? 0), box.y + box.h - bob + (strike?.lungeY ?? 0));
-        ctx.transform(strikeSquashX, 0, strike?.lean ?? 0, strikeSquashY, 0, 0);
-        ctx.translate(-(box.x + box.w / 2), -(box.y + box.h));
+        ctx.translate((strike?.bumpX ?? 0), -bob + (strike?.bumpY ?? 0));
         // Body block (3 voxels tall) with a subtle vertical gradient so
         // the cube faces read.
         const bodyH = Math.round(box.h * 0.7);
@@ -1251,6 +1306,7 @@ export class Renderer {
         ctx.strokeRect(box.x + 0.5, bodyY + 0.5, box.w - 1, bodyH - 1);
         ctx.strokeRect(box.x + headPad + 0.5, box.y + 0.5, box.w - headPad * 2 - 1, headH - 1);
         ctx.restore();
+        this._drawPlayerPickSwing(player, feetY, strike, player.facing.endsWith('left') ? 1 : -1);
         this._drawPlayerStrikeGlint(strike);
     }
 
