@@ -641,6 +641,7 @@ export class Game {
         const textColor = cfg?.textColor ?? '#1b5ba8';
         const rewardText = `+${formatCurrencyAmount(result.currency, result.amount)}`;
         const c = cellToScreen(obj.gx + 0.5, obj.gy + 0.5);
+        this.renderer.spawnPlayerStrike(c.x, c.y, { color: dustColor });
 
         if (result.depleted) {
             // Bigger burst + the staggered double-thud for the crumble.

@@ -131,6 +131,7 @@ export class Renderer {
         // these so the canvas redraws while FX are alive.
         this._floatingTexts = []; // {x,y,text,color,start,duration}
         this._particles    = []; // {x,y,vx,vy,color,start,duration,size}
+        this._playerStrike = null; // {targetX,targetY,start,duration,color}
 
         // Cached layers + the version stamps that produced them.
         // Chrome = backdrop + vignette in screen space (depends only on
@@ -328,6 +329,20 @@ export class Renderer {
         this._dirty = true;
     }
 
+    spawnPlayerStrike(targetX, targetY, {
+        color = '#ffe08a',
+        durationMs = 300,
+    } = {}) {
+        this._playerStrike = {
+            targetX,
+            targetY,
+            color,
+            start: performance.now(),
+            duration: durationMs,
+        };
+        this._dirty = true;
+    }
+
     _tickFX(now) {
         if (this._floatingTexts.length > 0) {
             this._floatingTexts = this._floatingTexts.filter(
@@ -338,6 +353,9 @@ export class Renderer {
             this._particles = this._particles.filter(
                 p => now - p.start < p.duration,
             );
+        }
+        if (this._playerStrike && now - this._playerStrike.start >= this._playerStrike.duration) {
+            this._playerStrike = null;
         }
     }
 
@@ -382,6 +400,69 @@ export class Renderer {
             ctx.fillText(f.text, f.x, y);
             ctx.restore();
         }
+    }
+
+    _playerStrikePose(player, feetY) {
+        const strike = this._playerStrike;
+        if (!strike) return null;
+        const t = (performance.now() - strike.start) / strike.duration;
+        if (t < 0 || t >= 1) return null;
+
+        let dx = strike.targetX - player.x;
+        let dy = strike.targetY - feetY;
+        const len = Math.hypot(dx, dy) || 1;
+        dx /= len;
+        dy /= len;
+
+        const windup = Math.max(0, 1 - Math.abs(t - 0.16) / 0.16);
+        const hit = Math.max(0, 1 - Math.abs(t - 0.42) / 0.22);
+        const recover = Math.max(0, 1 - Math.abs(t - 0.72) / 0.28);
+        const lunge = hit * hit;
+        const pullback = windup * 1.5;
+
+        return {
+            t,
+            color: strike.color,
+            targetX: strike.targetX,
+            targetY: strike.targetY,
+            dirX: dx,
+            dirY: dy,
+            lungeX: dx * (6 * lunge - pullback),
+            lungeY: dy * (5 * lunge - pullback),
+            lean: dx * (0.11 * lunge - 0.06 * windup) - dx * 0.025 * recover,
+            squashX: 1 + 0.045 * lunge,
+            squashY: 1 - 0.035 * lunge,
+            glint: Math.max(0, 1 - Math.abs(t - 0.43) / 0.16),
+        };
+    }
+
+    _drawPlayerStrikeGlint(strike) {
+        if (!strike || strike.glint <= 0) return;
+        const ctx = this.ctx;
+        const cx = strike.targetX - strike.dirX * 7;
+        const cy = strike.targetY - strike.dirY * 7;
+        const nx = -strike.dirY;
+        const ny = strike.dirX;
+        const len = 13 + strike.glint * 8;
+
+        ctx.save();
+        ctx.globalAlpha *= strike.glint;
+        ctx.lineCap = 'round';
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = 'rgba(255, 244, 190, 0.95)';
+        ctx.beginPath();
+        ctx.moveTo(cx - nx * len, cy - ny * len);
+        ctx.lineTo(cx + nx * len, cy + ny * len);
+        ctx.stroke();
+
+        ctx.globalAlpha *= 0.7;
+        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = strike.color;
+        ctx.beginPath();
+        ctx.moveTo(cx - strike.dirX * len * 0.75, cy - strike.dirY * len * 0.75);
+        ctx.lineTo(cx + strike.dirX * len * 0.35, cy + strike.dirY * len * 0.35);
+        ctx.stroke();
+        ctx.restore();
     }
 
     /**
@@ -508,7 +589,8 @@ export class Renderer {
         // has settled.
         const animsPending = this._anims.size > 0
             || this._floatingTexts.length > 0
-            || this._particles.length > 0;
+            || this._particles.length > 0
+            || this._playerStrike !== null;
         if (!this._dirty && !animsPending) return;
         this._dirty = false;
 
@@ -1057,13 +1139,22 @@ export class Renderer {
             const asset = this._playerAssetForFacing(player);
             if (asset) {
                 const feetY = player.y + TH / 2;
+                const strike = this._playerStrikePose(player, feetY);
+                const strikeSquashX = strike?.squashX ?? 1;
+                const strikeSquashY = strike?.squashY ?? 1;
                 // Contact shadow first (under the feet, scales with sprite).
                 // The shadow is symmetric so it doesn't flip with facing.
                 ctx.save();
                 ctx.globalAlpha *= 0.32;
                 ctx.fillStyle = 'rgba(30, 22, 8, 1)';
                 ctx.beginPath();
-                ctx.ellipse(player.x, feetY, asset.width * 0.32 * shadowSquash, TH * 0.18, 0, 0, Math.PI * 2);
+                ctx.ellipse(
+                    player.x + (strike?.lungeX ?? 0) * 0.4,
+                    feetY + (strike?.lungeY ?? 0) * 0.15,
+                    asset.width * 0.32 * shadowSquash * strikeSquashX,
+                    TH * 0.18,
+                    0, 0, Math.PI * 2,
+                );
                 ctx.fill();
                 if (walking) {
                     const footGap = Math.max(5, asset.width * 0.12);
@@ -1084,10 +1175,21 @@ export class Renderer {
                 const facing = player.facing.endsWith('left') !== facingUp ? 1 : -1;
                 const backLean = facingUp ? -0.018 : 0;
                 ctx.save();
-                ctx.translate(player.x + sway * facing, feetY - bob);
-                ctx.transform(facing * squashX, 0, (lean + backLean) * facing, squashY, 0, 0);
+                ctx.translate(
+                    player.x + sway * facing + (strike?.lungeX ?? 0),
+                    feetY - bob + (strike?.lungeY ?? 0),
+                );
+                ctx.transform(
+                    facing * squashX * strikeSquashX,
+                    0,
+                    (lean + backLean) * facing + (strike?.lean ?? 0),
+                    squashY * strikeSquashY,
+                    0,
+                    0,
+                );
                 ctx.drawImage(src, -asset.anchorX, -asset.height, asset.width, asset.height);
                 ctx.restore();
+                this._drawPlayerStrikeGlint(strike);
                 return;
             }
             // Asset id set but PNG not loaded → drop through to the cube
@@ -1097,18 +1199,30 @@ export class Renderer {
 
         const box = player.drawBox();
         const PAL = CONFIG.palette;
+        const feetY = box.y + box.h;
+        const strike = this._playerStrikePose(player, feetY);
+        const strikeSquashX = strike?.squashX ?? 1;
+        const strikeSquashY = strike?.squashY ?? 1;
 
         // Contact shadow — small flat ellipse under the feet.
         ctx.save();
         ctx.globalAlpha *= 0.32;
         ctx.fillStyle = 'rgba(30, 22, 8, 1)';
         ctx.beginPath();
-        ctx.ellipse(box.x + box.w / 2, box.y + box.h, box.w * 0.42 * shadowSquash, box.h * 0.06, 0, 0, Math.PI * 2);
+        ctx.ellipse(
+            box.x + box.w / 2 + (strike?.lungeX ?? 0) * 0.4,
+            box.y + box.h + (strike?.lungeY ?? 0) * 0.15,
+            box.w * 0.42 * shadowSquash * strikeSquashX,
+            box.h * 0.06,
+            0, 0, Math.PI * 2,
+        );
         ctx.fill();
         ctx.restore();
 
         ctx.save();
-        ctx.translate(0, -bob);
+        ctx.translate(box.x + box.w / 2 + (strike?.lungeX ?? 0), box.y + box.h - bob + (strike?.lungeY ?? 0));
+        ctx.transform(strikeSquashX, 0, strike?.lean ?? 0, strikeSquashY, 0, 0);
+        ctx.translate(-(box.x + box.w / 2), -(box.y + box.h));
         // Body block (3 voxels tall) with a subtle vertical gradient so
         // the cube faces read.
         const bodyH = Math.round(box.h * 0.7);
@@ -1137,6 +1251,7 @@ export class Renderer {
         ctx.strokeRect(box.x + 0.5, bodyY + 0.5, box.w - 1, bodyH - 1);
         ctx.strokeRect(box.x + headPad + 0.5, box.y + 0.5, box.w - headPad * 2 - 1, headH - 1);
         ctx.restore();
+        this._drawPlayerStrikeGlint(strike);
     }
 
     _playerAssetForFacing(player) {
