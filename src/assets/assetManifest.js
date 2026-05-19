@@ -148,32 +148,32 @@ export const ASSET_MANIFEST = [
     {
         id: 'player_miner', name: 'Miner', category: 'character', kind: 'object',
         footprint: { w: 1, d: 1 }, filename: 'player_miner.png',
-        sizeScale: 0.5, flatBase: true,
+        sizeScale: 0.5, flatBase: true, noShadow: true,
     },
     {
         id: 'player_miner_back', name: 'Miner Back', category: 'character', kind: 'object',
         footprint: { w: 1, d: 1 }, filename: 'player_miner_back.png',
-        sizeScale: 0.5, flatBase: true,
+        sizeScale: 0.5, flatBase: true, noShadow: true,
     },
     {
         id: 'player_seeker', name: 'Seeker', category: 'character', kind: 'object',
         footprint: { w: 1, d: 1 }, filename: 'player_seeker.png',
-        sizeScale: 0.5, flatBase: true,
+        sizeScale: 0.5, flatBase: true, noShadow: true,
     },
     {
         id: 'player_seeker_back', name: 'Seeker Back', category: 'character', kind: 'object',
         footprint: { w: 1, d: 1 }, filename: 'player_seeker_back.png',
-        sizeScale: 0.5, flatBase: true,
+        sizeScale: 0.5, flatBase: true, noShadow: true,
     },
     {
         id: 'player_tinker', name: 'Tinker', category: 'character', kind: 'object',
         footprint: { w: 1, d: 1 }, filename: 'player_tinker.png',
-        sizeScale: 0.5, flatBase: true,
+        sizeScale: 0.5, flatBase: true, noShadow: true,
     },
     {
         id: 'player_tinker_back', name: 'Tinker Back', category: 'character', kind: 'object',
         footprint: { w: 1, d: 1 }, filename: 'player_tinker_back.png',
-        sizeScale: 0.5, flatBase: true,
+        sizeScale: 0.5, flatBase: true, noShadow: true,
     },
 ];
 
