@@ -679,7 +679,7 @@ export class Game {
      * Kick off the crumble animation on an ore and queue its actual
      * removal one frame before the anim ends. The renderer treats the
      * obj as "animating" for the whole duration (static cache skips
-     * it), so the live overlay's shrink+fade draw is what the player
+     * it), so the live overlay's chunked crumble draw is what the player
      * sees; once the anim completes the obj is already gone from
      * `tileMap.objects` and the rebuilt static cache reflects that.
      */

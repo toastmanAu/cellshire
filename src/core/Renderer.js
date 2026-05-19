@@ -84,6 +84,15 @@ const SHADOW_ALPHA       = 0.32;
 const BACK_DRIFT_X       = 0.16;
 const BACK_DRIFT_Y       = 0.48;
 
+function hash01(n) {
+    const x = Math.sin(n * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+}
+
+function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+}
+
 export class Renderer {
     constructor(canvas, camera, tileMap) {
         this.canvas = canvas;
@@ -183,8 +192,8 @@ export class Renderer {
             this._objectsVersion = -1;
         } else if (key.startsWith('deplete-')) {
             // Mining deplete anim — same set-membership as a pop anim so
-            // the static cache skips this obj while it fades; the live
-            // overlay branches on the key to draw the shrink+fade curve.
+            // the static cache skips this obj while it crumbles; the live
+            // overlay branches on the key to draw the fractured chunks.
             const id = +key.slice('deplete-'.length);
             if (!Number.isNaN(id)) this._animObjectIds.add(id);
             this._objectsVersion = -1;
@@ -376,37 +385,91 @@ export class Renderer {
     }
 
     /**
-     * Draw a depleting ore — scales down and fades out over the anim's
-     * normalised t. Used by the live overlay when a `deplete-<id>` anim
-     * is active for an obj.
+     * Draw a depleting ore as fractured sprite chunks. This is intentionally
+     * asset-agnostic: any ore PNG can crumble without a bespoke animation
+     * sheet, and the whole effect remains deterministic for stable frames.
      */
-    _drawDepletingObject(obj, t) {
+    _drawCrumblingObject(obj, t) {
         const ctx = this.ctx;
         const asset = getAsset(obj.assetId);
         if (!asset) return;
         const { x, y } = cellToScreen(obj.gx, obj.gy);
         const dx = x - asset.anchorX;
         const dy = y - asset.anchorY;
-        // Ease-in shrink so the first half is gentle then it collapses.
-        const eased = t * t;
-        const s = 1 - eased * 0.7;          // 1.0 → 0.3
-        const alpha = 1 - eased;            // 1.0 → 0.0
         const pivot = cellToScreen(obj.gx + obj.footprint.w / 2, obj.gy + obj.footprint.d / 2);
         if (asset.flatBase) {
             pivot.y += (obj.footprint.w + obj.footprint.d) * TH / 4;
         }
+
+        const src = asset.displayCanvas || asset.canvas;
+        const breakT = Math.max(0, (t - 0.08) / 0.92);
+        const travel = easeOutCubic(breakT);
+        const fall = breakT * breakT;
+        const tremor = Math.sin(t * Math.PI * 18) * (1 - t) * 1.8;
+
+        // A brief ghost of the whole ore keeps the first impact readable
+        // before the pieces fully separate.
         ctx.save();
-        ctx.globalAlpha *= Math.max(0, alpha);
-        ctx.translate(pivot.x, pivot.y);
-        ctx.scale(s, s);
-        ctx.translate(-pivot.x, -pivot.y);
-        // Slight upward bob as if the ore lifts in the moment it
-        // crumbles. Subtle — 4px max — keeps the eye on the shrink.
-        ctx.translate(0, -4 * eased);
+        ctx.globalAlpha *= Math.max(0, 0.42 - t * 0.7);
+        ctx.translate(tremor, -Math.abs(tremor) * 0.6);
+        ctx.globalCompositeOperation = 'screen';
         this._drawAssetImage(ctx, asset, dx, dy, obj.gx, obj.gy, obj.footprint, {
             flipH: obj.flipH,
             flipV: obj.flipV,
         });
+        ctx.restore();
+
+        const cols = 5;
+        const rows = 5;
+        const chunkW = asset.width / cols;
+        const chunkH = asset.height / rows;
+        const alpha = Math.max(0, 1 - Math.pow(Math.max(0, t - 0.18) / 0.82, 1.4));
+
+        for (let row = 0; row < rows; row++)
+        for (let col = 0; col < cols; col++) {
+            const idx = row * cols + col;
+            const seed = obj.id * 97 + idx * 31;
+            const delay = hash01(seed + 5) * 0.18;
+            const localT = Math.max(0, Math.min(1, (breakT - delay) / (1 - delay)));
+            const localTravel = easeOutCubic(localT);
+            const cx = dx + col * chunkW + chunkW / 2;
+            const cy = dy + row * chunkH + chunkH / 2;
+            const outwardX = (cx - pivot.x) * (0.26 + hash01(seed + 1) * 0.34);
+            const upwardKick = -10 - hash01(seed + 2) * 20;
+            const sideways = (hash01(seed + 3) - 0.5) * 26;
+            const drop = fall * (14 + row * 9 + hash01(seed + 4) * 18);
+            const rot = (hash01(seed + 6) - 0.5) * 1.2 * localT;
+            const shrink = 1 - localT * 0.22;
+
+            ctx.save();
+            ctx.globalAlpha *= alpha * (0.9 + hash01(seed + 7) * 0.1);
+            ctx.translate(
+                outwardX * localTravel + sideways * localT,
+                upwardKick * Math.sin(localT * Math.PI) + drop,
+            );
+            ctx.translate(cx, cy);
+            ctx.rotate(rot);
+            ctx.scale(shrink, shrink);
+            ctx.translate(-cx, -cy);
+            ctx.beginPath();
+            ctx.rect(
+                dx + col * chunkW - 0.75,
+                dy + row * chunkH - 0.75,
+                chunkW + 1.5,
+                chunkH + 1.5,
+            );
+            ctx.clip();
+            ctx.drawImage(src, dx, dy, asset.width, asset.height);
+            ctx.restore();
+        }
+
+        // Small settling dust at the footprint after the chunks separate.
+        ctx.save();
+        ctx.globalAlpha *= Math.max(0, (1 - t) * 0.35);
+        ctx.fillStyle = 'rgba(220, 200, 160, 0.7)';
+        ctx.beginPath();
+        ctx.ellipse(pivot.x, pivot.y + 2, asset.width * (0.22 + travel * 0.22), TH * 0.16, 0, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
     }
 
@@ -879,7 +942,8 @@ export class Renderer {
                     draw: () => this._drawMiningHitObject(obj, hitT),
                 });
             } else if (depleteT != null) {
-                // Mining crumble: shrink + fade. Shadow fades alongside.
+                // Mining crumble: fractured chunks drift/fall away. Shadow
+                // fades alongside as the deposit leaves the ground.
                 if (this._castsShadow(asset)) {
                     items.push({
                         key: obj.sortKey() - 0.5,
@@ -896,7 +960,7 @@ export class Renderer {
                 }
                 items.push({
                     key: obj.sortKey(),
-                    draw: () => this._drawDepletingObject(obj, depleteT),
+                    draw: () => this._drawCrumblingObject(obj, depleteT),
                 });
             }
         }
