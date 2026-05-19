@@ -1013,11 +1013,11 @@ export class Renderer {
                 ctx.restore();
 
                 const src = asset.displayCanvas || asset.canvas;
-                // The character PNGs are drawn facing screen-left in their
-                // native orientation. Mirror only when the movement direction
-                // needs a screen-right facing.
-                const facing = player.facing.endsWith('left') ? 1 : -1;
                 const facingUp = player.facing.startsWith('up');
+                // Front sprites natively face screen-left. The generated
+                // back sprites natively face screen-right, so up-screen
+                // facings intentionally invert the mirror decision.
+                const facing = player.facing.endsWith('left') !== facingUp ? 1 : -1;
                 const backLean = facingUp ? -0.018 : 0;
                 ctx.save();
                 ctx.translate(player.x + sway * facing, feetY - bob);
