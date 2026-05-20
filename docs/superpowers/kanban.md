@@ -396,19 +396,38 @@ Verified with the browser test harness (`214 passed, 0 failed`),
 `node netlify-build.mjs`, module import checks, and a headless wallet-mode boot
 smoke.
 
-## Next
-
 ### Property Snapshot Cell Writer
+
+**Completed:** 2026-05-21
 
 **Goal:** write wallet-owned property snapshots into chain-shaped cells.
 
+Added a snapshot writer boundary for wallet-owned homes. The new payload builder
+exports `cellshire.property.snapshot` v1 data with owner, tier, tile map,
+camera, schema, and version fields. The local fixture writer stores owner-keyed
+snapshot cells under `cellshire:property-snapshot-cells:v1:<owner>`, matching
+the existing chain read adapter. Writes are gated behind a connected wallet
+whose address matches the editable property owner. `Game.save()` and property
+autosave now use a shared local-save-plus-snapshot helper, so local property
+storage still succeeds when the wallet writer is unavailable, disconnected, or
+owner-mismatched. The contract is documented in
+[`2026-05-21-property-snapshot-cell-writer.md`](specs/2026-05-21-property-snapshot-cell-writer.md).
+
+Verified with the browser test harness (`218 passed, 0 failed`),
+`node netlify-build.mjs`, and module import checks.
+
+## Next
+
+### Property Snapshot Submit Adapter
+
+**Goal:** turn wallet-owned property snapshots into wallet-submitted CKB transactions.
+
 **Acceptance:**
-- Editable wallet-owned home can export a `cellshire.property.snapshot` v1 cell
-  payload.
-- Writer path is gated behind connected wallet identity and keeps local save as
-  fallback.
-- Snapshot payload includes owner, tier, tile map, camera, and schema version.
-- Tests cover payload formatting, owner gating, and local fallback behavior.
+- Submit adapter prepares a transaction request for a property snapshot cell.
+- CCC/JoyID path is gated behind a connected signer and reports
+  cancellation/funding failures.
+- Local fixture writer remains available as offline/dev fallback.
+- Tests cover transaction payload mapping, signer gating, and failure normalization.
 
 ## Needs Decision
 

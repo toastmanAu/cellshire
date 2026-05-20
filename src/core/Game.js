@@ -44,9 +44,12 @@ import {
 } from '../property/propertyZone.js';
 import {
     clearPropertyZone,
-    savePropertyZone,
 } from '../property/propertyStore.js';
 import { LocalPropertySnapshotAdapter } from '../property/propertySnapshotAdapter.js';
+import {
+    LocalStoragePropertySnapshotWriter,
+    savePropertyZoneWithSnapshotWriter,
+} from '../property/propertySnapshotWriter.js';
 import {
     canAffordExpansion,
     formatExpansionCost,
@@ -63,6 +66,7 @@ import {
 import { LocalInventoryAdapter } from '../inventory/inventoryAdapter.js';
 import { propertyVisitLabel } from '../visiting/propertyVisit.js';
 import { buildVisitUrl, visitLinkSourceFromSnapshot } from '../visiting/visitLinks.js';
+import { loadWalletIdentity } from '../wallet/walletIdentity.js';
 import {
     buyStoreItem,
     formatStorePrice,
@@ -115,6 +119,7 @@ export class Game {
         this.propertySnapshotStatus = 'missing';
         this.propertySnapshotStale = false;
         this.propertySnapshotAdapter = new LocalPropertySnapshotAdapter({ storage: safeStorage });
+        this.propertySnapshotWriter = new LocalStoragePropertySnapshotWriter({ storage: safeStorage });
         this.propInventory = loadPropInventory(safeStorage);
         this.inventoryAdapter = new LocalInventoryAdapter({
             props: this.propInventory,
@@ -308,10 +313,8 @@ export class Game {
                 this.ui?.showToast('Visited properties are read-only');
                 return false;
             }
-            const ok = savePropertyZone(safeStorage, this.tileMap, this.camera, {
-                propertyTier: this.propertyTier,
-                ownerId: this.propertyOwner,
-            });
+            const result = this._savePropertyWithSnapshot();
+            const ok = result.ok;
             this.ui?.showToast(ok ? 'Saved your property' : 'Property save failed');
             return ok;
         }
@@ -1201,11 +1204,20 @@ export class Game {
 
     _autosaveProperty() {
         if (this.mapKind === 'property' && !this.propertyReadOnly) {
-            savePropertyZone(safeStorage, this.tileMap, this.camera, {
-                propertyTier: this.propertyTier,
-                ownerId: this.propertyOwner,
-            });
+            this._savePropertyWithSnapshot();
         }
+    }
+
+    _savePropertyWithSnapshot() {
+        return savePropertyZoneWithSnapshotWriter({
+            storage: safeStorage,
+            writer: this.propertySnapshotWriter,
+            walletState: loadWalletIdentity(safeStorage),
+            tileMap: this.tileMap,
+            camera: this.camera,
+            propertyTier: this.propertyTier,
+            ownerId: this.propertyOwner,
+        });
     }
 
     _captureRuntime() {
