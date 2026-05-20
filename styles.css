@@ -468,6 +468,167 @@ html, body {
     filter: saturate(0.5);
 }
 
+/* -- Player Marketplace ----------------------------------------- */
+
+#marketplace-hud {
+    position: fixed;
+    left: 12px;
+    bottom: 282px;
+    z-index: 21;
+    width: min(410px, calc(100vw - 24px));
+    color: var(--ink);
+    font: 12px/1.35 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.marketplace__toggle {
+    display: block;
+    border: 0;
+    border-radius: 7px;
+    background: #7a4f9a;
+    color: #fff;
+    font-weight: 800;
+    padding: 8px 11px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+}
+
+.marketplace__panel {
+    display: none;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid rgba(217, 208, 189, 0.95);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 252, 244, 0.97);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(8px);
+}
+
+#marketplace-hud[data-open="1"] .marketplace__panel {
+    display: grid;
+    gap: 8px;
+}
+
+.marketplace__title {
+    color: #6d3f8f;
+    font-weight: 800;
+}
+
+.marketplace__status {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.marketplace__list-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 84px auto;
+    align-items: center;
+    gap: 7px;
+    padding: 7px;
+    border: 1px solid rgba(217, 208, 189, 0.72);
+    border-radius: 7px;
+    background: #fffaf0;
+}
+
+.marketplace__form-label {
+    grid-column: 1 / -1;
+    color: var(--ink-soft);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.marketplace__list-form select,
+.marketplace__list-form input {
+    min-width: 0;
+    width: 100%;
+    border: 1px solid rgba(217, 208, 189, 0.95);
+    border-radius: 6px;
+    background: #fffaf0;
+    color: var(--ink);
+    font: 12px/1.25 system-ui, -apple-system, 'Segoe UI', sans-serif;
+    padding: 7px 8px;
+}
+
+.marketplace__list-button,
+.marketplace__action {
+    border: 0;
+    border-radius: 6px;
+    background: var(--cobalt);
+    color: #fff;
+    font-weight: 800;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+
+.marketplace__list-button:disabled,
+.marketplace__action:disabled {
+    cursor: default;
+    opacity: 0.45;
+    filter: saturate(0.5);
+}
+
+.marketplace__list {
+    display: grid;
+    gap: 7px;
+    max-height: min(46vh, 390px);
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.marketplace__item {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    padding: 7px;
+    border: 1px solid rgba(217, 208, 189, 0.72);
+    border-radius: 7px;
+    background: #fffaf0;
+}
+
+.marketplace__item[data-rarity="player"] {
+    border-color: rgba(61, 115, 85, 0.34);
+}
+
+.marketplace__item[data-rarity="rare"] {
+    border-color: rgba(122, 79, 154, 0.42);
+}
+
+.marketplace__thumb {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    background: rgba(238, 230, 211, 0.72);
+}
+
+.marketplace__thumb canvas {
+    display: block;
+}
+
+.marketplace__body {
+    min-width: 0;
+}
+
+.marketplace__name {
+    color: var(--ink);
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.marketplace__meta,
+.marketplace__price {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.marketplace__price {
+    color: var(--ink-soft);
+    font-weight: 700;
+}
+
 /* The touch-controls cheatsheet variant is a no-op on mouse devices —
    a media query below swaps it in on coarse-pointer devices. */
 .ins-grid--touch { display: none; }
@@ -1372,13 +1533,19 @@ body.mode-property #property-hud {
         width: min(280px, calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));
     }
     #general-store-hud,
+    #marketplace-hud,
     #trader-hud {
         bottom: calc(200px + 16px + env(safe-area-inset-bottom));
         width: min(280px, calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));
     }
     #general-store-hud { left: calc(8px + env(safe-area-inset-left)); }
+    #marketplace-hud { left: calc(82px + env(safe-area-inset-left)); }
     #trader-hud { right: calc(8px + env(safe-area-inset-right)); }
     .general-store__list { max-height: 38vh; }
+    .marketplace__list { max-height: 34vh; }
+    .marketplace__list-form {
+        grid-template-columns: minmax(0, 1fr) 72px auto;
+    }
     .ins-summary {
         padding: 10px 14px 10px 10px;
         min-height: 44px;
@@ -1413,6 +1580,7 @@ body.mode-property #property-hud {
     #instructions { bottom: calc(184px + 14px + env(safe-area-inset-bottom)); }
     #economy-hud { bottom: calc(184px + 14px + env(safe-area-inset-bottom)); }
     #general-store-hud,
+    #marketplace-hud,
     #trader-hud { bottom: calc(184px + 14px + env(safe-area-inset-bottom)); }
 }
 

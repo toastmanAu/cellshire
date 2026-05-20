@@ -57,6 +57,11 @@ export function installWalletHUD({ storage, shouldFail = false, connector = conn
         action.disabled = false;
     }
 
+    function emitWalletChange() {
+        if (typeof window === 'undefined') return;
+        window.dispatchEvent(new CustomEvent('cellshire:walletchange', { detail: state }));
+    }
+
     async function connect() {
         state = { status: 'connecting', account: null, error: null };
         render();
@@ -71,11 +76,13 @@ export function installWalletHUD({ storage, shouldFail = false, connector = conn
             };
         }
         render();
+        emitWalletChange();
     }
 
     function disconnect() {
         state = clearWalletIdentity(storage);
         render();
+        emitWalletChange();
     }
 
     action.addEventListener('click', () => {

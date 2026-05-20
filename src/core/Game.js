@@ -62,6 +62,14 @@ import {
     generalStoreItem,
 } from '../store/generalStoreCatalog.js';
 import {
+    buyMarketplaceListing,
+    cancelMarketplaceListing,
+    createMarketplaceListing,
+    loadMarketplaceState,
+    marketplaceListings,
+    saveMarketplaceState,
+} from '../marketplace/playerMarketplace.js';
+import {
     createMapRegistry,
     entrySpawnForMap,
     mapByKind,
@@ -92,8 +100,10 @@ export class Game {
         this.mapRegistry = createMapRegistry();
         this._mapRuntime = new Map();
         this._mapListeners = new Set();
+        this._marketplaceListeners = new Set();
         this.propertyTier = 1;
         this.propInventory = loadPropInventory(safeStorage);
+        this.marketplaceState = loadMarketplaceState(safeStorage);
         this.propInventory.onChange(() => {
             savePropInventory(safeStorage, this.propInventory);
             this.ui?.update();
@@ -883,6 +893,10 @@ export class Game {
             || this.propInventory.get(assetId) > 0;
     }
 
+    assetName(assetId) {
+        return ASSET_INDEX[assetId]?.name ?? assetId;
+    }
+
     propertyExpansionState() {
         const summary = propertyTierSummary(this.propertyTier);
         const next = nextPropertyTier(this.propertyTier);
@@ -937,6 +951,72 @@ export class Game {
         this.ui?.showToast?.(`Bought ${result.item.name}`, 1800);
         this.ui?.update();
         return result;
+    }
+
+    marketplaceListings() {
+        return marketplaceListings(this.marketplaceState);
+    }
+
+    listMarketplaceItem({ assetId, price, account }) {
+        const result = createMarketplaceListing({
+            assetId,
+            price,
+            seller: account,
+            propInventory: this.propInventory,
+            state: this.marketplaceState,
+        });
+        if (!result.ok) {
+            this.ui?.showToast?.(marketplaceFailureMessage(result.reason), 2200);
+            return result;
+        }
+        this._saveMarketplace();
+        this.ui?.showToast?.(`Listed ${result.listing.name}`, 1800);
+        return result;
+    }
+
+    buyMarketplaceListing(listingId, account) {
+        const result = buyMarketplaceListing({
+            listingId,
+            buyer: account,
+            inventory: this.player?.inventory,
+            propInventory: this.propInventory,
+            state: this.marketplaceState,
+        });
+        if (!result.ok) {
+            this.ui?.showToast?.(marketplaceFailureMessage(result.reason), 2200);
+            return result;
+        }
+        this._saveMarketplace();
+        this.ui?.showToast?.(`Bought ${result.listing.name}`, 1800);
+        return result;
+    }
+
+    cancelMarketplaceListing(listingId, account) {
+        const result = cancelMarketplaceListing({
+            listingId,
+            seller: account,
+            propInventory: this.propInventory,
+            state: this.marketplaceState,
+        });
+        if (!result.ok) {
+            this.ui?.showToast?.(marketplaceFailureMessage(result.reason), 2200);
+            return result;
+        }
+        this._saveMarketplace();
+        this.ui?.showToast?.(`Canceled ${result.listing.name}`, 1800);
+        return result;
+    }
+
+    onMarketplaceChange(cb) {
+        this._marketplaceListeners.add(cb);
+        return () => this._marketplaceListeners.delete(cb);
+    }
+
+    _saveMarketplace() {
+        saveMarketplaceState(safeStorage, this.marketplaceState);
+        for (const cb of this._marketplaceListeners) cb(this.marketplaceListings());
+        this.ui?.update();
+        this.renderer.markDirty();
     }
 
     onMapChange(cb) {
@@ -1114,4 +1194,14 @@ export class Game {
         this.renderer.draw();
         requestAnimationFrame(this._loop);
     }
+}
+
+function marketplaceFailureMessage(reason) {
+    if (reason === 'wallet-disconnected') return 'Connect JoyID to trade';
+    if (reason === 'insufficient-funds') return 'Not enough CKB';
+    if (reason === 'missing-owned-item') return 'No owned prop to list';
+    if (reason === 'invalid-price') return 'Enter a valid price';
+    if (reason === 'own-listing') return 'Cannot buy your own listing';
+    if (reason === 'not-owner') return 'Only the seller can cancel';
+    return 'Marketplace action failed';
 }

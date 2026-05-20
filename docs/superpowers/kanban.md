@@ -264,19 +264,26 @@ Verified with the browser test harness (`182 passed, 0 failed`),
 `node netlify-build.mjs`, and module import checks for the new HUD/Game
 wiring.
 
-## Next
-
 ### Player Marketplace
+
+**Completed:** 2026-05-20
 
 **Goal:** support unique player-listed items.
 
-## Later
+Added a local-first marketplace model for unique prop/skin listing cells,
+including seed listings for offline browsing, player-created prop listings,
+buy, and cancel flows. Listing player props consumes one owned prop instance;
+cancel returns it; buying spends local CKB and adds the purchased prop or skin
+to local marketplace state. The Marketplace HUD stays browse-only when no
+wallet identity is connected, and the live Cellswap/Spore settlement path is
+documented in
+[`2026-05-20-player-marketplace-cellswap-spore.md`](specs/2026-05-20-player-marketplace-cellswap-spore.md).
 
-**Acceptance:**
-- Listing model for unique prop/skin cells.
-- Browse, buy, cancel listing flows.
-- Cellswap/Spore integration design documented before implementation.
-- Marketplace remains read-only/offline-safe when wallet is disconnected.
+Verified with the browser test harness (`187 passed, 0 failed`),
+`node netlify-build.mjs`, marketplace module import checks, and a headless
+app smoke load confirming the browse-only Market HUD mounts cleanly.
+
+## Next
 
 ### Open Asset Standard
 
@@ -287,6 +294,8 @@ wiring.
 - Render-rule format maps cell metadata to existing asset/renderer paths.
 - Compatibility/versioning rules documented.
 - Test fixture cell renders as an in-game prop without hardcoded asset id.
+
+## Later
 
 ### Chain Inventory Read Model
 
