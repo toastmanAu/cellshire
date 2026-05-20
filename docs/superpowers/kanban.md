@@ -357,17 +357,35 @@ documented in
 Verified with the browser test harness (`205 passed, 0 failed`),
 `node netlify-build.mjs`, and module import checks.
 
-## Next
-
 ### Shareable Visit Links
+
+**Completed:** 2026-05-20
 
 **Goal:** make property visits discoverable from wallet identity.
 
+Added a visit-link formatter and property HUD share action. Links include the
+current property owner id and selected snapshot source (`local` or `chain`),
+strip session/editor params, and preserve useful context such as fixed prices.
+Local/disconnected property mode shares a local preview link, while visited or
+future wallet-owned properties share their loaded owner id. Clipboard copy uses
+the browser clipboard API when available and falls back to showing the URL in
+the toast. The link contract is documented in
+[`2026-05-20-shareable-visit-links.md`](specs/2026-05-20-shareable-visit-links.md).
+
+Verified with the browser test harness (`209 passed, 0 failed`),
+`node netlify-build.mjs`, and module import checks.
+
+## Next
+
+### Wallet Owner Property Binding
+
+**Goal:** bind home ownership to connected wallet identity.
+
 **Acceptance:**
-- Connected wallet HUD or property HUD exposes a copyable visit link.
-- Link includes owner id and chosen snapshot source.
-- Disconnected local mode can still show a local preview link.
-- Tests cover link formatting and source flag handling.
+- Connected wallet can opt into wallet-owned property owner id.
+- Existing local property save remains available for offline play.
+- Visit/share links use wallet address once ownership is bound.
+- Tests cover local-to-wallet property owner selection.
 
 ## Needs Decision
 

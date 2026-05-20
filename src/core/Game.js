@@ -62,6 +62,7 @@ import {
 } from '../property/propInventory.js';
 import { LocalInventoryAdapter } from '../inventory/inventoryAdapter.js';
 import { propertyVisitLabel } from '../visiting/propertyVisit.js';
+import { buildVisitUrl, visitLinkSourceFromSnapshot } from '../visiting/visitLinks.js';
 import {
     buyStoreItem,
     formatStorePrice,
@@ -1277,6 +1278,15 @@ export class Game {
 
     isVisitingProperty() {
         return this.mapKind === 'property' && this.propertyReadOnly;
+    }
+
+    shareableVisitLink({ baseUrl } = {}) {
+        const fallback = typeof window !== 'undefined' ? window.location.href : 'http://127.0.0.1/';
+        return buildVisitUrl({
+            baseUrl: baseUrl ?? fallback,
+            ownerId: this.propertyOwner || 'local',
+            source: visitLinkSourceFromSnapshot(this.propertySnapshotSource),
+        });
     }
 
     /* ── Frame loop ───────────────────────────────────────────── */

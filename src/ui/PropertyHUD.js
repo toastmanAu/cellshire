@@ -29,6 +29,18 @@ export function installPropertyHUD(game) {
     });
     root.appendChild(unlock);
 
+    const share = document.createElement('button');
+    share.type = 'button';
+    share.className = 'property-hud__share';
+    share.textContent = 'Share';
+    share.addEventListener('click', async () => {
+        const link = game.shareableVisitLink?.();
+        if (!link) return;
+        const copied = await copyText(link);
+        game.ui?.showToast?.(copied ? 'Visit link copied' : link, copied ? 1600 : 3600);
+    });
+    root.appendChild(share);
+
     document.body.appendChild(root);
 
     function render() {
@@ -48,6 +60,8 @@ export function installPropertyHUD(game) {
             unlock.disabled = !expansion.canAffordNext;
             unlock.textContent = `Expand · ${expansion.nextCostLabel}`;
         }
+        share.hidden = false;
+        share.textContent = home ? 'Share' : 'Share home';
     }
 
     function visitDetail(expansion) {
@@ -71,4 +85,16 @@ export function installPropertyHUD(game) {
             root.remove();
         },
     };
+}
+
+async function copyText(text) {
+    try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch {
+        return false;
+    }
+    return false;
 }
