@@ -1245,10 +1245,10 @@ body.mode-visit #property-hud {
     right: calc(12px + env(safe-area-inset-right));
     z-index: 18;
     display: grid;
-    grid-template-columns: auto auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 2px 8px;
-    max-width: min(300px, calc(100vw - 24px));
+    width: min(380px, calc(100vw - 24px));
     padding: 8px 10px;
     border-radius: 8px;
     background: rgba(255, 252, 244, 0.94);
@@ -1280,19 +1280,29 @@ body.mode-visit #property-hud {
     box-shadow: 0 0 0 3px rgba(201, 80, 80, 0.18);
 }
 .wallet-hud__label {
+    grid-column: 2;
     font-size: 12px;
     line-height: 1.1;
     font-weight: 800;
     letter-spacing: 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .wallet-hud__detail {
+    grid-column: 2;
     font-size: 10px;
     line-height: 1.2;
     color: var(--ink-soft);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .wallet-hud__action {
     grid-row: 1 / span 2;
-    grid-column: 3;
+    grid-column: 4;
     border: 0;
     border-radius: 6px;
     background: var(--cobalt);
@@ -1308,6 +1318,25 @@ body.mode-visit #property-hud {
     cursor: wait;
 }
 .wallet-hud__action:not(:disabled):hover { filter: brightness(1.05); }
+.wallet-hud__property {
+    grid-row: 1 / span 2;
+    grid-column: 3;
+    border: 0;
+    border-radius: 6px;
+    background: rgba(31, 42, 55, 0.88);
+    color: #fff;
+    font-weight: 800;
+    font-size: 10px;
+    padding: 7px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.wallet-hud__property[hidden] { display: none; }
+.wallet-hud__property:disabled {
+    opacity: 0.62;
+    cursor: wait;
+}
+.wallet-hud__property:not(:disabled):hover { filter: brightness(1.05); }
 
 /* ── Instructions panel ────────────────────────────────────────── */
 

@@ -940,6 +940,41 @@ export class Game {
         return true;
     }
 
+    async setHomePropertyOwner(ownerId = 'local', { toast = false } = {}) {
+        const nextOwner = ownerId || 'local';
+        const alreadyHome = this.mapKind === 'property'
+            && this.propertyOwner === nextOwner
+            && !this.propertyReadOnly;
+        if (alreadyHome) {
+            if (toast) this.ui?.showToast?.(homeOwnerToast(nextOwner), 1600);
+            return { ok: true, ownerId: nextOwner, changed: false };
+        }
+
+        if (this.mapKind === 'property' && !this.propertyReadOnly) this._autosaveProperty();
+        const mine = mapByKind(this.mapRegistry, 'mine');
+        this.mapRegistry = createMapRegistry({
+            epoch: this.currentEpoch,
+            propertyOwner: nextOwner,
+            propertyReadOnly: false,
+            mineSpawn: mine?.entrySpawn ?? null,
+        });
+
+        if (this.mapKind === 'property') {
+            await this.travelToProperty({ ownerId: nextOwner, readOnly: false });
+        } else {
+            this.propertyOwner = nextOwner;
+            this.propertyReadOnly = false;
+            this.propertySnapshotSource = 'local';
+            this.propertySnapshotStatus = 'missing';
+            this.propertySnapshotStale = false;
+            this._emitMapChange();
+            this.ui?.update();
+        }
+
+        if (toast) this.ui?.showToast?.(homeOwnerToast(nextOwner), 1800);
+        return { ok: true, ownerId: nextOwner, changed: true };
+    }
+
     travelToMine() {
         if (this.mapKind !== 'property') return;
         if (!this.propertyReadOnly) this._autosaveProperty();
@@ -1340,4 +1375,8 @@ function marketplaceFailureMessage(reason) {
     if (reason === 'own-listing') return 'Cannot buy your own listing';
     if (reason === 'not-owner') return 'Only the seller can cancel';
     return 'Marketplace action failed';
+}
+
+function homeOwnerToast(ownerId) {
+    return ownerId === 'local' ? 'Using local home' : 'Using wallet home';
 }

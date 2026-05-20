@@ -375,17 +375,40 @@ the toast. The link contract is documented in
 Verified with the browser test harness (`209 passed, 0 failed`),
 `node netlify-build.mjs`, and module import checks.
 
-## Next
-
 ### Wallet Owner Property Binding
+
+**Completed:** 2026-05-20
 
 **Goal:** bind home ownership to connected wallet identity.
 
+Added a separate owner-binding preference so a connected wallet can explicitly
+switch the home property owner from `local` to the wallet address. The Wallet
+HUD now exposes `Use wallet home` / `Use local home`, and disconnecting returns
+the live owner to local mode without deleting either local or owner-keyed
+property saves. Startup applies the wallet owner when wallet features are
+enabled, a persisted wallet is connected, and the binding mode is wallet.
+`Game.setHomePropertyOwner()` autosaves the current editable property before
+switching owners, so share links and the property portal target the selected
+owner id. The binding contract is documented in
+[`2026-05-20-wallet-owner-property-binding.md`](specs/2026-05-20-wallet-owner-property-binding.md).
+
+Verified with the browser test harness (`214 passed, 0 failed`),
+`node netlify-build.mjs`, module import checks, and a headless wallet-mode boot
+smoke.
+
+## Next
+
+### Property Snapshot Cell Writer
+
+**Goal:** write wallet-owned property snapshots into chain-shaped cells.
+
 **Acceptance:**
-- Connected wallet can opt into wallet-owned property owner id.
-- Existing local property save remains available for offline play.
-- Visit/share links use wallet address once ownership is bound.
-- Tests cover local-to-wallet property owner selection.
+- Editable wallet-owned home can export a `cellshire.property.snapshot` v1 cell
+  payload.
+- Writer path is gated behind connected wallet identity and keeps local save as
+  fallback.
+- Snapshot payload includes owner, tier, tile map, camera, and schema version.
+- Tests cover payload formatting, owner gating, and local fallback behavior.
 
 ## Needs Decision
 

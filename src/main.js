@@ -34,9 +34,10 @@ import { describeEpochValueRange } from './mining/epochValueRange.js';
 import { loadMinedState, pruneStaleMinedState } from './mining/minedStore.js';
 import { chainMiningEnabled, makeMiningAdapterFromParams } from './mining/miningAdapter.js';
 import { getEpochPriceSnapshot } from './mining/priceSnapshot.js';
-import { walletFeatureEnabled } from './wallet/walletIdentity.js';
+import { loadWalletIdentity, walletFeatureEnabled } from './wallet/walletIdentity.js';
 import { propertyVisitOwnerFromParams } from './visiting/propertyVisit.js';
 import { makePropertySnapshotAdapterFromParams } from './property/propertySnapshotAdapter.js';
+import { loadPropertyOwnerBinding, propertyOwnerFromBinding } from './property/propertyOwnerBinding.js';
 
 async function main() {
     document.body.dataset.cellshireBoot = 'loading';
@@ -69,6 +70,10 @@ async function main() {
     const params = new URLSearchParams(location.search);
     const devMode = params.get('dev') === '1';
     const visitOwner = propertyVisitOwnerFromParams(params);
+    const walletSurfaceEnabled = walletFeatureEnabled(params) || chainMiningEnabled(params) || cccJoyIdEnabled(params);
+    const walletState = walletSurfaceEnabled ? loadWalletIdentity(safeStorage) : null;
+    const homeOwner = visitOwner
+        ?? propertyOwnerFromBinding(walletState, loadPropertyOwnerBinding(safeStorage));
     game.mode = devMode ? 'build' : 'play';
     game.miningAdapter = makeMiningAdapterFromParams({
         params,
@@ -120,7 +125,7 @@ async function main() {
     });
     game.configureMapRegistry({
         epoch,
-        propertyOwner: visitOwner ?? 'local',
+        propertyOwner: homeOwner,
         propertyReadOnly: !!visitOwner,
     });
     const priceSnapshot = await getEpochPriceSnapshot({
@@ -191,7 +196,7 @@ async function main() {
             game.configureMapRegistry({
                 epoch,
                 mineSpawn: spawn,
-                propertyOwner: visitOwner ?? 'local',
+                propertyOwner: homeOwner,
                 propertyReadOnly: !!visitOwner,
             });
             game.ensureMinePropertyPortal(spawn);
@@ -243,10 +248,11 @@ async function main() {
     if (devMode) installOreDebugHUD(game);
     installEpochHUD(game, genStats);
     installPropertyHUD(game);
-    if (walletFeatureEnabled(params) || chainMiningEnabled(params) || cccJoyIdEnabled(params)) {
+    if (walletSurfaceEnabled) {
         const useRealJoyId = cccJoyIdEnabled(params) || cccJoyIdMiningEnabled(params);
         installWalletHUD({
             storage: safeStorage,
+            game,
             shouldFail: params.get('walletFail') === '1',
             connector: useRealJoyId
                 ? ({ shouldFail }) => {

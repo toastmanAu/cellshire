@@ -62,4 +62,42 @@ describe('WalletHUD', () => {
         expect(hud.root.querySelector('.wallet-hud__action').textContent).toBe('Retry');
         cleanup();
     });
+
+    it('lets a connected wallet opt into and out of wallet-owned home', async () => {
+        cleanup();
+        const storage = fakeStorage();
+        const game = {
+            propertyOwner: 'local',
+            async setHomePropertyOwner(ownerId) {
+                this.propertyOwner = ownerId;
+                return { ok: true, ownerId };
+            },
+        };
+        const hud = installWalletHUD({
+            storage,
+            game,
+            connector: async () => ({
+                provider: 'joyid',
+                address: 'ckt1owner',
+                label: 'JoyID Dev',
+            }),
+        });
+
+        hud.root.querySelector('.wallet-hud__action').click();
+        await new Promise(r => setTimeout(r, 0));
+        const propertyAction = hud.root.querySelector('.wallet-hud__property');
+        expect(propertyAction.textContent).toBe('Use wallet home');
+
+        propertyAction.click();
+        await new Promise(r => setTimeout(r, 0));
+        expect(game.propertyOwner).toBe('ckt1owner');
+        expect(JSON.parse(storage.get('cellshire:propertyOwnerBinding:v1')).mode).toBe('wallet');
+        expect(propertyAction.textContent).toBe('Use local home');
+
+        propertyAction.click();
+        await new Promise(r => setTimeout(r, 0));
+        expect(game.propertyOwner).toBe('local');
+        expect(storage.get('cellshire:propertyOwnerBinding:v1')).toBeNull();
+        cleanup();
+    });
 });
