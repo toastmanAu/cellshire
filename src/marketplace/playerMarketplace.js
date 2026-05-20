@@ -1,4 +1,4 @@
-import { ASSET_INDEX } from '../assets/assetManifest.js';
+import { assetDefinitionFor } from '../assets/assetRegistry.js';
 import { formatCurrencyAmount } from '../mining/cryptoEconomy.js';
 
 export const MARKETPLACE_STORAGE_KEY = 'cellshire:marketplace:v1:local';
@@ -62,7 +62,7 @@ function normalizeState(data) {
 
 function normalizeStoredListing(entry) {
     if (!entry || typeof entry !== 'object') return null;
-    if (!ASSET_INDEX[entry.assetId]) return null;
+    if (!assetDefinitionFor(entry.assetId)) return null;
     if (entry.itemType !== 'prop' && entry.itemType !== 'skin') return null;
     if (!entry.price || typeof entry.price.currency !== 'string' || !Number.isFinite(Number(entry.price.amount))) {
         return null;
@@ -109,7 +109,7 @@ export function marketplaceCanMutate(walletState) {
 }
 
 export function enrichListing(listing, source = 'local') {
-    const asset = ASSET_INDEX[listing.assetId];
+    const asset = assetDefinitionFor(listing.assetId);
     if (!asset) return null;
     return {
         ...listing,
@@ -147,7 +147,7 @@ export function createMarketplaceListing({
     now = Date.now,
 } = {}) {
     if (!seller?.address) return { ok: false, reason: 'wallet-disconnected' };
-    if (!ASSET_INDEX[assetId]) return { ok: false, reason: 'missing-asset' };
+    if (!assetDefinitionFor(assetId)) return { ok: false, reason: 'missing-asset' };
     if (itemType !== 'prop' && itemType !== 'skin') return { ok: false, reason: 'invalid-item-type' };
     const amount = Number(price?.amount);
     const currency = price?.currency || 'ckb';

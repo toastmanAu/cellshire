@@ -14,7 +14,11 @@ import { Player } from './Player.js';
 import { TileMap } from '../grid/TileMap.js';
 import { PlacementSystem } from '../building/PlacementSystem.js';
 import { PlacedObject } from '../building/PlacedObject.js';
-import { ASSET_INDEX, ASSET_MANIFEST } from '../assets/assetManifest.js';
+import { ASSET_MANIFEST } from '../assets/assetManifest.js';
+import {
+    allAssetDefinitions,
+    assetDefinitionFor,
+} from '../assets/assetRegistry.js';
 import { SaveSystem } from '../storage/SaveSystem.js';
 import { cellToScreen } from '../grid/IsoGrid.js';
 import { findPath } from '../grid/Pathfinder.js';
@@ -223,7 +227,7 @@ export class Game {
         if (this.category === cat) return;
         this.category = cat;
         // Auto-select first asset of that category.
-        const first = ASSET_MANIFEST.find(a => a.category === cat);
+        const first = allAssetDefinitions().find(a => a.category === cat);
         if (first) this.selectedAssetId = first.id;
         this._resetFlip();
         this.renderer.markDirty();
@@ -231,7 +235,7 @@ export class Game {
     }
 
     selectAsset(id) {
-        const a = ASSET_INDEX[id];
+        const a = assetDefinitionFor(id);
         if (!a) return;
         const changed = this.selectedAssetId !== id;
         this.selectedAssetId = id;
@@ -894,7 +898,7 @@ export class Game {
     }
 
     assetName(assetId) {
-        return ASSET_INDEX[assetId]?.name ?? assetId;
+        return assetDefinitionFor(assetId)?.name ?? assetId;
     }
 
     propertyExpansionState() {
@@ -1042,7 +1046,7 @@ export class Game {
         this.selectedAssetId = isStarterPropertyAsset(this.selectedAssetId)
             ? this.selectedAssetId
             : 'path';
-        this.category = ASSET_INDEX[this.selectedAssetId]?.category ?? 'terrain';
+        this.category = assetDefinitionFor(this.selectedAssetId)?.category ?? 'terrain';
         this.tool = 'place';
         this._resetFlip();
         this.renderer.markDirty();

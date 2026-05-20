@@ -1,4 +1,4 @@
-import { ASSET_INDEX } from '../assets/assetManifest.js';
+import { assetDefinitionFor } from '../assets/assetRegistry.js';
 import { PlacedObject } from '../building/PlacedObject.js';
 import { TileMap } from '../grid/TileMap.js';
 
@@ -48,7 +48,7 @@ export function isStarterPropertyAsset(assetId) {
 }
 
 export function footprintWithinBounds(assetId, gx, gy, bounds = PROPERTY_EDIT_BOUNDS) {
-    const asset = ASSET_INDEX[assetId];
+    const asset = assetDefinitionFor(assetId);
     if (!asset) return false;
     const w = asset.footprint?.w ?? 1;
     const d = asset.footprint?.d ?? 1;
@@ -133,7 +133,7 @@ function findPortalSpot(tileMap, nearCell) {
 }
 
 function addObject(tileMap, assetId, gx, gy, opts = {}) {
-    const asset = ASSET_INDEX[assetId];
+    const asset = assetDefinitionFor(assetId);
     if (!asset || !tileMap.isFreeFor(gx, gy, asset.footprint.w, asset.footprint.d)) return null;
     const obj = new PlacedObject({
         id: tileMap.nextId(),

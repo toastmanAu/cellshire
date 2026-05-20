@@ -15,6 +15,10 @@
  */
 
 import { ASSET_MANIFEST } from './assetManifest.js';
+import {
+    assetDefinitionFor,
+    openAssetDefinitions,
+} from './assetRegistry.js';
 import { imageToAsset, loadImageElement } from './imageToAsset.js';
 import { renderVoxels } from './voxelRenderer.js';
 
@@ -300,17 +304,45 @@ export async function loadAssets(onProgress = () => {}) {
     }
 
     _assets = out;
+    for (const def of openAssetDefinitions()) materializeOpenAsset(def);
     return _assets;
 }
 
 export function getAsset(id) {
     if (!_assets) throw new Error('Assets not yet loaded');
-    const a = _assets[id];
+    let a = _assets[id];
+    if (!a) {
+        const def = assetDefinitionFor(id);
+        if (def?.renderSourceAssetId) a = materializeOpenAsset(def);
+    }
     if (!a) console.warn(`Unknown asset id: ${id}`);
     return a;
 }
 
 export function allAssets() {
     if (!_assets) throw new Error('Assets not yet loaded');
+    for (const def of openAssetDefinitions()) materializeOpenAsset(def);
     return _assets;
+}
+
+function materializeOpenAsset(definition) {
+    if (!_assets || !definition?.renderSourceAssetId) return null;
+    if (_assets[definition.id]) return _assets[definition.id];
+    const source = _assets[definition.renderSourceAssetId];
+    if (!source) return null;
+    _assets[definition.id] = {
+        ...source,
+        id: definition.id,
+        name: definition.name,
+        category: definition.category,
+        kind: definition.kind,
+        footprint: definition.footprint,
+        tileLike: definition.tileLike === true,
+        noShadow: definition.noShadow === true,
+        flatBase: definition.flatBase === true,
+        shadowStyle: definition.shadowStyle ?? source.shadowStyle ?? 'cast',
+        openAsset: definition.openAsset,
+        renderSourceAssetId: definition.renderSourceAssetId,
+    };
+    return _assets[definition.id];
 }

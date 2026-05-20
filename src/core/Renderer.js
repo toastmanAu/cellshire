@@ -36,7 +36,7 @@
 import { CONFIG } from '../config.js';
 import { cellToScreen } from '../grid/IsoGrid.js';
 import { allAssets, getAsset } from '../assets/assetLoader.js';
-import { ASSET_INDEX } from '../assets/assetManifest.js';
+import { assetDefinitionFor } from '../assets/assetRegistry.js';
 
 const TW = CONFIG.tile.w;
 const TH = CONFIG.tile.h;
@@ -1133,7 +1133,7 @@ export class Renderer {
         if (this.hoverCell) {
             const { gx, gy } = this.hoverCell;
             const previewAsset = this.previewAssetId
-                ? ASSET_INDEX[this.previewAssetId]
+                ? assetDefinitionFor(this.previewAssetId)
                 : null;
             const fp = previewAsset?.footprint ?? { w: 1, d: 1 };
             items.push({

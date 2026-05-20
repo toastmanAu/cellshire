@@ -5,7 +5,7 @@
  * and the world (tile map).
  */
 
-import { ASSET_INDEX } from '../assets/assetManifest.js';
+import { assetDefinitionFor } from '../assets/assetRegistry.js';
 import { PlacedObject } from './PlacedObject.js';
 
 export class PlacementSystem {
@@ -15,7 +15,7 @@ export class PlacementSystem {
 
     /** Test whether the given asset can be placed at (gx, gy). */
     canPlace(assetId, gx, gy) {
-        const asset = ASSET_INDEX[assetId];
+        const asset = assetDefinitionFor(assetId);
         if (!asset) return false;
 
         if (asset.kind === 'terrain') {
@@ -27,7 +27,7 @@ export class PlacementSystem {
     }
 
     place(assetId, gx, gy, opts = {}) {
-        const asset = ASSET_INDEX[assetId];
+        const asset = assetDefinitionFor(assetId);
         if (!asset || !this.canPlace(assetId, gx, gy)) return null;
 
         if (asset.kind === 'terrain') {

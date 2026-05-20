@@ -6,7 +6,8 @@
  * they'll be placing.
  */
 
-import { ASSET_MANIFEST, CATEGORIES } from '../assets/assetManifest.js';
+import { CATEGORIES } from '../assets/assetManifest.js';
+import { allAssetDefinitions } from '../assets/assetRegistry.js';
 import { allAssets } from '../assets/assetLoader.js';
 import { playUiClick } from './Audio.js';
 
@@ -40,7 +41,7 @@ export class AssetPalette {
     _renderGrid() {
         this.gridEl.innerHTML = '';
         const generated = allAssets();
-        const items = ASSET_MANIFEST.filter(a => a.category === this.game.category
+        const items = allAssetDefinitions().filter(a => a.category === this.game.category
             && (this.game.isAssetVisibleInPalette?.(a.id) ?? true));
         for (const def of items) {
             const swatch = document.createElement('button');
@@ -83,7 +84,7 @@ export class AssetPalette {
         // Re-render grid only when category changed.
         const visibleIds = Array.from(this.gridEl.querySelectorAll('.swatch'))
             .map(el => el.dataset.assetId);
-        const expectedIds = ASSET_MANIFEST
+        const expectedIds = allAssetDefinitions()
             .filter(a => a.category === this.game.category
                 && (this.game.isAssetVisibleInPalette?.(a.id) ?? true))
             .map(a => a.id);

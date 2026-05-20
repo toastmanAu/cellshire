@@ -283,19 +283,27 @@ Verified with the browser test harness (`187 passed, 0 failed`),
 `node netlify-build.mjs`, marketplace module import checks, and a headless
 app smoke load confirming the browse-only Market HUD mounts cleanly.
 
-## Next
-
 ### Open Asset Standard
+
+**Completed:** 2026-05-20
 
 **Goal:** let community-minted assets appear in game.
 
-**Acceptance:**
-- Molecule schema draft for ground tiles, props, character skins, and accessories.
-- Render-rule format maps cell metadata to existing asset/renderer paths.
-- Compatibility/versioning rules documented.
-- Test fixture cell renders as an in-game prop without hardcoded asset id.
+Captured the v1 schema draft in
+[`2026-05-20-open-asset-standard.md`](specs/2026-05-20-open-asset-standard.md),
+covering ground tile, prop, character skin, and accessory cells. Added a
+`cellshire.manifest-alias` render rule that maps compliant cell metadata to
+existing renderer sources while preserving a generated `open:<cell id>` runtime
+asset id. Placement, property bounds, palette visibility, renderer preview,
+and marketplace validation now resolve assets through a registry that includes
+dynamic open definitions. The browser fixture registers a Spore-like prop cell
+and places it as an in-game prop without adding its id to the static catalog.
 
-## Later
+Verified with the browser test harness (`190 passed, 0 failed`),
+`node netlify-build.mjs`, open-asset module import checks, and a headless app
+smoke load.
+
+## Next
 
 ### Chain Inventory Read Model
 
@@ -306,6 +314,8 @@ app smoke load confirming the browse-only Market HUD mounts cleanly.
 - HUD can render local-dev inventory or chain inventory through the same interface.
 - Reconciliation handles pending txs and stale indexer reads.
 - Local inventory tests stay valid through adapter fixtures.
+
+## Later
 
 ### Visiting + Presence
 
