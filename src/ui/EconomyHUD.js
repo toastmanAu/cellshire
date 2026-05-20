@@ -83,13 +83,16 @@ export function buildEconomySummary(inventory, priceSnapshot) {
     };
 }
 
-export function installEconomyHUD({ player, game, priceSnapshot = null }) {
+export function installEconomyHUD({ player, game, inventoryAdapter = null, priceSnapshot = null }) {
     const card = document.createElement('section');
     card.id = 'economy-hud';
     card.setAttribute('aria-live', 'polite');
     document.body.appendChild(card);
 
     let lastChange = null;
+    let currentSnapshot = null;
+    let currentInventory = player.inventory;
+    let unsubscribeInventory = null;
 
     function makeRow(currencyId, amount) {
         const row = div('economy-hud__row');
@@ -114,7 +117,7 @@ export function installEconomyHUD({ player, game, priceSnapshot = null }) {
     function render() {
         clear(card);
 
-        const summary = buildEconomySummary(player.inventory, priceSnapshot);
+        const summary = buildEconomySummary(currentInventory, priceSnapshot);
         const snapshot = priceSnapshotDetail(priceSnapshot);
         const header = div('economy-hud__header');
         const title = div('economy-hud__title', 'Economy');
@@ -135,6 +138,10 @@ export function installEconomyHUD({ player, game, priceSnapshot = null }) {
         }
         priceDetails.appendChild(detailGrid);
         card.appendChild(priceDetails);
+
+        if (currentSnapshot?.stale) {
+            card.appendChild(div('economy-hud__detail', 'Chain inventory is reconciling pending changes.'));
+        }
 
         if (!summary.hasBalances) {
             card.appendChild(div('economy-hud__empty', 'Mine a deposit to start balances.'));
@@ -158,17 +165,37 @@ export function installEconomyHUD({ player, game, priceSnapshot = null }) {
         }
     }
 
-    render();
-    const off = player.inventory.onChange(change => {
-        lastChange = change;
+    function subscribeToInventory(inventory) {
+        unsubscribeInventory?.();
+        unsubscribeInventory = inventory?.onChange
+            ? inventory.onChange(change => {
+                lastChange = change;
+                render();
+            })
+            : null;
+    }
+
+    async function refresh() {
+        if (!inventoryAdapter?.read) return currentSnapshot;
+        currentSnapshot = await inventoryAdapter.read();
+        if (currentSnapshot?.currencies) currentInventory = currentSnapshot.currencies;
+        subscribeToInventory(currentInventory);
         render();
+        return currentSnapshot;
+    }
+
+    subscribeToInventory(currentInventory);
+    render();
+    refresh().catch(err => {
+        console.warn('[cellshire] inventory adapter read failed', err);
     });
 
     return {
         el: card,
         render,
+        refresh,
         dismiss() {
-            off();
+            unsubscribeInventory?.();
             card.remove();
         },
     };

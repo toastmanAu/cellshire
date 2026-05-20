@@ -182,6 +182,7 @@ async function main() {
             installEconomyHUD({
                 player: game.player,
                 game,
+                inventoryAdapter: game.inventoryAdapter,
                 priceSnapshot,
             });
             installTraderHUD({

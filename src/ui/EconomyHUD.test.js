@@ -1,7 +1,7 @@
 import { describe, it, expect } from '../test/harness.js';
 import { Inventory } from '../core/Inventory.js';
 import { fixedPriceSnapshot } from '../mining/cryptoEconomy.js';
-import { buildEconomySummary, priceSnapshotDetail } from './EconomyHUD.js';
+import { buildEconomySummary, installEconomyHUD, priceSnapshotDetail } from './EconomyHUD.js';
 
 describe('EconomyHUD summary', () => {
     it('totals balances against the active price snapshot', () => {
@@ -35,5 +35,27 @@ describe('EconomyHUD summary', () => {
             ['Captured', '2026-05-18T14:06:32Z'],
             ['Currency', 'USD'],
         ]);
+    });
+
+    it('renders balances from an inventory adapter snapshot', async () => {
+        const chainCurrencies = new Inventory();
+        chainCurrencies.add('ckb', 1000);
+        const hud = installEconomyHUD({
+            player: { inventory: new Inventory() },
+            inventoryAdapter: {
+                async read() {
+                    return {
+                        source: 'chain',
+                        stale: false,
+                        currencies: chainCurrencies,
+                    };
+                },
+            },
+            priceSnapshot: fixedPriceSnapshot(),
+        });
+        await hud.refresh();
+        expect(hud.el.textContent.includes('CKB')).toBe(true);
+        expect(hud.el.textContent.includes('$1.44')).toBe(true);
+        hud.dismiss();
     });
 });

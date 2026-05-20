@@ -60,6 +60,7 @@ import {
     loadPropInventory,
     savePropInventory,
 } from '../property/propInventory.js';
+import { LocalInventoryAdapter } from '../inventory/inventoryAdapter.js';
 import {
     buyStoreItem,
     formatStorePrice,
@@ -107,6 +108,9 @@ export class Game {
         this._marketplaceListeners = new Set();
         this.propertyTier = 1;
         this.propInventory = loadPropInventory(safeStorage);
+        this.inventoryAdapter = new LocalInventoryAdapter({
+            props: this.propInventory,
+        });
         this.marketplaceState = loadMarketplaceState(safeStorage);
         this.propInventory.onChange(() => {
             savePropInventory(safeStorage, this.propInventory);
@@ -188,6 +192,10 @@ export class Game {
     spawnPlayer(gx, gy, opts = {}) {
         if (!isWalkable(this.tileMap, gx, gy)) return false;
         this.player = new Player({ gx, gy, assetId: opts.assetId ?? null });
+        this.inventoryAdapter = new LocalInventoryAdapter({
+            currencies: this.player.inventory,
+            props: this.propInventory,
+        });
         this.renderer.player = this.player;
         this.renderer.markDirty();
         // Recentre the camera on the player so first-frame UX is "you are
@@ -196,6 +204,10 @@ export class Game {
         const { innerWidth: w, innerHeight: h } = window;
         this.camera.centerOn(c.x, c.y, w, h);
         return true;
+    }
+
+    readInventory() {
+        return this.inventoryAdapter.read();
     }
 
     movePlayerTo(gx, gy) {

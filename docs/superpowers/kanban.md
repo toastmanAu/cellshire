@@ -303,19 +303,24 @@ Verified with the browser test harness (`190 passed, 0 failed`),
 `node netlify-build.mjs`, open-asset module import checks, and a headless app
 smoke load.
 
-## Next
-
 ### Chain Inventory Read Model
+
+**Completed:** 2026-05-20
 
 **Goal:** replace local inventory balances with wallet-owned cells.
 
-**Acceptance:**
-- Read player currency/item cells through a single inventory adapter.
-- HUD can render local-dev inventory or chain inventory through the same interface.
-- Reconciliation handles pending txs and stale indexer reads.
-- Local inventory tests stay valid through adapter fixtures.
+Added a local/chain inventory adapter boundary that normalizes currency, prop,
+and skin cells into the existing inventory interfaces. The chain snapshot path
+filters stale indexer cells by `minBlockNumber`, applies pending transaction
+deltas, and reports stale cells for reconciliation UX. The Economy HUD now reads
+through an adapter snapshot while preserving the local player inventory path.
+The read-model contract is documented in
+[`2026-05-20-chain-inventory-read-model.md`](specs/2026-05-20-chain-inventory-read-model.md).
 
-## Later
+Verified with the browser test harness (`196 passed, 0 failed`),
+`node netlify-build.mjs`, and module import checks.
+
+## Next
 
 ### Visiting + Presence
 
