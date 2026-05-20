@@ -416,18 +416,40 @@ owner-mismatched. The contract is documented in
 Verified with the browser test harness (`218 passed, 0 failed`),
 `node netlify-build.mjs`, and module import checks.
 
-## Next
-
 ### Property Snapshot Submit Adapter
+
+**Completed:** 2026-05-21
 
 **Goal:** turn wallet-owned property snapshots into wallet-submitted CKB transactions.
 
+Added a logical property snapshot transaction request builder and a submit
+adapter for wallet-owned property snapshots. The default writer remains the
+local fixture writer; `?propertySnapshotSubmit=ccc` or
+`?propertySnapshotReal=1` switches saves to the CCC/JoyID submit adapter. The
+adapter preserves the existing wallet-owner gate, maps snapshots into
+`cellshire_property_snapshot_tx` requests, and reports normalized submit
+failures while keeping the local property save successful. CCC/JoyID now has a
+property snapshot receipt payload and transaction builder that mirrors the
+mining submit path. The flow is documented in
+[`2026-05-21-property-snapshot-submit-adapter.md`](specs/2026-05-21-property-snapshot-submit-adapter.md).
+
+Verified with the browser test harness (`227 passed, 0 failed`),
+`node netlify-build.mjs`, module import checks, and a headless
+`?propertySnapshotSubmit=ccc` boot smoke.
+
+## Next
+
+### Property Snapshot Save Status
+
+**Goal:** surface local/snapshot publish status after property saves.
+
 **Acceptance:**
-- Submit adapter prepares a transaction request for a property snapshot cell.
-- CCC/JoyID path is gated behind a connected signer and reports
-  cancellation/funding failures.
-- Local fixture writer remains available as offline/dev fallback.
-- Tests cover transaction payload mapping, signer gating, and failure normalization.
+- Explicit property saves show whether the local save, fixture write, or submit
+  path succeeded.
+- Snapshot submit failures surface normalized player-facing messages.
+- Autosave avoids noisy toasts but records latest snapshot write status for
+  HUD/debug use.
+- Tests cover status formatting and submit failure messaging.
 
 ## Needs Decision
 

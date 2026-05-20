@@ -307,13 +307,13 @@ export class Game {
         this.ui?.update();
     }
 
-    save() {
+    async save() {
         if (this.mapKind === 'property') {
             if (this.propertyReadOnly) {
                 this.ui?.showToast('Visited properties are read-only');
                 return false;
             }
-            const result = this._savePropertyWithSnapshot();
+            const result = await this._savePropertyWithSnapshot();
             const ok = result.ok;
             this.ui?.showToast(ok ? 'Saved your property' : 'Property save failed');
             return ok;
@@ -1204,11 +1204,11 @@ export class Game {
 
     _autosaveProperty() {
         if (this.mapKind === 'property' && !this.propertyReadOnly) {
-            this._savePropertyWithSnapshot();
+            void this._savePropertyWithSnapshot();
         }
     }
 
-    _savePropertyWithSnapshot() {
+    async _savePropertyWithSnapshot() {
         return savePropertyZoneWithSnapshotWriter({
             storage: safeStorage,
             writer: this.propertySnapshotWriter,

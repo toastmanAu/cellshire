@@ -1,5 +1,7 @@
 import { savePropertyZone } from './propertyStore.js';
 import { normalizePropertyTier } from './propertyExpansion.js';
+import { buildPropertySnapshotTransaction } from '../chain/propertySnapshotTx.js';
+import { createCccJoyIdPropertySnapshotSubmitter } from '../chain/cccJoyId.js';
 import {
     PROPERTY_SNAPSHOT_CELL_SCHEMA,
     PROPERTY_SNAPSHOT_CELL_VERSION,
@@ -44,7 +46,7 @@ export class LocalStoragePropertySnapshotWriter {
         this.now = now;
     }
 
-    write({ snapshot, walletState, blockNumber = null } = {}) {
+    async write({ snapshot, walletState, blockNumber = null } = {}) {
         const gate = propertySnapshotWriteGate(walletState, snapshot?.ownerId);
         if (!gate.ok) return gate;
         const existing = this._readCells(snapshot.ownerId);
@@ -77,7 +79,60 @@ export class LocalStoragePropertySnapshotWriter {
     }
 }
 
-export function savePropertyZoneWithSnapshotWriter({
+export class PropertySnapshotSubmitAdapter {
+    constructor({
+        submit,
+        shouldFail = false,
+    } = {}) {
+        this.submit = submit ?? defaultSubmitPrototypePropertySnapshotTx;
+        this.shouldFail = shouldFail;
+    }
+
+    async write({ snapshot, walletState } = {}) {
+        const gate = propertySnapshotWriteGate(walletState, snapshot?.ownerId);
+        if (!gate.ok) return gate;
+        const tx = buildPropertySnapshotTransaction({
+            walletAccount: walletState.account,
+            snapshot,
+            txNonce: `${Date.now()}`,
+        });
+        const receipt = await this.submit(tx, { shouldFail: this.shouldFail });
+        if (!receipt.ok) {
+            return {
+                ok: false,
+                reason: receipt.reason || 'tx-failed',
+                message: receipt.message || 'Property snapshot transaction failed',
+                tx,
+            };
+        }
+        return {
+            ok: true,
+            source: receipt.mode || 'submit',
+            ownerId: snapshot.ownerId,
+            tx,
+            txHash: receipt.txHash,
+        };
+    }
+}
+
+export async function defaultSubmitPrototypePropertySnapshotTx(tx, { shouldFail = false } = {}) {
+    await new Promise(r => setTimeout(r, 250));
+    if (shouldFail) {
+        return {
+            ok: false,
+            reason: 'signature-cancelled',
+            message: 'JoyID signature cancelled',
+        };
+    }
+    const id = btoa(`${tx.outputs.property_snapshot_cell.ownerId}:${tx.tx_nonce}`).replace(/=+$/, '');
+    return {
+        ok: true,
+        mode: 'prototype',
+        txHash: `0xpropsnap${id.slice(0, 24).padEnd(24, '0')}`,
+    };
+}
+
+export async function savePropertyZoneWithSnapshotWriter({
     storage,
     writer,
     walletState,
@@ -109,9 +164,29 @@ export function savePropertyZoneWithSnapshotWriter({
         ok: true,
         localSaved: true,
         snapshotWrite: writer?.write
-            ? writer.write({ snapshot, walletState })
+            ? await writer.write({ snapshot, walletState })
             : { ok: false, reason: 'writer-unavailable' },
     };
+}
+
+export function propertySnapshotSubmitMode(params) {
+    const mode = params?.get?.('propertySnapshotSubmit') || params?.get?.('propertySnapshotMode');
+    return params?.get?.('propertySnapshotReal') === '1'
+        || mode === 'ccc'
+        || mode === 'joyid'
+        || mode === 'ccc-joyid'
+        ? 'ccc-joyid'
+        : 'local-fixture';
+}
+
+export function makePropertySnapshotWriterFromParams({ params, storage, location, importModule } = {}) {
+    if (propertySnapshotSubmitMode(params) !== 'ccc-joyid') {
+        return new LocalStoragePropertySnapshotWriter({ storage });
+    }
+    return new PropertySnapshotSubmitAdapter({
+        submit: createCccJoyIdPropertySnapshotSubmitter({ params, location, importModule }),
+        shouldFail: params?.get?.('propertySnapshotFail') === '1',
+    });
 }
 
 function nextBlockNumber(cells) {

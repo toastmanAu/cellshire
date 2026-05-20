@@ -101,11 +101,60 @@ export function miningReceiptPayload(miningTx) {
     };
 }
 
+export function propertySnapshotReceiptPayload(propertySnapshotTx) {
+    const cell = propertySnapshotTx?.outputs?.property_snapshot_cell;
+    if (!cell?.ownerId || !cell?.tileMap) throw new Error('property snapshot transaction payload required');
+    return {
+        protocol: 'cellshire.property.snapshot',
+        version: 1,
+        action: propertySnapshotTx.action || 'publish_property_snapshot',
+        tx_nonce: propertySnapshotTx.tx_nonce,
+        owner_id: cell.ownerId,
+        cell_id: cell.cellId,
+        block_number: cell.blockNumber,
+        saved_at: cell.savedAt,
+        property_tier: cell.propertyTier,
+        camera: cell.camera ?? null,
+        tile_map: cell.tileMap,
+    };
+}
+
 export function utf8ToHex(value) {
     const bytes = new TextEncoder().encode(String(value));
     let out = '0x';
     for (const byte of bytes) out += byte.toString(16).padStart(2, '0');
     return out;
+}
+
+export async function buildCccPropertySnapshotTransaction({
+    ccc,
+    client,
+    signer,
+    propertySnapshotTx,
+    receiptCapacityCkb = 61,
+}) {
+    const address = await signer.getRecommendedAddress();
+    const expected = propertySnapshotTx?.witness?.address;
+    if (expected && expected !== address) {
+        throw new Error('connected JoyID address does not match property wallet');
+    }
+
+    const { script: lock } = await ccc.Address.fromString(address, client);
+    const payload = propertySnapshotReceiptPayload(propertySnapshotTx);
+    const payloadHex = utf8ToHex(JSON.stringify(payload));
+    const tx = ccc.Transaction.from({
+        outputs: [{
+            capacity: ccc.fixedPointFrom(receiptCapacityCkb),
+            lock,
+        }],
+    });
+
+    await tx.completeInputsByCapacity(signer);
+    if (!Array.isArray(tx.witnesses)) tx.witnesses = [];
+    if (tx.witnesses.length === 0) tx.witnesses.push('0x');
+    tx.witnesses.push(payloadHex);
+    await tx.completeFeeBy(signer);
+    return { tx, payload, payloadHex };
 }
 
 export async function buildCccMiningTransaction({
@@ -137,6 +186,44 @@ export async function buildCccMiningTransaction({
     tx.witnesses.push(payloadHex);
     await tx.completeFeeBy(signer);
     return { tx, payload, payloadHex };
+}
+
+export async function submitCccJoyIdPropertySnapshotTx(propertySnapshotTx, {
+    params,
+    location,
+    ccc,
+    importModule,
+    shouldFail = false,
+    receiptCapacityCkb,
+} = {}) {
+    try {
+        if (shouldFail) throw new Error('JoyID signature cancelled');
+        const config = resolveCccJoyIdConfig({ params, location });
+        const cccModule = await loadCcc({ ccc, cccUrl: config.cccUrl, importModule });
+        const client = createCccClient(cccModule, config);
+        const signer = new cccModule.JoyId.CkbSigner(client, config.name, config.logo);
+        await signer.connect();
+        const prepared = await buildCccPropertySnapshotTransaction({
+            ccc: cccModule,
+            client,
+            signer,
+            propertySnapshotTx,
+            receiptCapacityCkb,
+        });
+        const txHash = await signer.sendTransaction(prepared.tx);
+        return {
+            ok: true,
+            mode: 'ccc-joyid',
+            txHash,
+            payload: prepared.payload,
+        };
+    } catch (err) {
+        return {
+            ok: false,
+            reason: classifyCccJoyIdError(err),
+            message: err?.message || 'CCC/JoyID property snapshot submit failed',
+        };
+    }
 }
 
 export async function submitCccJoyIdMiningTx(miningTx, {
@@ -175,6 +262,10 @@ export async function submitCccJoyIdMiningTx(miningTx, {
             message: err?.message || 'CCC/JoyID mining submit failed',
         };
     }
+}
+
+export function createCccJoyIdPropertySnapshotSubmitter(options = {}) {
+    return (tx, runtime = {}) => submitCccJoyIdPropertySnapshotTx(tx, { ...options, ...runtime });
 }
 
 export function createCccJoyIdMiningSubmitter(options = {}) {

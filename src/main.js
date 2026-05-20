@@ -37,6 +37,7 @@ import { getEpochPriceSnapshot } from './mining/priceSnapshot.js';
 import { loadWalletIdentity, walletFeatureEnabled } from './wallet/walletIdentity.js';
 import { propertyVisitOwnerFromParams } from './visiting/propertyVisit.js';
 import { makePropertySnapshotAdapterFromParams } from './property/propertySnapshotAdapter.js';
+import { makePropertySnapshotWriterFromParams } from './property/propertySnapshotWriter.js';
 import { loadPropertyOwnerBinding, propertyOwnerFromBinding } from './property/propertyOwnerBinding.js';
 
 async function main() {
@@ -83,6 +84,11 @@ async function main() {
     game.propertySnapshotAdapter = makePropertySnapshotAdapterFromParams({
         params,
         storage: safeStorage,
+    });
+    game.propertySnapshotWriter = makePropertySnapshotWriterFromParams({
+        params,
+        storage: safeStorage,
+        location: window.location,
     });
     document.body.classList.add(devMode ? 'mode-build' : 'mode-play');
 

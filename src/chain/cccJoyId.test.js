@@ -1,14 +1,20 @@
 import { describe, it, expect } from '../test/harness.js';
 import {
+    buildCccPropertySnapshotTransaction,
     buildCccMiningTransaction,
     cccJoyIdEnabled,
     cccJoyIdMiningEnabled,
     classifyCccJoyIdError,
     connectCccJoyId,
     miningReceiptPayload,
+    propertySnapshotReceiptPayload,
     resolveCccJoyIdConfig,
+    submitCccJoyIdPropertySnapshotTx,
     submitCccJoyIdMiningTx,
 } from './cccJoyId.js';
+import { buildPropertySnapshotPayload } from '../property/propertySnapshotWriter.js';
+import { createStarterPropertyMap } from '../property/propertyZone.js';
+import { buildPropertySnapshotTransaction } from './propertySnapshotTx.js';
 
 const address = 'ckt1qyq9xcellshirejoyidreal00000000000000000000';
 
@@ -114,6 +120,23 @@ function miningTx() {
     };
 }
 
+function propertySnapshotTx() {
+    return buildPropertySnapshotTransaction({
+        walletAccount: {
+            provider: 'joyid',
+            address,
+        },
+        snapshot: buildPropertySnapshotPayload({
+            ownerId: address,
+            tileMap: createStarterPropertyMap(),
+            propertyTier: 2,
+            savedAt: 123,
+        }),
+        txNonce: 'property-1',
+        blockNumber: 4,
+    });
+}
+
 describe('CCC JoyID flags', () => {
     it('enables wallet and mining submit modes through explicit flags', () => {
         expect(cccJoyIdEnabled(new URLSearchParams('wallet=joyid'))).toBe(true);
@@ -196,5 +219,53 @@ describe('CCC mining submit', () => {
         expect(classifyCccJoyIdError(new Error('User rejected request'))).toBe('signature-cancelled');
         expect(classifyCccJoyIdError(new Error('Insufficient capacity'))).toBe('insufficient-capacity');
         expect(classifyCccJoyIdError(new Error('boom'))).toBe('tx-failed');
+    });
+});
+
+describe('CCC property snapshot submit', () => {
+    it('builds a compact property snapshot receipt payload', () => {
+        const payload = propertySnapshotReceiptPayload(propertySnapshotTx());
+        expect(payload.protocol).toBe('cellshire.property.snapshot');
+        expect(payload.owner_id).toBe(address);
+        expect(payload.property_tier).toBe(2);
+        expect(payload.tile_map.width).toBe(24);
+    });
+
+    it('prepares a CCC transaction with a property snapshot witness', async () => {
+        const capture = {};
+        const ccc = fakeCcc(capture);
+        const client = new ccc.ClientPublicTestnet({ url: 'https://testnet.ckb.dev' });
+        const signer = new ccc.JoyId.CkbSigner(client, 'Cellshire', 'logo.png');
+        const prepared = await buildCccPropertySnapshotTransaction({
+            ccc,
+            client,
+            signer,
+            propertySnapshotTx: propertySnapshotTx(),
+        });
+        expect(prepared.tx.completedInputs).toBe(true);
+        expect(prepared.tx.completedFee).toBe(true);
+        expect(prepared.tx.outputs[0].capacity).toBe('fixed:61');
+        expect(prepared.tx.witnesses.length).toBe(2);
+        expect(prepared.payload.owner_id).toBe(address);
+    });
+
+    it('signs and submits property snapshots through CCC JoyID', async () => {
+        const capture = {};
+        const out = await submitCccJoyIdPropertySnapshotTx(propertySnapshotTx(), {
+            ccc: fakeCcc(capture),
+        });
+        expect(out.ok).toBe(true);
+        expect(out.mode).toBe('ccc-joyid');
+        expect(out.txHash).toBe('0xrealhash');
+        expect(capture.sent).toBe(capture.tx);
+    });
+
+    it('normalizes cancellation and funding failures for property snapshots', async () => {
+        const cancelled = await submitCccJoyIdPropertySnapshotTx(propertySnapshotTx(), {
+            ccc: fakeCcc(),
+            shouldFail: true,
+        });
+        expect(cancelled.ok).toBe(false);
+        expect(cancelled.reason).toBe('signature-cancelled');
     });
 });
