@@ -230,19 +230,23 @@ targets, and spawn fallback.
 Verified with the browser test harness (`166 passed, 0 failed`) and
 `node netlify-build.mjs`.
 
-## Next
-
 ### Trader Store MVP
+
+**Completed:** 2026-05-20
 
 **Goal:** make mined ore balances useful before full marketplace work.
 
-**Acceptance:**
-- Add Trader UI with deterministic exchange rates.
-- Swap local balances between ore currencies.
-- Rate table lives in one tested module.
-- Later Cellswap integration has a clear adapter boundary.
+Added a local Trader HUD that quotes deterministic currency swaps from the
+active/fixed price snapshot with a trader fee. Players can choose source and
+target proof-of-work currencies, use a Max affordance against local balances,
+preview the quote/rate, and swap through the local inventory model. The rate
+table and quote math live in a tested trader module, and the local swap path
+sits behind a trader adapter with an explicit future Cellswap boundary.
 
-## Later
+Verified with the browser test harness (`174 passed, 0 failed`), a headless
+app smoke load, and `node netlify-build.mjs`.
+
+## Next
 
 ### General Store
 
@@ -253,6 +257,8 @@ Verified with the browser test harness (`166 passed, 0 failed`) and
 - Buy action adds owned prop inventory.
 - Property placement consumes owned prop instances when appropriate.
 - Chain vendor-script path documented for the live version.
+
+## Later
 
 ### Player Marketplace
 

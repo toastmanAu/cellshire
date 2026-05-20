@@ -16,6 +16,7 @@ import { installWalletHUD } from './ui/WalletHUD.js';
 import { installPropertyHUD } from './ui/PropertyHUD.js';
 import { installEconomyHUD } from './ui/EconomyHUD.js';
 import { installOreDebugHUD } from './ui/OreDebugHUD.js';
+import { installTraderHUD } from './ui/TraderHUD.js';
 import { isWalkable } from './grid/walkability.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
 import { safeStorage } from './lib/safeStorage.js';
@@ -177,6 +178,11 @@ async function main() {
             game.configureMapRegistry({ epoch, mineSpawn: spawn });
             game.ensureMinePropertyPortal(spawn);
             installEconomyHUD({
+                player: game.player,
+                game,
+                priceSnapshot,
+            });
+            installTraderHUD({
                 player: game.player,
                 game,
                 priceSnapshot,

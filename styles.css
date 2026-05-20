@@ -231,6 +231,114 @@ html, body {
     white-space: normal;
 }
 
+/* -- Trader ------------------------------------------------------ */
+
+#trader-hud {
+    position: fixed;
+    right: 12px;
+    bottom: 230px;
+    z-index: 20;
+    width: min(360px, calc(100vw - 24px));
+    color: var(--ink);
+    font: 12px/1.35 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.trader-hud__toggle {
+    display: block;
+    margin-left: auto;
+    border: 0;
+    border-radius: 7px;
+    background: var(--cobalt);
+    color: #fff;
+    font-weight: 800;
+    padding: 8px 11px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+}
+
+.trader-hud__panel {
+    display: none;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid rgba(217, 208, 189, 0.95);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 252, 244, 0.97);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(8px);
+}
+
+#trader-hud[data-open="1"] .trader-hud__panel {
+    display: grid;
+    gap: 8px;
+}
+
+.trader-hud__title {
+    color: var(--cobalt);
+    font-weight: 800;
+}
+
+.trader-hud__field {
+    display: grid;
+    grid-template-columns: 62px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    color: var(--ink-soft);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.trader-hud__field--amount {
+    grid-template-columns: 62px minmax(0, 1fr) auto;
+}
+
+.trader-hud__field select,
+.trader-hud__field input {
+    min-width: 0;
+    width: 100%;
+    border: 1px solid rgba(217, 208, 189, 0.95);
+    border-radius: 6px;
+    background: #fffaf0;
+    color: var(--ink);
+    font: 12px/1.25 system-ui, -apple-system, 'Segoe UI', sans-serif;
+    padding: 7px 8px;
+}
+
+.trader-hud__secondary,
+.trader-hud__submit {
+    border: 0;
+    border-radius: 6px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.trader-hud__secondary {
+    padding: 7px 9px;
+    background: var(--cobalt-light);
+    color: var(--cobalt);
+}
+
+.trader-hud__submit {
+    padding: 9px 10px;
+    background: var(--leaf);
+    color: #fff;
+}
+
+.trader-hud__submit:disabled {
+    cursor: default;
+    opacity: 0.45;
+    filter: saturate(0.5);
+}
+
+.trader-hud__quote {
+    color: var(--ink);
+    font-weight: 700;
+}
+
+.trader-hud__rate {
+    color: var(--muted);
+    font-size: 11px;
+}
+
 /* The touch-controls cheatsheet variant is a no-op on mouse devices —
    a media query below swaps it in on coarse-pointer devices. */
 .ins-grid--touch { display: none; }
