@@ -20,7 +20,7 @@ import { cellToScreen } from '../grid/IsoGrid.js';
 import { findPath } from '../grid/Pathfinder.js';
 import { isWalkable, isInteractable, findAdjacentWalkable } from '../grid/walkability.js';
 import { OreState } from '../mining/OreState.js';
-import { formatCurrencyAmount } from '../mining/cryptoEconomy.js';
+import { formatCurrencyAmount, splitUsdBudget } from '../mining/cryptoEconomy.js';
 import { isOre, oreConfig } from '../mining/oreCatalog.js';
 import { playPlacementFor, playMineHit, playMineDeplete } from '../ui/Audio.js';
 import { CELL_CURSORS } from '../ui/cursors.js';
@@ -42,6 +42,23 @@ import {
     loadPropertyZone,
     savePropertyZone,
 } from '../property/propertyStore.js';
+import {
+    canAffordExpansion,
+    formatExpansionCost,
+    nextPropertyTier,
+    propertyBoundsForTier,
+    propertyExpansionPreview,
+    propertyTierSummary,
+    spendExpansionCost,
+} from '../property/propertyExpansion.js';
+import {
+    createMapRegistry,
+    entrySpawnForMap,
+    mapByKind,
+    mapById,
+    mineMapIdForEpoch,
+    travelTargetForRole,
+} from '../maps/mapRegistry.js';
 
 export class Game {
     constructor(canvas, ui = null) {
@@ -61,8 +78,11 @@ export class Game {
         // Main.js flips to 'build' when ?dev=1 is set.
         this.mode = 'play';
         this.mapKind = 'mine';
+        this.currentMapId = mineMapIdForEpoch(null);
+        this.mapRegistry = createMapRegistry();
         this._mapRuntime = new Map();
         this._mapListeners = new Set();
+        this.propertyTier = 1;
 
         // Player avatar — created lazily by main.js once procgen has run
         // and a walkable spawn cell exists. Game still functions without
@@ -233,7 +253,9 @@ export class Game {
 
     save() {
         if (this.mapKind === 'property') {
-            const ok = savePropertyZone(safeStorage, this.tileMap, this.camera);
+            const ok = savePropertyZone(safeStorage, this.tileMap, this.camera, {
+                propertyTier: this.propertyTier,
+            });
             this.ui?.showToast(ok ? 'Saved your property' : 'Property save failed');
             return ok;
         }
@@ -443,7 +465,7 @@ export class Game {
         }
 
         if (!this._canPlacePropertyAt(this.selectedAssetId, gx, gy)) {
-            this.ui?.showToast?.('That spot is outside your starter plot');
+            this.ui?.showToast?.('That spot is outside your claim');
             return;
         }
         const result = this.placement.place(this.selectedAssetId, gx, gy, {
@@ -473,22 +495,28 @@ export class Game {
     }
 
     _canPlacePropertyAt(assetId, gx, gy) {
-        return canPlacePropertyAsset(assetId, gx, gy)
+        const bounds = this._propertyBounds();
+        return canPlacePropertyAsset(assetId, gx, gy, bounds)
             && this.placement.canPlace(assetId, gx, gy);
     }
 
     _canErasePropertyAt(gx, gy) {
+        const bounds = this._propertyBounds();
         const obj = this.tileMap.objectAt(gx, gy);
         if (obj?.role) return false;
         if (obj) {
             const fp = obj.footprint || { w: 1, d: 1 };
             for (let ix = 0; ix < fp.w; ix++)
             for (let iy = 0; iy < fp.d; iy++) {
-                if (!canEditPropertyCell(obj.gx + ix, obj.gy + iy)) return false;
+                if (!canEditPropertyCell(obj.gx + ix, obj.gy + iy, bounds)) return false;
             }
             return true;
         }
-        return canEditPropertyCell(gx, gy) && !!this.tileMap.getTerrain(gx, gy);
+        return canEditPropertyCell(gx, gy, bounds) && !!this.tileMap.getTerrain(gx, gy);
+    }
+
+    _propertyBounds() {
+        return propertyBoundsForTier(this.propertyTier);
     }
 
     _syncCursorForCell(cell) {
@@ -533,9 +561,15 @@ export class Game {
      */
     populateOreStates(rand = Math.random, opts = {}) {
         this.oreStates.clear();
-        for (const obj of this.tileMap.objects) {
-            if (!isOre(obj.assetId)) continue;
-            const state = OreState.fromAsset(obj.assetId, rand, opts);
+        const oreObjects = this.tileMap.objects.filter(obj => isOre(obj.assetId));
+        const budgets = Number.isFinite(opts.totalClearValueUsd)
+            ? splitUsdBudget(opts.totalClearValueUsd, oreObjects.length, rand)
+            : null;
+        for (let i = 0; i < oreObjects.length; i++) {
+            const obj = oreObjects[i];
+            const state = OreState.fromAsset(obj.assetId, rand, budgets
+                ? { ...opts, totalValueUsd: budgets[i] }
+                : opts);
             if (state) this.oreStates.set(obj.id, state);
         }
     }
@@ -548,11 +582,11 @@ export class Game {
     onInteract(gx, gy) {
         const obj = this.tileMap.objectAt(gx, gy);
         if (obj?.role === MINE_PROPERTY_PORTAL_ROLE) {
-            this.travelToProperty();
+            this.travelToMapRole(obj.role);
             return;
         }
         if (obj?.role === PROPERTY_MINE_PORTAL_ROLE) {
-            this.travelToMine();
+            this.travelToMapRole(obj.role);
             return;
         }
         if (obj && isOre(obj.assetId)) {
@@ -748,9 +782,41 @@ export class Game {
         return obj;
     }
 
+    configureMapRegistry(opts = {}) {
+        this.mapRegistry = createMapRegistry(opts);
+        const mine = mapByKind(this.mapRegistry, 'mine');
+        if (this.mapKind === 'mine' && mine) this.currentMapId = mine.id;
+        this._emitMapChange();
+    }
+
+    travelToMapRole(role) {
+        const target = travelTargetForRole(role, this.mapRegistry);
+        if (!target) return false;
+        return this.travelToMap(target.id);
+    }
+
+    travelToMap(mapId) {
+        const target = mapById(this.mapRegistry, mapId);
+        if (!target) {
+            this.ui?.showToast?.('Map is not available');
+            return false;
+        }
+        if (target.id === this.currentMapId) return true;
+        if (target.kind === 'property') {
+            this.travelToProperty();
+            return true;
+        }
+        if (target.kind === 'mine') {
+            this.travelToMine();
+            return true;
+        }
+        this.ui?.showToast?.('Map is not available');
+        return false;
+    }
+
     travelToProperty() {
         if (this.mapKind === 'property') return;
-        this._mapRuntime.set('mine', this._captureRuntime());
+        this._mapRuntime.set(this.currentMapId, this._captureRuntime());
         const saved = loadPropertyZone(safeStorage);
         this._loadPropertyMap(saved);
         this.ui?.showToast?.('Welcome home', 1800);
@@ -759,14 +825,18 @@ export class Game {
     travelToMine() {
         if (this.mapKind !== 'property') return;
         this._autosaveProperty();
-        const mine = this._mapRuntime.get('mine');
+        const mineDef = mapByKind(this.mapRegistry, 'mine');
+        const mineId = mineDef?.id ?? mineMapIdForEpoch(this.currentEpoch);
+        const mine = this._mapRuntime.get(mineId);
         if (!mine) {
             this.ui?.showToast?.('Mine map is not loaded');
             return;
         }
         this._restoreRuntime(mine);
         this.mapKind = 'mine';
+        this.currentMapId = mineId;
         this.mode = 'play';
+        this._syncPropertyExpansionPreview();
         this._syncBodyModeClass();
         this._emitMapChange();
         this.ui?.showToast?.('Back to the mine', 1600);
@@ -777,20 +847,57 @@ export class Game {
         return this.mapKind !== 'property' || isStarterPropertyAsset(assetId);
     }
 
+    propertyExpansionState() {
+        const summary = propertyTierSummary(this.propertyTier);
+        const next = nextPropertyTier(this.propertyTier);
+        return {
+            ...summary,
+            next,
+            canAffordNext: canAffordExpansion(this.player?.inventory, this.propertyTier),
+            nextCostLabel: next?.cost ? formatExpansionCost(next.cost) : 'Max tier',
+        };
+    }
+
+    unlockNextPropertyTier() {
+        if (this.mapKind !== 'property') return { ok: false, reason: 'not-property' };
+        const result = spendExpansionCost(this.player?.inventory, this.propertyTier);
+        if (!result.ok) {
+            const next = result.next ?? nextPropertyTier(this.propertyTier);
+            const cost = next?.cost ? formatExpansionCost(next.cost) : 'Max tier';
+            const message = result.reason === 'max-tier'
+                ? 'Claim is fully expanded'
+                : `Need ${cost} to expand`;
+            this.ui?.showToast?.(message, 2200);
+            return result;
+        }
+
+        this.propertyTier = result.tier;
+        this._syncPropertyExpansionPreview();
+        this._autosaveProperty();
+        this.renderer.markDirty();
+        this._emitMapChange();
+        this.ui?.showToast?.(`Expanded to ${propertyTierSummary(this.propertyTier).name}`, 2200);
+        return result;
+    }
+
     onMapChange(cb) {
         this._mapListeners.add(cb);
         return () => this._mapListeners.delete(cb);
     }
 
     _loadPropertyMap(saved) {
+        const propertyDef = mapByKind(this.mapRegistry, 'property');
+        const entrySpawn = entrySpawnForMap(propertyDef, PROPERTY_SPAWN);
         const starter = saved ? null : createStarterPropertyMap();
         const tileMapData = saved?.tileMap ?? starter.serialize();
         this.tileMap.deserialize(tileMapData, d => new PlacedObject(d));
+        this.propertyTier = saved?.propertyTier ?? 1;
         this.oreStates.clear();
         this._pendingInteract = null;
         this._pendingDepletions.clear();
         this.currentEpoch = null;
         this.priceSnapshot = null;
+        this.currentMapId = propertyDef?.id ?? 'property:local';
         this.mapKind = 'property';
         this.mode = 'property';
         this.selectedAssetId = isStarterPropertyAsset(this.selectedAssetId)
@@ -800,19 +907,24 @@ export class Game {
         this.tool = 'place';
         this._resetFlip();
         this.renderer.markDirty();
-        this.movePlayerTo(PROPERTY_SPAWN.gx, PROPERTY_SPAWN.gy);
+        this.movePlayerTo(entrySpawn.gx, entrySpawn.gy);
         if (saved?.camera) {
             this.camera.offsetX = saved.camera.offsetX;
             this.camera.offsetY = saved.camera.offsetY;
             this.camera.zoom = saved.camera.zoom;
         }
         this._syncBodyModeClass();
+        this._syncPropertyExpansionPreview();
         this.ui?.update();
         this._emitMapChange();
     }
 
     _autosaveProperty() {
-        if (this.mapKind === 'property') savePropertyZone(safeStorage, this.tileMap, this.camera);
+        if (this.mapKind === 'property') {
+            savePropertyZone(safeStorage, this.tileMap, this.camera, {
+                propertyTier: this.propertyTier,
+            });
+        }
     }
 
     _captureRuntime() {
@@ -824,11 +936,13 @@ export class Game {
                 zoom: this.camera.zoom,
             },
             playerCell: this.player ? { gx: this.player.gx, gy: this.player.gy } : null,
+            currentMapId: this.currentMapId,
             currentEpoch: this.currentEpoch,
             epochYieldModifier: this.epochYieldModifier,
             priceSnapshot: this.priceSnapshot,
             mode: this.mode,
             mapKind: this.mapKind,
+            propertyTier: this.propertyTier,
             oreStates: Array.from(this.oreStates.entries()).map(([id, state]) => ({
                 id,
                 oreType: state.oreType,
@@ -850,6 +964,10 @@ export class Game {
         this.priceSnapshot = runtime.priceSnapshot ?? null;
         this.mode = runtime.mode;
         this.mapKind = runtime.mapKind;
+        this.currentMapId = runtime.currentMapId
+            ?? mapByKind(this.mapRegistry, runtime.mapKind)?.id
+            ?? this.currentMapId;
+        this.propertyTier = runtime.propertyTier ?? this.propertyTier;
         this.oreStates.clear();
         for (const entry of runtime.oreStates ?? []) {
             this.oreStates.set(entry.id, new OreState(
@@ -864,6 +982,7 @@ export class Game {
         }
         this._pendingInteract = null;
         this._pendingDepletions.clear();
+        this._syncPropertyExpansionPreview();
         this.renderer.markDirty();
         if (runtime.playerCell) this.movePlayerTo(runtime.playerCell.gx, runtime.playerCell.gy);
         this.ui?.update();
@@ -876,8 +995,20 @@ export class Game {
         document.body.classList.toggle('mode-property', this.mode === 'property');
     }
 
+    _syncPropertyExpansionPreview() {
+        this.renderer.propertyExpansionPreview = this.mapKind === 'property'
+            ? propertyExpansionPreview(this.propertyTier)
+            : null;
+        this.renderer.markDirty();
+    }
+
     _emitMapChange() {
-        const state = { mapKind: this.mapKind, mode: this.mode };
+        const state = {
+            mapId: this.currentMapId,
+            mapKind: this.mapKind,
+            mode: this.mode,
+            map: mapById(this.mapRegistry, this.currentMapId),
+        };
         for (const cb of this._mapListeners) cb(state);
     }
 

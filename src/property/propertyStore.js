@@ -1,10 +1,13 @@
+import { normalizePropertyTier } from './propertyExpansion.js';
+
 export const PROPERTY_STORAGE_KEY = 'cellshire:property:v1:local';
 
-export function savePropertyZone(storage, tileMap, camera = null) {
+export function savePropertyZone(storage, tileMap, camera = null, opts = {}) {
     try {
         storage.set(PROPERTY_STORAGE_KEY, JSON.stringify({
             v: 1,
             savedAt: Date.now(),
+            propertyTier: normalizePropertyTier(opts.propertyTier),
             tileMap: tileMap.serialize(),
             camera: camera ? {
                 offsetX: camera.offsetX,
@@ -28,6 +31,7 @@ export function loadPropertyZone(storage) {
             tileMap: data.tileMap,
             camera: data.camera ?? null,
             savedAt: data.savedAt ?? null,
+            propertyTier: normalizePropertyTier(data.propertyTier),
         };
     } catch {
         return null;

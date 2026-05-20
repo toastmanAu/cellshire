@@ -110,6 +110,7 @@ export class Renderer {
         this.previewAssetId = null;  // null when not in place mode
         this.previewValid = true;
         this.eraseMode = false;
+        this.propertyExpansionPreview = null;
         // Player entity drawn in the live overlay (set by Game.spawnPlayer).
         this.player = null;
         // Flip flags applied to the ghost preview (set by Game).
@@ -1121,6 +1122,14 @@ export class Renderer {
         }
 
         // Hover highlight + preview.
+        if (this.propertyExpansionPreview) {
+            items.push({
+                key: -10000,
+                draw: () => this._drawPropertyExpansionPreview(this.propertyExpansionPreview),
+            });
+        }
+
+        // Hover highlight + preview.
         if (this.hoverCell) {
             const { gx, gy } = this.hoverCell;
             const previewAsset = this.previewAssetId
@@ -1621,5 +1630,59 @@ export class Renderer {
             ctx.stroke();
         }
         ctx.restore();
+    }
+
+    _drawPropertyExpansionPreview(preview) {
+        const ctx = this.ctx;
+        const current = preview.currentBounds;
+        const next = preview.nextBounds;
+        if (!current || !next) return;
+
+        ctx.save();
+        ctx.lineWidth = 1 / this.camera.zoom;
+
+        for (let gy = next.minGy; gy <= next.maxGy; gy++)
+        for (let gx = next.minGx; gx <= next.maxGx; gx++) {
+            if (!this.tileMap.inBounds(gx, gy)) continue;
+            const unlocked = gx >= current.minGx
+                && gy >= current.minGy
+                && gx <= current.maxGx
+                && gy <= current.maxGy;
+            const edge = gx === next.minGx
+                || gy === next.minGy
+                || gx === next.maxGx
+                || gy === next.maxGy
+                || gx === current.minGx
+                || gy === current.minGy
+                || gx === current.maxGx
+                || gy === current.maxGy;
+            if (unlocked && !edge) continue;
+
+            ctx.fillStyle = unlocked
+                ? 'rgba(61, 115, 85, 0.055)'
+                : 'rgba(214, 152, 65, 0.16)';
+            ctx.strokeStyle = unlocked
+                ? 'rgba(61, 115, 85, 0.22)'
+                : 'rgba(214, 152, 65, 0.46)';
+            this._drawCellDiamond(gx, gy, true);
+        }
+
+        ctx.restore();
+    }
+
+    _drawCellDiamond(gx, gy, fill = true) {
+        const ctx = this.ctx;
+        const a = cellToScreen(gx, gy);
+        const b = cellToScreen(gx + 1, gy);
+        const c = cellToScreen(gx + 1, gy + 1);
+        const d = cellToScreen(gx, gy + 1);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.lineTo(d.x, d.y);
+        ctx.closePath();
+        if (fill) ctx.fill();
+        ctx.stroke();
     }
 }

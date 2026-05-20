@@ -1,7 +1,7 @@
+import { mineMapIdForEpoch } from '../maps/mapRegistry.js';
+
 export function mapIdForEpoch(epochNumber) {
-    return epochNumber === null || epochNumber === undefined || epochNumber === ''
-        ? 'mine:local'
-        : `mine:${epochNumber}`;
+    return mineMapIdForEpoch(epochNumber);
 }
 
 export function oreIdForObject({ mapId, epoch, obj }) {

@@ -131,7 +131,7 @@ describe('CCC JoyID flags', () => {
         expect(config.network).toBe('testnet');
         expect(config.rpcURL).toBe('https://example.test');
         expect(config.connectedAt).toBe(123);
-        expect(config.logo).toBe('https://cellshire.test/assets/player_miner.png');
+        expect(config.logo).toBe('https://cellshire.test/assets/cellshire_logo.png');
     });
 });
 

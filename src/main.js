@@ -15,6 +15,7 @@ import { installEpochHUD } from './ui/EpochHUD.js';
 import { installWalletHUD } from './ui/WalletHUD.js';
 import { installPropertyHUD } from './ui/PropertyHUD.js';
 import { installEconomyHUD } from './ui/EconomyHUD.js';
+import { installOreDebugHUD } from './ui/OreDebugHUD.js';
 import { isWalkable } from './grid/walkability.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
 import { safeStorage } from './lib/safeStorage.js';
@@ -107,6 +108,7 @@ async function main() {
         fetch: window.fetch.bind(window),
         defaultUrl: 'https://testnet.ckb.dev',
     });
+    game.configureMapRegistry({ epoch });
     const priceSnapshot = await getEpochPriceSnapshot({
         epoch,
         storage: safeStorage,
@@ -119,11 +121,11 @@ async function main() {
     game.renderer.markDirty();
 
     // Build mining state from the procgen output. Same `seed` is mixed
-    // in so per-ore capacity and USD value budgets are deterministic
+    // in so per-ore capacity and the epoch-clear USD budget split are deterministic
     // across reloads.
     const epochValueRange = describeEpochValueRange(epochHash);
     game.populateOreStates(makeSeededRand(seed ^ 0x70F0), {
-        valueRangeUsd: epochValueRange.range,
+        totalClearValueUsd: epochValueRange.clearValueUsd,
     });
 
     // Tag the Game with the epoch so _mineOre can persist hits to the
@@ -172,6 +174,7 @@ async function main() {
                 catalog,
             });
             game.spawnPlayer(spawn.gx, spawn.gy, { assetId: chosen });
+            game.configureMapRegistry({ epoch, mineSpawn: spawn });
             game.ensureMinePropertyPortal(spawn);
             installEconomyHUD({
                 player: game.player,
@@ -209,6 +212,7 @@ async function main() {
         ...stats,
     };
     installPerfHUD(game, genStats);
+    if (devMode) installOreDebugHUD(game);
     installEpochHUD(game, genStats);
     installPropertyHUD(game);
     if (walletFeatureEnabled(params) || chainMiningEnabled(params) || cccJoyIdEnabled(params)) {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from '../test/harness.js';
 import { Inventory } from '../core/Inventory.js';
 import { fixedPriceSnapshot } from '../mining/cryptoEconomy.js';
-import { buildEconomySummary } from './EconomyHUD.js';
+import { buildEconomySummary, priceSnapshotDetail } from './EconomyHUD.js';
 
 describe('EconomyHUD summary', () => {
     it('totals balances against the active price snapshot', () => {
@@ -19,5 +19,21 @@ describe('EconomyHUD summary', () => {
         expect(summary.entries.length).toBe(0);
         expect(summary.totalUsd).toBe(0);
         expect(summary.hasBalances).toBe(false);
+    });
+
+    it('formats price snapshot details for the disclosure affordance', () => {
+        const detail = priceSnapshotDetail({
+            mode: 'live',
+            source: 'coingecko:simple-price',
+            capturedAt: '2026-05-18T14:06:32Z',
+            vsCurrency: 'usd',
+        });
+        expect(detail.label).toBe('prices live · 2026-05-18');
+        expect(detail.rows).toEqual([
+            ['Mode', 'live'],
+            ['Source', 'coingecko:simple-price'],
+            ['Captured', '2026-05-18T14:06:32Z'],
+            ['Currency', 'USD'],
+        ]);
     });
 });

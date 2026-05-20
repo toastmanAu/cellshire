@@ -34,6 +34,7 @@ const ENTRIES = [
     'styles.css',
     'src',
     'assets',
+    'logos',
     ...AUDIO_FILES,
 ];
 

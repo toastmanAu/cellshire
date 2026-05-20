@@ -22,7 +22,7 @@ export function cccJoyIdMiningEnabled(params) {
 export function resolveCccJoyIdConfig({ params, location, now = Date.now } = {}) {
     const network = params?.get?.('ckbNetwork') === 'mainnet' ? 'mainnet' : 'testnet';
     const href = location?.href || 'http://127.0.0.1/';
-    const logo = params?.get?.('joyidLogo') || new URL('/assets/player_miner.png', href).href;
+    const logo = params?.get?.('joyidLogo') || new URL('/assets/cellshire_logo.png', href).href;
     return {
         cccUrl: params?.get?.('cccUrl') || DEFAULT_CCC_ESM_URL,
         name: params?.get?.('joyidAppName') || 'Cellshire',

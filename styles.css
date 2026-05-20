@@ -90,7 +90,7 @@ html, body {
     position: fixed;
     right: 12px;
     bottom: 12px;
-    width: min(280px, calc(100vw - 24px));
+    width: min(420px, calc(100vw - 24px));
     z-index: 19;
     padding: 10px 12px;
     color: var(--ink);
@@ -99,7 +99,7 @@ html, body {
     border-radius: var(--radius-sm);
     box-shadow: var(--shadow);
     font: 12px/1.35 system-ui, -apple-system, 'Segoe UI', sans-serif;
-    pointer-events: none;
+    pointer-events: auto;
     user-select: none;
 }
 
@@ -126,15 +126,41 @@ html, body {
     font-weight: 700;
 }
 
-.economy-hud__meta,
 .economy-hud__empty,
 .economy-hud__detail {
     color: var(--muted);
     font-size: 11px;
 }
 
-.economy-hud__meta {
+.economy-hud__snapshot {
     margin-bottom: 8px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.economy-hud__snapshot summary {
+    width: fit-content;
+    cursor: pointer;
+    list-style-position: outside;
+}
+
+.economy-hud__snapshot-grid {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 2px 8px;
+    margin-top: 5px;
+    padding-top: 5px;
+    border-top: 1px solid rgba(217, 208, 189, 0.55);
+}
+
+.economy-hud__snapshot-key {
+    color: var(--ink-soft);
+}
+
+.economy-hud__snapshot-value {
+    min-width: 0;
+    color: var(--muted);
+    overflow-wrap: anywhere;
 }
 
 .economy-hud__row {
@@ -144,8 +170,42 @@ html, body {
 }
 
 .economy-hud__asset,
+.economy-hud__label,
 .economy-hud__balance {
     min-width: 0;
+}
+
+.economy-hud__asset {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+}
+
+.economy-hud__mark {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(255, 252, 244, 0.86);
+    border: 1px solid rgba(217, 208, 189, 0.7);
+    color: var(--cobalt);
+    font-size: 8px;
+    font-weight: 800;
+    line-height: 1;
+    overflow: hidden;
+}
+
+.economy-hud__mark img {
+    display: block;
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+}
+
+.economy-hud__mark--fallback {
+    font-size: 7px;
 }
 
 .economy-hud__symbol,
@@ -629,7 +689,7 @@ html, body {
     right: calc(12px + env(safe-area-inset-right));
     z-index: 18;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 1px 8px;
     width: min(280px, calc(100vw - 24px));
@@ -652,6 +712,9 @@ html, body {
     font-size: 10px;
     line-height: 1.2;
     color: var(--ink-soft);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 .property-hud__action {
@@ -667,6 +730,26 @@ html, body {
     cursor: pointer;
 }
 .property-hud__action:hover { filter: brightness(1.05); }
+.property-hud__unlock {
+    grid-row: 1 / span 2;
+    grid-column: 3;
+    border: 0;
+    border-radius: 6px;
+    background: var(--cobalt);
+    color: #fff;
+    font-weight: 800;
+    font-size: 10px;
+    padding: 7px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.property-hud__unlock:hover { filter: brightness(1.05); }
+.property-hud__unlock:disabled {
+    cursor: default;
+    opacity: 0.48;
+    filter: saturate(0.5);
+}
+.property-hud__unlock[hidden] { display: none; }
 body.mode-property #property-hud {
     border-color: rgba(61, 115, 85, 0.28);
     background: rgba(244, 251, 237, 0.96);
@@ -677,6 +760,56 @@ body.mode-property #property-hud {
     right: 12px !important;
     bottom: 12px !important;
     left: auto !important;
+}
+
+#ore-debug-hud {
+    position: fixed;
+    left: 16px;
+    top: calc(16px + var(--title-card-height) + 206px);
+    z-index: 9;
+    width: min(420px, calc(100vw - 32px));
+    max-height: min(42vh, 420px);
+    padding: 8px 10px;
+    overflow: auto;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.68);
+    color: #e8f5ff;
+    font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+#ore-debug-hud summary {
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.ore-debug-hud__rows {
+    display: grid;
+    gap: 2px;
+    margin-top: 8px;
+}
+
+.ore-debug-hud__row {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) 48px minmax(104px, auto) 40px;
+    gap: 8px;
+    align-items: baseline;
+    border-top: 1px solid rgba(232, 245, 255, 0.12);
+    padding-top: 2px;
+}
+
+.ore-debug-hud__name,
+.ore-debug-hud__value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ore-debug-hud__cell,
+.ore-debug-hud__capacity,
+.ore-debug-hud__empty {
+    color: rgba(232, 245, 255, 0.68);
 }
 
 #perf-hud {

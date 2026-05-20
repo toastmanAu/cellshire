@@ -8,6 +8,7 @@
 
 import {
     currencyDisplayName,
+    currencyLogoPath,
     currencySymbol,
     formatCurrencyAmount,
     formatUsd,
@@ -17,11 +18,21 @@ import {
 
 const MAX_ROWS = 5;
 
-function snapshotLabel(snapshot) {
-    if (!snapshot) return 'prices fixed';
-    const mode = snapshot.mode || snapshot.source || 'fixed';
-    if (!snapshot.capturedAt) return `prices ${mode}`;
-    return `prices ${mode} · ${snapshot.capturedAt.slice(0, 10)}`;
+export function priceSnapshotDetail(snapshot) {
+    const mode = snapshot?.mode || snapshot?.source || 'fixed';
+    const capturedAt = snapshot?.capturedAt || null;
+    const source = snapshot?.source || mode;
+    const rows = [
+        ['Mode', mode],
+        ['Source', source],
+        ['Captured', capturedAt || 'not available'],
+        ['Currency', (snapshot?.vsCurrency || 'usd').toUpperCase()],
+    ];
+    if (snapshot?.fallback) rows.push(['Fallback', 'yes']);
+    return {
+        label: capturedAt ? `prices ${mode} · ${capturedAt.slice(0, 10)}` : `prices ${mode}`,
+        rows,
+    };
 }
 
 function clear(el) {
@@ -33,6 +44,30 @@ function div(className, text = '') {
     if (className) el.className = className;
     el.textContent = text;
     return el;
+}
+
+function makeCurrencyMark(currencyId) {
+    const symbol = currencySymbol(currencyId);
+    const logoPath = currencyLogoPath(currencyId);
+    const mark = div('economy-hud__mark', logoPath ? '' : symbol);
+    mark.setAttribute('aria-hidden', 'true');
+
+    if (logoPath) {
+        const img = document.createElement('img');
+        img.src = logoPath;
+        img.alt = '';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.addEventListener('error', () => {
+            mark.textContent = symbol;
+            mark.classList.add('economy-hud__mark--fallback');
+        }, { once: true });
+        mark.appendChild(img);
+    } else {
+        mark.classList.add('economy-hud__mark--fallback');
+    }
+
+    return mark;
 }
 
 export function buildEconomySummary(inventory, priceSnapshot) {
@@ -60,10 +95,12 @@ export function installEconomyHUD({ player, game, priceSnapshot = null }) {
         const row = div('economy-hud__row');
 
         const left = div('economy-hud__asset');
-        const symbol = div('economy-hud__symbol', currencySymbol(currencyId));
-        const name = div('economy-hud__name', currencyDisplayName(currencyId));
-        left.appendChild(symbol);
-        left.appendChild(name);
+        left.appendChild(makeCurrencyMark(currencyId));
+
+        const label = div('economy-hud__label');
+        label.appendChild(div('economy-hud__symbol', currencySymbol(currencyId)));
+        label.appendChild(div('economy-hud__name', currencyDisplayName(currencyId)));
+        left.appendChild(label);
 
         const right = div('economy-hud__balance');
         right.appendChild(div('economy-hud__amount', formatCurrencyAmount(currencyId, amount)));
@@ -78,6 +115,7 @@ export function installEconomyHUD({ player, game, priceSnapshot = null }) {
         clear(card);
 
         const summary = buildEconomySummary(player.inventory, priceSnapshot);
+        const snapshot = priceSnapshotDetail(priceSnapshot);
         const header = div('economy-hud__header');
         const title = div('economy-hud__title', 'Economy');
         const total = div('economy-hud__total', formatUsd(summary.totalUsd));
@@ -85,7 +123,18 @@ export function installEconomyHUD({ player, game, priceSnapshot = null }) {
         header.appendChild(total);
         card.appendChild(header);
 
-        card.appendChild(div('economy-hud__meta', snapshotLabel(priceSnapshot)));
+        const priceDetails = document.createElement('details');
+        priceDetails.className = 'economy-hud__snapshot';
+        const priceSummary = document.createElement('summary');
+        priceSummary.textContent = snapshot.label;
+        priceDetails.appendChild(priceSummary);
+        const detailGrid = div('economy-hud__snapshot-grid');
+        for (const [label, value] of snapshot.rows) {
+            detailGrid.appendChild(div('economy-hud__snapshot-key', label));
+            detailGrid.appendChild(div('economy-hud__snapshot-value', value));
+        }
+        priceDetails.appendChild(detailGrid);
+        card.appendChild(priceDetails);
 
         if (!summary.hasBalances) {
             card.appendChild(div('economy-hud__empty', 'Mine a deposit to start balances.'));

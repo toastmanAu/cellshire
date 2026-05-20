@@ -274,6 +274,12 @@ consume-and-recreate tx. The blob is small (< 1 KB) so the cell stays at
 the minimum 61 CKB capacity floor; players pay maybe 0.0001 CKB in tx
 fees per save.
 
+The first approved implementation path is the custom minimum-capacity
+Cellshire resume state cell defined in
+[`2026-05-20-resume-state-cell-spec.md`](superpowers/specs/2026-05-20-resume-state-cell-spec.md).
+CKBFS V3 remains reserved for larger player-authored files or exported
+blueprints rather than the v1 resume blob.
+
 ### When to prompt
 
 - **On game load**: read the player's state cell, restore resume state.

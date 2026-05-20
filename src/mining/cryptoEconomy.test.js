@@ -4,10 +4,12 @@ import {
     ORE_CURRENCY_MAP,
     amountForUsdValue,
     currencyDisplayName,
+    currencyLogoPath,
     currencySymbol,
     formatCurrencyAmount,
     rewardCurrencyForOre,
     rollOreValueUsd,
+    splitUsdBudget,
 } from './cryptoEconomy.js';
 import { ORE_CATALOG } from './oreCatalog.js';
 
@@ -39,6 +41,12 @@ describe('crypto economy mapping', () => {
         expect(currencySymbol('rvn')).toBe('RVN');
     });
 
+    it('exposes logo paths for the copied currency assets', () => {
+        expect(currencyLogoPath('btc')).toBe('logos/bitcoin-btc-logo.svg');
+        expect(currencyLogoPath('ckb')).toBe('logos/nervos-network-ckb-logo.svg');
+        expect(currencyLogoPath('dash')).toBe('logos/dash-dash-logo.svg');
+    });
+
     it('scales mined quantity by fixed USD value and coin price', () => {
         expect(amountForUsdValue('btc', 100)).toBe(0.00130129);
         expect(amountForUsdValue('ckb', 100)).toBe(69658.74182381);
@@ -49,6 +57,11 @@ describe('crypto economy mapping', () => {
         expect(rollOreValueUsd(() => 0)).toBe(50);
         expect(rollOreValueUsd(() => 0.5)).toBe(125);
         expect(rollOreValueUsd(() => 1)).toBe(200);
+    });
+
+    it('splits an epoch clear budget across spawned ores', () => {
+        expect(splitUsdBudget(60, 4, () => 0.5)).toEqual([15, 15, 15, 15]);
+        expect(splitUsdBudget(20, 0, () => 0.5)).toEqual([]);
     });
 
     it('formats small and large balances for the inventory HUD', () => {

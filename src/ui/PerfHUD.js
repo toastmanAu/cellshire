@@ -74,8 +74,8 @@ export function installPerfHUD(game, genStats) {
             : 'prices fixed';
         const valueRange = genStats.epochValueRange;
         const valueLine = valueRange
-            ? `ore value ${valueRange.label} (${valueRange.source})`
-            : 'ore value fixed';
+            ? `economy ${valueRange.label} (${valueRange.source})`
+            : 'economy fixed';
 
         el.textContent =
               `${epochLine}\n`

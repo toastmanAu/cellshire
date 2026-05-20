@@ -1,16 +1,14 @@
-import { DEFAULT_ORE_VALUE_USD_RANGE } from './cryptoEconomy.js';
+import { DEFAULT_EPOCH_CLEAR_VALUE_USD_RANGE } from './cryptoEconomy.js';
 
 const HEX_WORD_BITS = 32;
 const HEX_WORD_NIBBLES = 8;
 const MAX_UINT32 = 0xffffffff;
 
 export const EPOCH_VALUE_RANGE_TUNING = Object.freeze({
-    lowerMinUsd: 1,
-    lowerMaxUsd: 100,
-    spreadMinUsd: 20,
-    spreadMaxUsd: 200,
-    lowerOffsetNibbles: 12,
-    spreadOffsetNibbles: 20,
+    clearMinUsd: DEFAULT_EPOCH_CLEAR_VALUE_USD_RANGE[0],
+    clearMaxUsd: DEFAULT_EPOCH_CLEAR_VALUE_USD_RANGE[1],
+    clearOffsetNibbles: 12,
+    saltOffsetNibbles: 20,
 });
 
 function hexBody(hash) {
@@ -38,38 +36,36 @@ function money(n) {
 }
 
 export function epochValueRangeWords(hash) {
-    const lowerWord = wordAt(hash, EPOCH_VALUE_RANGE_TUNING.lowerOffsetNibbles);
-    const spreadWord = wordAt(hash, EPOCH_VALUE_RANGE_TUNING.spreadOffsetNibbles);
-    if (lowerWord === null || spreadWord === null) return null;
-    return { lowerWord, spreadWord, bits: HEX_WORD_BITS };
+    const clearWord = wordAt(hash, EPOCH_VALUE_RANGE_TUNING.clearOffsetNibbles);
+    const saltWord = wordAt(hash, EPOCH_VALUE_RANGE_TUNING.saltOffsetNibbles);
+    if (clearWord === null || saltWord === null) return null;
+    return { clearWord, saltWord, bits: HEX_WORD_BITS };
 }
 
 export function epochValueRange(hash) {
     const words = epochValueRangeWords(hash);
+    const range = DEFAULT_EPOCH_CLEAR_VALUE_USD_RANGE;
     if (!words) {
         return {
-            range: DEFAULT_ORE_VALUE_USD_RANGE,
-            lowerUsd: DEFAULT_ORE_VALUE_USD_RANGE[0],
-            spreadUsd: DEFAULT_ORE_VALUE_USD_RANGE[1] - DEFAULT_ORE_VALUE_USD_RANGE[0],
+            range,
+            clearValueUsd: money((range[0] + range[1]) / 2),
+            lowerUsd: range[0],
+            spreadUsd: range[1] - range[0],
             source: 'fixed',
         };
     }
 
-    const lowerUsd = money(lerp(
-        EPOCH_VALUE_RANGE_TUNING.lowerMinUsd,
-        EPOCH_VALUE_RANGE_TUNING.lowerMaxUsd,
-        roll01(words.lowerWord),
-    ));
-    const spreadUsd = money(lerp(
-        EPOCH_VALUE_RANGE_TUNING.spreadMinUsd,
-        EPOCH_VALUE_RANGE_TUNING.spreadMaxUsd,
-        roll01(words.spreadWord),
+    const clearValueUsd = money(lerp(
+        EPOCH_VALUE_RANGE_TUNING.clearMinUsd,
+        EPOCH_VALUE_RANGE_TUNING.clearMaxUsd,
+        roll01(words.clearWord),
     ));
 
     return {
-        range: [lowerUsd, money(lowerUsd + spreadUsd)],
-        lowerUsd,
-        spreadUsd,
+        range,
+        clearValueUsd,
+        lowerUsd: range[0],
+        spreadUsd: range[1] - range[0],
         source: 'epoch-hash',
         ...words,
     };
@@ -79,6 +75,7 @@ export function describeEpochValueRange(hash) {
     const out = epochValueRange(hash);
     return {
         ...out,
-        label: `$${out.range[0].toFixed(2)}-$${out.range[1].toFixed(2)} ore values`,
+        label: `$${out.clearValueUsd.toFixed(2)} clear budget `
+            + `($${out.range[0].toFixed(2)}-$${out.range[1].toFixed(2)} cap)`,
     };
 }

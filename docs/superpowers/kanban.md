@@ -1,6 +1,6 @@
 # Cellshire Kanban
 
-Status captured 2026-05-17. This board tracks the next implementation
+Status captured 2026-05-20. This board tracks the next implementation
 cards needed to turn the current prototype into the game described in
 `docs/DESIGN.md`.
 
@@ -19,6 +19,8 @@ cards needed to turn the current prototype into the game described in
   lithium, bismuth, cobalt, and silicon quartz.
 - Character picker, persisted character choice, starter character PNGs,
   and directional facing.
+- Flux2 Kleingenerated Cellshire shield/logo integrated across the boot
+  screen, title card, browser icon, touch icon, and JoyID app metadata.
 - Build mode remains available via `?dev=1` for property-zone tooling.
 
 ## Done
@@ -151,51 +153,84 @@ lower bound from `$1-$100` and a spread from `$20-$200`, allowing lean
 roll deterministically inside the epoch band, so all players see the same
 ore values for the same epoch/world seed.
 
-## Next
+### Cellshire Brand Logo Integration
+
+**Completed:** 2026-05-20
+
+Promoted the final `cs_logo.png` into the served `assets/cellshire_logo.png`
+slot, bumped the browser cache key, added favicon and Apple touch icon links,
+and switched the CCC/JoyID default app logo from the miner sprite to the
+Cellshire brand mark. Verified with the browser test harness
+(`151 passed, 0 failed`) and `node netlify-build.mjs`.
 
 ### Economy HUD + Token Detail
+
+**Completed:** 2026-05-20
 
 **Goal:** make the crypto economy legible to players while keeping the
 current HUD compact.
 
-**Acceptance:**
-- Show the currency symbol and approximate USD value for recent mining hits.
-- Add an inventory detail affordance for price snapshot source/time.
-- Expose each ore's remaining USD value budget in debug mode only.
-- Keep the local/internal balance path compatible with future Nervos UDT
-  issuance.
+Added currency logo marks, symbol/name rows, approximate USD balances, and a
+recent-hit detail line for the compact economy HUD. Added a disclosure for
+price snapshot mode/source/capture metadata. Added a `?dev=1` ore budget debug
+panel that lists every live ore's remaining/total USD budget, cell, capacity,
+and mapped currency. The balance model still uses internal currency IDs so the
+local path remains compatible with a later Nervos UDT-backed inventory adapter.
 
-## Soon
+Verified with the browser test harness (`155 passed, 0 failed`), a dev-mode
+headless page load, and `node netlify-build.mjs`.
 
 ### Property Expansion Tiers
 
+**Completed:** 2026-05-20
+
 **Goal:** make the property zone grow through gameplay.
 
-**Acceptance:**
-- Define tier sizes, prices, and max bounds.
-- UI previews locked/unlocked expansion cells.
-- Spending local currency unlocks the next tier.
-- Expansion state is stored in the same resume-state model planned for chain save.
+Added four tested claim tiers that expand the editable property bounds from
+the starter `16x16` claim up to a `22x22` max claim. The property HUD now
+shows the current tier, next expansion cost, and an unlock action while at
+home. Unlocking spends local CKB from the existing inventory model, refreshes
+the property-mode canvas preview overlay, and autosaves the unlocked tier with
+the property snapshot for the future resume-state path. Existing starter
+fences remain placeable/erasable objects once they fall inside an unlocked
+claim.
+
+Verified with the browser test harness (`162 passed, 0 failed`) and
+`node netlify-build.mjs`.
 
 ### Resume State Cell Spec
 
+**Completed:** 2026-05-20
+
 **Goal:** turn save/load into the designed one-cell resume snapshot.
 
-**Acceptance:**
-- Specify compact state blob: current map, camera, selected character, UI prefs, property tier.
-- Define migration/version rules for old blobs.
-- Define save prompts and pending-save badge behavior.
-- Decide CKBFS V3 vs custom state cell for first implementation.
+Captured in
+[`2026-05-20-resume-state-cell-spec.md`](specs/2026-05-20-resume-state-cell-spec.md).
+The spec defines the resume-state boundary, logical and compact v1 blob
+shapes, validation rules, local-to-chain migration, prompt and pending-save
+badge behavior, load UX, adapter boundaries, and the first implementation
+slice. Decision: use a custom minimum-capacity Cellshire resume state cell for
+v1; keep CKBFS V3 for larger player-authored files/exported blueprints.
 
 ### Multiple Map Travel
 
+**Completed:** 2026-05-20
+
 **Goal:** support mine/property/region transitions without one huge world.
 
-**Acceptance:**
-- Add map registry with ids, names, seed source, and entry spawn.
-- Portal/lift/ferry interaction switches maps and restores camera/spawn.
-- Mining map remains epoch-derived; property map remains player-derived.
-- Tests cover deterministic map selection and spawn fallback.
+Added a tested map registry with deterministic ids, display names, seed
+sources, and entry spawns. Public mine maps are keyed by epoch
+(`mine:<epoch>` with `mine:local` fallback); property maps are keyed by player
+owner (`property:<owner>`, currently `property:local`). Portal roles now resolve
+through the registry, and the game captures/restores map runtime by map id so
+mine/property travel preserves camera, player position, epoch state, ore state,
+and property tier. The registry tests cover deterministic map selection, role
+targets, and spawn fallback.
+
+Verified with the browser test harness (`166 passed, 0 failed`) and
+`node netlify-build.mjs`.
+
+## Next
 
 ### Trader Store MVP
 
