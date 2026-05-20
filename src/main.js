@@ -36,6 +36,7 @@ import { chainMiningEnabled, makeMiningAdapterFromParams } from './mining/mining
 import { getEpochPriceSnapshot } from './mining/priceSnapshot.js';
 import { walletFeatureEnabled } from './wallet/walletIdentity.js';
 import { propertyVisitOwnerFromParams } from './visiting/propertyVisit.js';
+import { makePropertySnapshotAdapterFromParams } from './property/propertySnapshotAdapter.js';
 
 async function main() {
     document.body.dataset.cellshireBoot = 'loading';
@@ -73,6 +74,10 @@ async function main() {
         params,
         storage: safeStorage,
         location: window.location,
+    });
+    game.propertySnapshotAdapter = makePropertySnapshotAdapterFromParams({
+        params,
+        storage: safeStorage,
     });
     document.body.classList.add(devMode ? 'mode-build' : 'mode-play');
 
@@ -190,7 +195,7 @@ async function main() {
                 propertyReadOnly: !!visitOwner,
             });
             game.ensureMinePropertyPortal(spawn);
-            if (visitOwner) game.visitProperty(visitOwner);
+            if (visitOwner) await game.visitProperty(visitOwner);
             installEconomyHUD({
                 player: game.player,
                 game,

@@ -338,17 +338,36 @@ and the Fiber-later recommendation are captured in
 Verified with the browser test harness (`200 passed, 0 failed`),
 `node netlify-build.mjs`, and module import checks.
 
-## Next
-
 ### Chain Property Snapshot Adapter
+
+**Completed:** 2026-05-20
 
 **Goal:** load visited property snapshots from indexed owner cells.
 
+Added a property snapshot adapter boundary with local and chain/indexer
+implementations. The chain adapter normalizes `cellshire.property.snapshot` v1
+cells into the same snapshot shape returned by local storage, chooses the
+newest owner cell, reports stale cells below `visitMinBlock`, and leaves the
+visit route in a clear read-only starter/pending state when no current snapshot
+is indexed. `?visitSource=chain` now routes visits through the chain adapter;
+the default remains local owner-keyed storage. The fixture/indexer contract is
+documented in
+[`2026-05-20-chain-property-snapshot-adapter.md`](specs/2026-05-20-chain-property-snapshot-adapter.md).
+
+Verified with the browser test harness (`205 passed, 0 failed`),
+`node netlify-build.mjs`, and module import checks.
+
+## Next
+
+### Shareable Visit Links
+
+**Goal:** make property visits discoverable from wallet identity.
+
 **Acceptance:**
-- Chain/indexer adapter returns the same property snapshot shape as local storage.
-- `?visit=<owner id>` can choose chain or local snapshot source through a flag.
-- Missing or stale owner snapshots surface a clear read-only placeholder state.
-- Property snapshot tests cover owner-keyed fixture loading.
+- Connected wallet HUD or property HUD exposes a copyable visit link.
+- Link includes owner id and chosen snapshot source.
+- Disconnected local mode can still show a local preview link.
+- Tests cover link formatting and source flag handling.
 
 ## Needs Decision
 

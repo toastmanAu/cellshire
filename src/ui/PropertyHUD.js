@@ -40,7 +40,7 @@ export function installPropertyHUD(game) {
             ? visiting ? 'Visiting plot' : 'Home plot'
             : 'Public mine';
         detail.textContent = home && expansion
-            ? visiting ? `Owner ${expansion.ownerId}` : `${expansion.label} · ${expansion.name}`
+            ? visiting ? visitDetail(expansion) : `${expansion.label} · ${expansion.name}`
             : 'Quarry shift';
         action.textContent = home ? 'Return to mine' : 'Go home';
         unlock.hidden = !home || visiting || !expansion?.next;
@@ -48,6 +48,16 @@ export function installPropertyHUD(game) {
             unlock.disabled = !expansion.canAffordNext;
             unlock.textContent = `Expand · ${expansion.nextCostLabel}`;
         }
+    }
+
+    function visitDetail(expansion) {
+        const source = expansion.snapshotSource === 'chain' ? 'chain' : 'local';
+        const status = expansion.snapshotStatus === 'found'
+            ? `${source} snapshot`
+            : expansion.snapshotStatus === 'stale'
+                ? `${source} snapshot pending`
+                : 'starter view';
+        return `Owner ${expansion.ownerId} · ${status}`;
     }
 
     const off = game.onMapChange?.(render);

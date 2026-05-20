@@ -44,9 +44,9 @@ import {
 } from '../property/propertyZone.js';
 import {
     clearPropertyZone,
-    loadPropertyZone,
     savePropertyZone,
 } from '../property/propertyStore.js';
+import { LocalPropertySnapshotAdapter } from '../property/propertySnapshotAdapter.js';
 import {
     canAffordExpansion,
     formatExpansionCost,
@@ -110,6 +110,10 @@ export class Game {
         this.propertyTier = 1;
         this.propertyOwner = 'local';
         this.propertyReadOnly = false;
+        this.propertySnapshotSource = 'local';
+        this.propertySnapshotStatus = 'missing';
+        this.propertySnapshotStale = false;
+        this.propertySnapshotAdapter = new LocalPropertySnapshotAdapter({ storage: safeStorage });
         this.propInventory = loadPropInventory(safeStorage);
         this.inventoryAdapter = new LocalInventoryAdapter({
             props: this.propInventory,
@@ -878,7 +882,7 @@ export class Game {
         return this.travelToMap(target.id);
     }
 
-    travelToMap(mapId) {
+    async travelToMap(mapId) {
         const target = mapById(this.mapRegistry, mapId);
         if (!target) {
             this.ui?.showToast?.('Map is not available');
@@ -886,7 +890,7 @@ export class Game {
         }
         if (target.id === this.currentMapId) return true;
         if (target.kind === 'property') {
-            this.travelToProperty({
+            await this.travelToProperty({
                 ownerId: target.ownerId ?? 'local',
                 readOnly: !!target.readOnly,
             });
@@ -900,7 +904,7 @@ export class Game {
         return false;
     }
 
-    travelToProperty(opts = {}) {
+    async travelToProperty(opts = {}) {
         const propertyDef = mapByKind(this.mapRegistry, 'property');
         const ownerId = opts.ownerId ?? propertyDef?.ownerId ?? 'local';
         const readOnly = !!(opts.readOnly ?? propertyDef?.readOnly);
@@ -908,12 +912,21 @@ export class Game {
             && this.propertyOwner === ownerId
             && this.propertyReadOnly === readOnly) return;
         if (this.mapKind !== 'property') this._mapRuntime.set(this.currentMapId, this._captureRuntime());
-        const saved = loadPropertyZone(safeStorage, { ownerId });
-        this._loadPropertyMap(saved, { ownerId, readOnly });
-        this.ui?.showToast?.(readOnly ? `Visiting ${propertyVisitLabel(ownerId)}` : 'Welcome home', 1800);
+        const read = await this._readPropertySnapshot(ownerId);
+        this._loadPropertyMap(read.snapshot, {
+            ownerId,
+            readOnly,
+            snapshotSource: read.source,
+            snapshotStatus: read.status,
+            snapshotStale: read.stale,
+        });
+        const visitStatus = read.status === 'found'
+            ? `Visiting ${propertyVisitLabel(ownerId)}`
+            : `Visiting ${propertyVisitLabel(ownerId)} · ${read.status === 'stale' ? 'snapshot pending' : 'starter view'}`;
+        this.ui?.showToast?.(readOnly ? visitStatus : 'Welcome home', 1800);
     }
 
-    visitProperty(ownerId) {
+    async visitProperty(ownerId) {
         if (!ownerId) return false;
         const mine = mapByKind(this.mapRegistry, 'mine');
         this.mapRegistry = createMapRegistry({
@@ -922,7 +935,7 @@ export class Game {
             propertyReadOnly: true,
             mineSpawn: mine?.entrySpawn ?? null,
         });
-        this.travelToProperty({ ownerId, readOnly: true });
+        await this.travelToProperty({ ownerId, readOnly: true });
         return true;
     }
 
@@ -965,6 +978,9 @@ export class Game {
             ...summary,
             ownerId: this.propertyOwner,
             readOnly: this.propertyReadOnly,
+            snapshotSource: this.propertySnapshotSource,
+            snapshotStatus: this.propertySnapshotStatus,
+            snapshotStale: this.propertySnapshotStale,
             next: this.propertyReadOnly ? null : next,
             canAffordNext: !this.propertyReadOnly && canAffordExpansion(this.player?.inventory, this.propertyTier),
             nextCostLabel: next?.cost ? formatExpansionCost(next.cost) : 'Max tier',
@@ -1091,6 +1107,23 @@ export class Game {
         return () => this._mapListeners.delete(cb);
     }
 
+    async _readPropertySnapshot(ownerId) {
+        if (this.propertySnapshotAdapter?.read) {
+            try {
+                return await this.propertySnapshotAdapter.read({ ownerId });
+            } catch (err) {
+                console.warn('[cellshire] property snapshot read failed', err);
+            }
+        }
+        return {
+            source: 'unknown',
+            ownerId,
+            status: 'missing',
+            stale: false,
+            snapshot: null,
+        };
+    }
+
     _loadPropertyMap(saved, opts = {}) {
         const propertyDef = mapByKind(this.mapRegistry, 'property');
         const entrySpawn = entrySpawnForMap(propertyDef, PROPERTY_SPAWN);
@@ -1100,6 +1133,9 @@ export class Game {
         this.propertyTier = saved?.propertyTier ?? 1;
         this.propertyOwner = opts.ownerId ?? propertyDef?.ownerId ?? saved?.ownerId ?? 'local';
         this.propertyReadOnly = !!opts.readOnly;
+        this.propertySnapshotSource = opts.snapshotSource ?? 'local';
+        this.propertySnapshotStatus = opts.snapshotStatus ?? (saved ? 'found' : 'missing');
+        this.propertySnapshotStale = !!opts.snapshotStale;
         this.oreStates.clear();
         this._pendingInteract = null;
         this._pendingDepletions.clear();
@@ -1154,6 +1190,9 @@ export class Game {
             propertyTier: this.propertyTier,
             propertyOwner: this.propertyOwner,
             propertyReadOnly: this.propertyReadOnly,
+            propertySnapshotSource: this.propertySnapshotSource,
+            propertySnapshotStatus: this.propertySnapshotStatus,
+            propertySnapshotStale: this.propertySnapshotStale,
             oreStates: Array.from(this.oreStates.entries()).map(([id, state]) => ({
                 id,
                 oreType: state.oreType,
@@ -1183,6 +1222,9 @@ export class Game {
         }
         this.propertyOwner = runtime.propertyOwner ?? this.propertyOwner ?? 'local';
         this.propertyReadOnly = !!runtime.propertyReadOnly;
+        this.propertySnapshotSource = runtime.propertySnapshotSource ?? this.propertySnapshotSource ?? 'local';
+        this.propertySnapshotStatus = runtime.propertySnapshotStatus ?? this.propertySnapshotStatus ?? 'missing';
+        this.propertySnapshotStale = !!runtime.propertySnapshotStale;
         this.oreStates.clear();
         for (const entry of runtime.oreStates ?? []) {
             this.oreStates.set(entry.id, new OreState(
@@ -1225,6 +1267,9 @@ export class Game {
             mode: this.mode,
             propertyOwner: this.propertyOwner,
             propertyReadOnly: this.propertyReadOnly,
+            propertySnapshotSource: this.propertySnapshotSource,
+            propertySnapshotStatus: this.propertySnapshotStatus,
+            propertySnapshotStale: this.propertySnapshotStale,
             map: mapById(this.mapRegistry, this.currentMapId),
         };
         for (const cb of this._mapListeners) cb(state);
