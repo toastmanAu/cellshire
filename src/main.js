@@ -17,6 +17,7 @@ import { installPropertyHUD } from './ui/PropertyHUD.js';
 import { installEconomyHUD } from './ui/EconomyHUD.js';
 import { installOreDebugHUD } from './ui/OreDebugHUD.js';
 import { installTraderHUD } from './ui/TraderHUD.js';
+import { installGeneralStoreHUD } from './ui/GeneralStoreHUD.js';
 import { isWalkable } from './grid/walkability.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
 import { safeStorage } from './lib/safeStorage.js';
@@ -187,6 +188,7 @@ async function main() {
                 game,
                 priceSnapshot,
             });
+            installGeneralStoreHUD(game);
 
             // No stored / URL choice — show the first-load gate. World
             // is already rendering, so the picker overlays on top of it.

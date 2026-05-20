@@ -65,8 +65,9 @@ export function canEditPropertyCell(gx, gy, bounds = PROPERTY_EDIT_BOUNDS) {
         && gy <= bounds.maxGy;
 }
 
-export function canPlacePropertyAsset(assetId, gx, gy, bounds = PROPERTY_EDIT_BOUNDS) {
-    return isStarterPropertyAsset(assetId)
+export function canPlacePropertyAsset(assetId, gx, gy, bounds = PROPERTY_EDIT_BOUNDS, opts = {}) {
+    const owned = !!(opts.isOwned?.(assetId) || opts.ownedAssetIds?.has?.(assetId));
+    return (isStarterPropertyAsset(assetId) || owned)
         && footprintWithinBounds(assetId, gx, gy, bounds);
 }
 

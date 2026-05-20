@@ -32,6 +32,7 @@ import {
     canEditPropertyCell,
     canPlacePropertyAsset,
     createStarterPropertyMap,
+    footprintWithinBounds,
     MINE_PROPERTY_PORTAL_ROLE,
     PROPERTY_MINE_PORTAL_ROLE,
     PROPERTY_SPAWN,
@@ -51,6 +52,15 @@ import {
     propertyTierSummary,
     spendExpansionCost,
 } from '../property/propertyExpansion.js';
+import {
+    loadPropInventory,
+    savePropInventory,
+} from '../property/propInventory.js';
+import {
+    buyStoreItem,
+    formatStorePrice,
+    generalStoreItem,
+} from '../store/generalStoreCatalog.js';
 import {
     createMapRegistry,
     entrySpawnForMap,
@@ -83,6 +93,12 @@ export class Game {
         this._mapRuntime = new Map();
         this._mapListeners = new Set();
         this.propertyTier = 1;
+        this.propInventory = loadPropInventory(safeStorage);
+        this.propInventory.onChange(() => {
+            savePropInventory(safeStorage, this.propInventory);
+            this.ui?.update();
+            this.renderer.markDirty();
+        });
 
         // Player avatar — created lazily by main.js once procgen has run
         // and a walkable spawn cell exists. Game still functions without
@@ -457,6 +473,9 @@ export class Game {
             const terrainHere = this.tileMap.getTerrain(gx, gy);
             const targetId = objHere ? objHere.assetId : terrainHere;
             if (this.placement.erase(gx, gy)) {
+                if (objHere && !isStarterPropertyAsset(objHere.assetId)) {
+                    this.propInventory.add(objHere.assetId, 1);
+                }
                 this.renderer.markDirty();
                 playPlacementFor(targetId);
                 this._autosaveProperty();
@@ -465,7 +484,7 @@ export class Game {
         }
 
         if (!this._canPlacePropertyAt(this.selectedAssetId, gx, gy)) {
-            this.ui?.showToast?.('That spot is outside your claim');
+            this.ui?.showToast?.(this._propertyPlacementBlockedMessage(this.selectedAssetId, gx, gy));
             return;
         }
         const result = this.placement.place(this.selectedAssetId, gx, gy, {
@@ -474,6 +493,7 @@ export class Game {
         });
         if (result?.kind === 'object') {
             const o = result.object;
+            if (!isStarterPropertyAsset(o.assetId)) this.propInventory.consume(o.assetId, 1);
             this.renderer.spawnAnim(`obj-${o.id}`, {
                 gx: o.gx,
                 gy: o.gy,
@@ -496,8 +516,22 @@ export class Game {
 
     _canPlacePropertyAt(assetId, gx, gy) {
         const bounds = this._propertyBounds();
-        return canPlacePropertyAsset(assetId, gx, gy, bounds)
+        return canPlacePropertyAsset(assetId, gx, gy, bounds, {
+            isOwned: id => this.propInventory.get(id) > 0,
+        })
             && this.placement.canPlace(assetId, gx, gy);
+    }
+
+    _propertyPlacementBlockedMessage(assetId, gx, gy) {
+        const bounds = this._propertyBounds();
+        if (!footprintWithinBounds(assetId, gx, gy, bounds)) {
+            return 'That spot is outside your claim';
+        }
+        if (!isStarterPropertyAsset(assetId) && this.propInventory.get(assetId) <= 0) {
+            const item = generalStoreItem(assetId);
+            return item ? `Buy ${item.name} at the store` : 'That prop is not owned';
+        }
+        return 'That spot is blocked';
     }
 
     _canErasePropertyAt(gx, gy) {
@@ -844,7 +878,9 @@ export class Game {
 
     isAssetVisibleInPalette(assetId) {
         if (assetId.startsWith('player_') && assetId.endsWith('_back')) return false;
-        return this.mapKind !== 'property' || isStarterPropertyAsset(assetId);
+        return this.mapKind !== 'property'
+            || isStarterPropertyAsset(assetId)
+            || this.propInventory.get(assetId) > 0;
     }
 
     propertyExpansionState() {
@@ -877,6 +913,29 @@ export class Game {
         this.renderer.markDirty();
         this._emitMapChange();
         this.ui?.showToast?.(`Expanded to ${propertyTierSummary(this.propertyTier).name}`, 2200);
+        return result;
+    }
+
+    buyGeneralStoreItem(assetId) {
+        const item = generalStoreItem(assetId);
+        const result = buyStoreItem({
+            assetId,
+            inventory: this.player?.inventory,
+            propInventory: this.propInventory,
+            propertyTier: this.propertyTier,
+        });
+        if (!result.ok) {
+            if (result.reason === 'locked-tier') {
+                this.ui?.showToast?.(`Unlock Tier ${item?.unlockTier ?? '?'} first`, 2200);
+            } else if (result.reason === 'insufficient-funds') {
+                this.ui?.showToast?.(`Need ${item ? formatStorePrice(item) : 'more CKB'}`, 2200);
+            } else {
+                this.ui?.showToast?.('Store purchase failed', 1800);
+            }
+            return result;
+        }
+        this.ui?.showToast?.(`Bought ${result.item.name}`, 1800);
+        this.ui?.update();
         return result;
     }
 
@@ -967,7 +1026,9 @@ export class Game {
         this.currentMapId = runtime.currentMapId
             ?? mapByKind(this.mapRegistry, runtime.mapKind)?.id
             ?? this.currentMapId;
-        this.propertyTier = runtime.propertyTier ?? this.propertyTier;
+        if (runtime.mapKind === 'property') {
+            this.propertyTier = runtime.propertyTier ?? this.propertyTier;
+        }
         this.oreStates.clear();
         for (const entry of runtime.oreStates ?? []) {
             this.oreStates.set(entry.id, new OreState(

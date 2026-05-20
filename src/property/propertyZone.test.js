@@ -33,6 +33,13 @@ describe('property zone starter map', () => {
         expect(canPlacePropertyAsset('bench', PROPERTY_EDIT_BOUNDS.maxGx + 1, PROPERTY_EDIT_BOUNDS.maxGy)).toBe(false);
     });
 
+    it('allows bought non-starter assets inside the claim footprint', () => {
+        expect(canPlacePropertyAsset('blue_railing', PROPERTY_EDIT_BOUNDS.minGx, PROPERTY_EDIT_BOUNDS.minGy)).toBe(false);
+        expect(canPlacePropertyAsset('blue_railing', PROPERTY_EDIT_BOUNDS.minGx, PROPERTY_EDIT_BOUNDS.minGy, PROPERTY_EDIT_BOUNDS, {
+            isOwned: assetId => assetId === 'blue_railing',
+        })).toBe(true);
+    });
+
     it('adds a mine-side property portal near a target cell', () => {
         const map = new TileMap(8, 8);
         for (let gy = 0; gy < 8; gy++)

@@ -246,23 +246,31 @@ sits behind a trader adapter with an explicit future Cellswap boundary.
 Verified with the browser test harness (`174 passed, 0 failed`), a headless
 app smoke load, and `node netlify-build.mjs`.
 
-## Next
-
 ### General Store
+
+**Completed:** 2026-05-20
 
 **Goal:** sell common props at fixed game-set prices.
 
-**Acceptance:**
-- Fixed catalog of placeable props, price, rarity, and unlock tier.
-- Buy action adds owned prop inventory.
-- Property placement consumes owned prop instances when appropriate.
-- Chain vendor-script path documented for the live version.
+Added a fixed General Store catalog with placeable props, CKB prices, rarity,
+and property-tier unlocks. Purchases spend local CKB and add instances to a
+persisted local prop inventory. Bought non-starter props become visible in the
+property palette, placement consumes one owned instance, and erasing a bought
+prop returns it to inventory. The local path is documented against the future
+chain vendor-script flow in
+[`2026-05-20-general-store-vendor-script.md`](specs/2026-05-20-general-store-vendor-script.md).
 
-## Later
+Verified with the browser test harness (`182 passed, 0 failed`),
+`node netlify-build.mjs`, and module import checks for the new HUD/Game
+wiring.
+
+## Next
 
 ### Player Marketplace
 
 **Goal:** support unique player-listed items.
+
+## Later
 
 **Acceptance:**
 - Listing model for unique prop/skin cells.
