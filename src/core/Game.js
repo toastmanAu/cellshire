@@ -47,6 +47,7 @@ import {
 } from '../property/propertyStore.js';
 import { LocalPropertySnapshotAdapter } from '../property/propertySnapshotAdapter.js';
 import {
+    formatPropertySnapshotSaveStatus,
     LocalStoragePropertySnapshotWriter,
     savePropertyZoneWithSnapshotWriter,
 } from '../property/propertySnapshotWriter.js';
@@ -120,6 +121,7 @@ export class Game {
         this.propertySnapshotStale = false;
         this.propertySnapshotAdapter = new LocalPropertySnapshotAdapter({ storage: safeStorage });
         this.propertySnapshotWriter = new LocalStoragePropertySnapshotWriter({ storage: safeStorage });
+        this.propertySnapshotSaveResult = null;
         this.propInventory = loadPropInventory(safeStorage);
         this.inventoryAdapter = new LocalInventoryAdapter({
             props: this.propInventory,
@@ -315,7 +317,7 @@ export class Game {
             }
             const result = await this._savePropertyWithSnapshot();
             const ok = result.ok;
-            this.ui?.showToast(ok ? 'Saved your property' : 'Property save failed');
+            this.ui?.showToast(formatPropertySnapshotSaveStatus(result), ok ? 2200 : 1800);
             return ok;
         }
         const ok = SaveSystem.save(this.tileMap, this.camera);
@@ -1020,9 +1022,18 @@ export class Game {
             snapshotSource: this.propertySnapshotSource,
             snapshotStatus: this.propertySnapshotStatus,
             snapshotStale: this.propertySnapshotStale,
+            saveStatus: this.propertySnapshotSaveStatus(),
             next: this.propertyReadOnly ? null : next,
             canAffordNext: !this.propertyReadOnly && canAffordExpansion(this.player?.inventory, this.propertyTier),
             nextCostLabel: next?.cost ? formatExpansionCost(next.cost) : 'Max tier',
+        };
+    }
+
+    propertySnapshotSaveStatus({ compact = true } = {}) {
+        if (!this.propertySnapshotSaveResult) return null;
+        return {
+            ...this.propertySnapshotSaveResult,
+            label: formatPropertySnapshotSaveStatus(this.propertySnapshotSaveResult, { compact }),
         };
     }
 
@@ -1209,7 +1220,7 @@ export class Game {
     }
 
     async _savePropertyWithSnapshot() {
-        return savePropertyZoneWithSnapshotWriter({
+        const result = await savePropertyZoneWithSnapshotWriter({
             storage: safeStorage,
             writer: this.propertySnapshotWriter,
             walletState: loadWalletIdentity(safeStorage),
@@ -1218,6 +1229,13 @@ export class Game {
             propertyTier: this.propertyTier,
             ownerId: this.propertyOwner,
         });
+        this.propertySnapshotSaveResult = {
+            ...result,
+            savedAt: Date.now(),
+            ownerId: this.propertyOwner,
+        };
+        this._emitMapChange();
+        return this.propertySnapshotSaveResult;
     }
 
     _captureRuntime() {
@@ -1241,6 +1259,7 @@ export class Game {
             propertySnapshotSource: this.propertySnapshotSource,
             propertySnapshotStatus: this.propertySnapshotStatus,
             propertySnapshotStale: this.propertySnapshotStale,
+            propertySnapshotSaveResult: this.propertySnapshotSaveResult,
             oreStates: Array.from(this.oreStates.entries()).map(([id, state]) => ({
                 id,
                 oreType: state.oreType,
@@ -1273,6 +1292,7 @@ export class Game {
         this.propertySnapshotSource = runtime.propertySnapshotSource ?? this.propertySnapshotSource ?? 'local';
         this.propertySnapshotStatus = runtime.propertySnapshotStatus ?? this.propertySnapshotStatus ?? 'missing';
         this.propertySnapshotStale = !!runtime.propertySnapshotStale;
+        this.propertySnapshotSaveResult = runtime.propertySnapshotSaveResult ?? this.propertySnapshotSaveResult ?? null;
         this.oreStates.clear();
         for (const entry of runtime.oreStates ?? []) {
             this.oreStates.set(entry.id, new OreState(
@@ -1318,6 +1338,7 @@ export class Game {
             propertySnapshotSource: this.propertySnapshotSource,
             propertySnapshotStatus: this.propertySnapshotStatus,
             propertySnapshotStale: this.propertySnapshotStale,
+            propertySnapshotSaveResult: this.propertySnapshotSaveResult,
             map: mapById(this.mapRegistry, this.currentMapId),
         };
         for (const cb of this._mapListeners) cb(state);

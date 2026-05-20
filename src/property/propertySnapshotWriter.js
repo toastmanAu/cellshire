@@ -169,6 +169,43 @@ export async function savePropertyZoneWithSnapshotWriter({
     };
 }
 
+export function formatPropertySnapshotSaveStatus(result, { compact = false } = {}) {
+    if (!result?.localSaved) return compact ? 'save failed' : 'Property save failed';
+    const write = result.snapshotWrite ?? {};
+    if (write.ok) {
+        if (write.source === 'local-fixture') {
+            return compact ? 'snapshot ready' : 'Saved local + visit snapshot';
+        }
+        if (write.source === 'ccc-joyid' || write.txHash) {
+            return compact ? 'snapshot published' : 'Saved local + published snapshot';
+        }
+        return compact ? 'snapshot submitted' : 'Saved local + submitted snapshot';
+    }
+
+    if (write.reason === 'local-owner') {
+        return compact ? 'local saved' : 'Saved local property';
+    }
+    if (write.reason === 'wallet-disconnected') {
+        return compact ? 'wallet needed' : 'Saved local; connect JoyID to publish';
+    }
+    if (write.reason === 'owner-mismatch') {
+        return compact ? 'owner mismatch' : 'Saved local; wallet owner mismatch';
+    }
+    if (write.reason === 'signature-cancelled') {
+        return compact ? 'publish cancelled' : 'Saved local; publish cancelled';
+    }
+    if (write.reason === 'insufficient-capacity') {
+        return compact ? 'needs CKB' : 'Saved local; not enough CKB to publish';
+    }
+    if (write.reason === 'write-failed') {
+        return compact ? 'snapshot failed' : 'Saved local; snapshot write failed';
+    }
+    if (write.reason === 'writer-unavailable') {
+        return compact ? 'local only' : 'Saved local; snapshot writer unavailable';
+    }
+    return compact ? 'snapshot pending' : (write.message || 'Saved local; snapshot not published');
+}
+
 export function propertySnapshotSubmitMode(params) {
     const mode = params?.get?.('propertySnapshotSubmit') || params?.get?.('propertySnapshotMode');
     return params?.get?.('propertySnapshotReal') === '1'

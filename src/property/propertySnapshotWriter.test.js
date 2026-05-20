@@ -6,6 +6,7 @@ import {
     LocalStoragePropertySnapshotWriter,
     PropertySnapshotSubmitAdapter,
     buildPropertySnapshotPayload,
+    formatPropertySnapshotSaveStatus,
     makePropertySnapshotWriterFromParams,
     propertySnapshotWriteGate,
     propertySnapshotSubmitMode,
@@ -142,5 +143,24 @@ describe('property snapshot writer', () => {
             params: new URLSearchParams('propertySnapshotSubmit=ccc'),
             storage: fakeStorage(),
         }).constructor.name).toBe('PropertySnapshotSubmitAdapter');
+    });
+
+    it('formats explicit save and compact HUD statuses', () => {
+        expect(formatPropertySnapshotSaveStatus({
+            localSaved: true,
+            snapshotWrite: { ok: true, source: 'local-fixture' },
+        })).toBe('Saved local + visit snapshot');
+        expect(formatPropertySnapshotSaveStatus({
+            localSaved: true,
+            snapshotWrite: { ok: true, source: 'ccc-joyid', txHash: '0xabc' },
+        })).toBe('Saved local + published snapshot');
+        expect(formatPropertySnapshotSaveStatus({
+            localSaved: true,
+            snapshotWrite: { ok: false, reason: 'insufficient-capacity' },
+        })).toBe('Saved local; not enough CKB to publish');
+        expect(formatPropertySnapshotSaveStatus({
+            localSaved: true,
+            snapshotWrite: { ok: false, reason: 'signature-cancelled' },
+        }, { compact: true })).toBe('publish cancelled');
     });
 });

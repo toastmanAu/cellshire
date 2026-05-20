@@ -437,19 +437,37 @@ Verified with the browser test harness (`227 passed, 0 failed`),
 `node netlify-build.mjs`, module import checks, and a headless
 `?propertySnapshotSubmit=ccc` boot smoke.
 
-## Next
-
 ### Property Snapshot Save Status
+
+**Completed:** 2026-05-21
 
 **Goal:** surface local/snapshot publish status after property saves.
 
+Added a shared formatter for combined local-save and snapshot-write results.
+Explicit property saves now await the snapshot writer and show precise toast
+messages such as `Saved local + visit snapshot`, `Saved local + published
+snapshot`, or `Saved local; not enough CKB to publish`. Autosave still runs the
+same helper without toast noise, records the latest result on the game, and
+emits map state for HUD/debug consumers. The Property HUD appends the compact
+save label to editable home details after a save status exists. The behavior is
+documented in
+[`2026-05-21-property-snapshot-save-status.md`](specs/2026-05-21-property-snapshot-save-status.md).
+
+Verified with the browser test harness (`228 passed, 0 failed`),
+`node netlify-build.mjs`, module import checks, and a headless
+`?propertySnapshotSubmit=ccc` boot smoke.
+
+## Next
+
+### Chain Visit Smoke Fixtures
+
+**Goal:** prove wallet-owned snapshot saves can be visited through the chain snapshot read path.
+
 **Acceptance:**
-- Explicit property saves show whether the local save, fixture write, or submit
-  path succeeded.
-- Snapshot submit failures surface normalized player-facing messages.
-- Autosave avoids noisy toasts but records latest snapshot write status for
-  HUD/debug use.
-- Tests cover status formatting and submit failure messaging.
+- Saving a wallet-owned fixture snapshot produces a visit-readable chain source fixture.
+- A `?visit=<owner>&visitSource=chain` smoke loads the saved snapshot owner.
+- Tests cover writer-to-reader compatibility and missing/stale fallback behavior.
+- Docs capture the local fixture flow for manual testing.
 
 ## Needs Decision
 
