@@ -320,17 +320,35 @@ The read-model contract is documented in
 Verified with the browser test harness (`196 passed, 0 failed`),
 `node netlify-build.mjs`, and module import checks.
 
-## Next
-
 ### Visiting + Presence
+
+**Completed:** 2026-05-20
 
 **Goal:** let other players see property zones and eventually each other.
 
+Added `?visit=<owner id>` as a read-only property snapshot route. Property
+storage now supports owner-keyed local snapshots while preserving the existing
+`local` key, and map registry entries carry owner/read-only metadata. Visit
+mode lets the local avatar walk around the loaded property but blocks place,
+erase, save, reset, expand, and autosave paths. The toolbar/palette are hidden
+for visitors, and the property HUD labels the inspected owner. Presence options
+and the Fiber-later recommendation are captured in
+[`2026-05-20-visiting-presence.md`](specs/2026-05-20-visiting-presence.md).
+
+Verified with the browser test harness (`200 passed, 0 failed`),
+`node netlify-build.mjs`, and module import checks.
+
+## Next
+
+### Chain Property Snapshot Adapter
+
+**Goal:** load visited property snapshots from indexed owner cells.
+
 **Acceptance:**
-- Read-only visit route for a property zone by owner id.
-- Visitor cannot mutate owner props.
-- Presence transport options documented; Fiber remains the likely later path.
-- Snapshot view ships before real-time movement sync.
+- Chain/indexer adapter returns the same property snapshot shape as local storage.
+- `?visit=<owner id>` can choose chain or local snapshot source through a flag.
+- Missing or stale owner snapshots surface a clear read-only placeholder state.
+- Property snapshot tests cover owner-keyed fixture loading.
 
 ## Needs Decision
 

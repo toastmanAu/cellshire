@@ -21,6 +21,7 @@ describe('mapRegistry', () => {
         const registry = createMapRegistry({
             epoch: '14455',
             propertyOwner: 'joyid:alice',
+            propertyReadOnly: true,
             mineSpawn: { gx: 10, gy: 12 },
         });
         const mine = mapByKind(registry, MAP_KINDS.mine);
@@ -29,6 +30,9 @@ describe('mapRegistry', () => {
         expect(mine.seedSource).toBe('epoch');
         expect(mine.entrySpawn).toEqual({ gx: 10, gy: 12 });
         expect(property.id).toBe('property:joyid%3Aalice');
+        expect(property.name).toBe('Visited plot');
+        expect(property.ownerId).toBe('joyid:alice');
+        expect(property.readOnly).toBe(true);
         expect(property.seedSource).toBe('player');
     });
 

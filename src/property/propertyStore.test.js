@@ -3,6 +3,7 @@ import {
     PROPERTY_STORAGE_KEY,
     clearPropertyZone,
     loadPropertyZone,
+    propertyStorageKeyForOwner,
     savePropertyZone,
 } from './propertyStore.js';
 import { createStarterPropertyMap } from './propertyZone.js';
@@ -32,6 +33,20 @@ describe('propertyStore', () => {
         const map = createStarterPropertyMap();
         expect(savePropertyZone(storage, map, null, { propertyTier: 3 })).toBe(true);
         expect(loadPropertyZone(storage).propertyTier).toBe(3);
+    });
+
+    it('stores owner-specific property snapshots for visits', () => {
+        const storage = fakeStorage();
+        const map = createStarterPropertyMap();
+        expect(propertyStorageKeyForOwner('joyid:alice')).toBe('cellshire:property:v1:joyid%3Aalice');
+        expect(savePropertyZone(storage, map, null, {
+            ownerId: 'joyid:alice',
+            propertyTier: 2,
+        })).toBe(true);
+        expect(loadPropertyZone(storage)).toBeNull();
+        const out = loadPropertyZone(storage, { ownerId: 'joyid:alice' });
+        expect(out.ownerId).toBe('joyid:alice');
+        expect(out.propertyTier).toBe(2);
     });
 
     it('returns null for missing or malformed storage', () => {

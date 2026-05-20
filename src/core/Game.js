@@ -61,6 +61,7 @@ import {
     savePropInventory,
 } from '../property/propInventory.js';
 import { LocalInventoryAdapter } from '../inventory/inventoryAdapter.js';
+import { propertyVisitLabel } from '../visiting/propertyVisit.js';
 import {
     buyStoreItem,
     formatStorePrice,
@@ -107,6 +108,8 @@ export class Game {
         this._mapListeners = new Set();
         this._marketplaceListeners = new Set();
         this.propertyTier = 1;
+        this.propertyOwner = 'local';
+        this.propertyReadOnly = false;
         this.propInventory = loadPropInventory(safeStorage);
         this.inventoryAdapter = new LocalInventoryAdapter({
             props: this.propInventory,
@@ -226,6 +229,7 @@ export class Game {
     /* ── Intents from UI / input ──────────────────────────────── */
 
     setTool(t) {
+        if (this.isVisitingProperty() && t !== 'pan') t = 'pan';
         this.tool = t;
         this.renderer.eraseMode = (t === 'erase');
         this.canvas.style.cursor = t === 'pan' ? CELL_CURSORS.pan
@@ -295,8 +299,13 @@ export class Game {
 
     save() {
         if (this.mapKind === 'property') {
+            if (this.propertyReadOnly) {
+                this.ui?.showToast('Visited properties are read-only');
+                return false;
+            }
             const ok = savePropertyZone(safeStorage, this.tileMap, this.camera, {
                 propertyTier: this.propertyTier,
+                ownerId: this.propertyOwner,
             });
             this.ui?.showToast(ok ? 'Saved your property' : 'Property save failed');
             return ok;
@@ -314,6 +323,10 @@ export class Game {
 
     reset() {
         if (this.mapKind === 'property') {
+            if (this.propertyReadOnly) {
+                this.ui?.showToast('Visited properties are read-only');
+                return;
+            }
             clearPropertyZone(safeStorage);
             this._loadPropertyMap(null);
             this.ui?.showToast('Property reset');
@@ -489,6 +502,11 @@ export class Game {
     }
 
     _handlePropertyClick(gx, gy) {
+        if (this.propertyReadOnly) {
+            this.tool = 'pan';
+            this._handlePlayClick(gx, gy);
+            return;
+        }
         if (this.tool === 'pan') {
             this._handlePlayClick(gx, gy);
             return;
@@ -541,6 +559,7 @@ export class Game {
     }
 
     _canPlacePropertyAt(assetId, gx, gy) {
+        if (this.propertyReadOnly) return false;
         const bounds = this._propertyBounds();
         return canPlacePropertyAsset(assetId, gx, gy, bounds, {
             isOwned: id => this.propInventory.get(id) > 0,
@@ -549,6 +568,7 @@ export class Game {
     }
 
     _propertyPlacementBlockedMessage(assetId, gx, gy) {
+        if (this.propertyReadOnly) return 'Visited properties are read-only';
         const bounds = this._propertyBounds();
         if (!footprintWithinBounds(assetId, gx, gy, bounds)) {
             return 'That spot is outside your claim';
@@ -561,6 +581,7 @@ export class Game {
     }
 
     _canErasePropertyAt(gx, gy) {
+        if (this.propertyReadOnly) return false;
         const bounds = this._propertyBounds();
         const obj = this.tileMap.objectAt(gx, gy);
         if (obj?.role) return false;
@@ -844,6 +865,8 @@ export class Game {
 
     configureMapRegistry(opts = {}) {
         this.mapRegistry = createMapRegistry(opts);
+        const property = mapByKind(this.mapRegistry, 'property');
+        if (property?.ownerId) this.propertyOwner = property.ownerId;
         const mine = mapByKind(this.mapRegistry, 'mine');
         if (this.mapKind === 'mine' && mine) this.currentMapId = mine.id;
         this._emitMapChange();
@@ -863,7 +886,10 @@ export class Game {
         }
         if (target.id === this.currentMapId) return true;
         if (target.kind === 'property') {
-            this.travelToProperty();
+            this.travelToProperty({
+                ownerId: target.ownerId ?? 'local',
+                readOnly: !!target.readOnly,
+            });
             return true;
         }
         if (target.kind === 'mine') {
@@ -874,17 +900,35 @@ export class Game {
         return false;
     }
 
-    travelToProperty() {
-        if (this.mapKind === 'property') return;
-        this._mapRuntime.set(this.currentMapId, this._captureRuntime());
-        const saved = loadPropertyZone(safeStorage);
-        this._loadPropertyMap(saved);
-        this.ui?.showToast?.('Welcome home', 1800);
+    travelToProperty(opts = {}) {
+        const propertyDef = mapByKind(this.mapRegistry, 'property');
+        const ownerId = opts.ownerId ?? propertyDef?.ownerId ?? 'local';
+        const readOnly = !!(opts.readOnly ?? propertyDef?.readOnly);
+        if (this.mapKind === 'property'
+            && this.propertyOwner === ownerId
+            && this.propertyReadOnly === readOnly) return;
+        if (this.mapKind !== 'property') this._mapRuntime.set(this.currentMapId, this._captureRuntime());
+        const saved = loadPropertyZone(safeStorage, { ownerId });
+        this._loadPropertyMap(saved, { ownerId, readOnly });
+        this.ui?.showToast?.(readOnly ? `Visiting ${propertyVisitLabel(ownerId)}` : 'Welcome home', 1800);
+    }
+
+    visitProperty(ownerId) {
+        if (!ownerId) return false;
+        const mine = mapByKind(this.mapRegistry, 'mine');
+        this.mapRegistry = createMapRegistry({
+            epoch: this.currentEpoch,
+            propertyOwner: ownerId,
+            propertyReadOnly: true,
+            mineSpawn: mine?.entrySpawn ?? null,
+        });
+        this.travelToProperty({ ownerId, readOnly: true });
+        return true;
     }
 
     travelToMine() {
         if (this.mapKind !== 'property') return;
-        this._autosaveProperty();
+        if (!this.propertyReadOnly) this._autosaveProperty();
         const mineDef = mapByKind(this.mapRegistry, 'mine');
         const mineId = mineDef?.id ?? mineMapIdForEpoch(this.currentEpoch);
         const mine = this._mapRuntime.get(mineId);
@@ -894,6 +938,7 @@ export class Game {
         }
         this._restoreRuntime(mine);
         this.mapKind = 'mine';
+        this.propertyReadOnly = false;
         this.currentMapId = mineId;
         this.mode = 'play';
         this._syncPropertyExpansionPreview();
@@ -918,14 +963,20 @@ export class Game {
         const next = nextPropertyTier(this.propertyTier);
         return {
             ...summary,
-            next,
-            canAffordNext: canAffordExpansion(this.player?.inventory, this.propertyTier),
+            ownerId: this.propertyOwner,
+            readOnly: this.propertyReadOnly,
+            next: this.propertyReadOnly ? null : next,
+            canAffordNext: !this.propertyReadOnly && canAffordExpansion(this.player?.inventory, this.propertyTier),
             nextCostLabel: next?.cost ? formatExpansionCost(next.cost) : 'Max tier',
         };
     }
 
     unlockNextPropertyTier() {
         if (this.mapKind !== 'property') return { ok: false, reason: 'not-property' };
+        if (this.propertyReadOnly) {
+            this.ui?.showToast?.('Visited properties are read-only', 2200);
+            return { ok: false, reason: 'read-only' };
+        }
         const result = spendExpansionCost(this.player?.inventory, this.propertyTier);
         if (!result.ok) {
             const next = result.next ?? nextPropertyTier(this.propertyTier);
@@ -1040,13 +1091,15 @@ export class Game {
         return () => this._mapListeners.delete(cb);
     }
 
-    _loadPropertyMap(saved) {
+    _loadPropertyMap(saved, opts = {}) {
         const propertyDef = mapByKind(this.mapRegistry, 'property');
         const entrySpawn = entrySpawnForMap(propertyDef, PROPERTY_SPAWN);
         const starter = saved ? null : createStarterPropertyMap();
         const tileMapData = saved?.tileMap ?? starter.serialize();
         this.tileMap.deserialize(tileMapData, d => new PlacedObject(d));
         this.propertyTier = saved?.propertyTier ?? 1;
+        this.propertyOwner = opts.ownerId ?? propertyDef?.ownerId ?? saved?.ownerId ?? 'local';
+        this.propertyReadOnly = !!opts.readOnly;
         this.oreStates.clear();
         this._pendingInteract = null;
         this._pendingDepletions.clear();
@@ -1054,12 +1107,12 @@ export class Game {
         this.priceSnapshot = null;
         this.currentMapId = propertyDef?.id ?? 'property:local';
         this.mapKind = 'property';
-        this.mode = 'property';
+        this.mode = this.propertyReadOnly ? 'visit' : 'property';
         this.selectedAssetId = isStarterPropertyAsset(this.selectedAssetId)
             ? this.selectedAssetId
             : 'path';
         this.category = assetDefinitionFor(this.selectedAssetId)?.category ?? 'terrain';
-        this.tool = 'place';
+        this.tool = this.propertyReadOnly ? 'pan' : 'place';
         this._resetFlip();
         this.renderer.markDirty();
         this.movePlayerTo(entrySpawn.gx, entrySpawn.gy);
@@ -1075,9 +1128,10 @@ export class Game {
     }
 
     _autosaveProperty() {
-        if (this.mapKind === 'property') {
+        if (this.mapKind === 'property' && !this.propertyReadOnly) {
             savePropertyZone(safeStorage, this.tileMap, this.camera, {
                 propertyTier: this.propertyTier,
+                ownerId: this.propertyOwner,
             });
         }
     }
@@ -1098,6 +1152,8 @@ export class Game {
             mode: this.mode,
             mapKind: this.mapKind,
             propertyTier: this.propertyTier,
+            propertyOwner: this.propertyOwner,
+            propertyReadOnly: this.propertyReadOnly,
             oreStates: Array.from(this.oreStates.entries()).map(([id, state]) => ({
                 id,
                 oreType: state.oreType,
@@ -1125,6 +1181,8 @@ export class Game {
         if (runtime.mapKind === 'property') {
             this.propertyTier = runtime.propertyTier ?? this.propertyTier;
         }
+        this.propertyOwner = runtime.propertyOwner ?? this.propertyOwner ?? 'local';
+        this.propertyReadOnly = !!runtime.propertyReadOnly;
         this.oreStates.clear();
         for (const entry of runtime.oreStates ?? []) {
             this.oreStates.set(entry.id, new OreState(
@@ -1150,10 +1208,11 @@ export class Game {
         document.body.classList.toggle('mode-play', this.mode === 'play');
         document.body.classList.toggle('mode-build', this.mode === 'build');
         document.body.classList.toggle('mode-property', this.mode === 'property');
+        document.body.classList.toggle('mode-visit', this.mode === 'visit');
     }
 
     _syncPropertyExpansionPreview() {
-        this.renderer.propertyExpansionPreview = this.mapKind === 'property'
+        this.renderer.propertyExpansionPreview = this.mapKind === 'property' && !this.propertyReadOnly
             ? propertyExpansionPreview(this.propertyTier)
             : null;
         this.renderer.markDirty();
@@ -1164,9 +1223,15 @@ export class Game {
             mapId: this.currentMapId,
             mapKind: this.mapKind,
             mode: this.mode,
+            propertyOwner: this.propertyOwner,
+            propertyReadOnly: this.propertyReadOnly,
             map: mapById(this.mapRegistry, this.currentMapId),
         };
         for (const cb of this._mapListeners) cb(state);
+    }
+
+    isVisitingProperty() {
+        return this.mapKind === 'property' && this.propertyReadOnly;
     }
 
     /* ── Frame loop ───────────────────────────────────────────── */

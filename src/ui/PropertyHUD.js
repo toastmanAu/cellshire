@@ -34,13 +34,16 @@ export function installPropertyHUD(game) {
     function render() {
         const home = game.mapKind === 'property';
         const expansion = game.propertyExpansionState?.();
+        const visiting = !!expansion?.readOnly;
         root.dataset.map = home ? 'property' : 'mine';
-        label.textContent = home ? 'Home plot' : 'Public mine';
+        label.textContent = home
+            ? visiting ? 'Visiting plot' : 'Home plot'
+            : 'Public mine';
         detail.textContent = home && expansion
-            ? `${expansion.label} · ${expansion.name}`
+            ? visiting ? `Owner ${expansion.ownerId}` : `${expansion.label} · ${expansion.name}`
             : 'Quarry shift';
         action.textContent = home ? 'Return to mine' : 'Go home';
-        unlock.hidden = !home || !expansion?.next;
+        unlock.hidden = !home || visiting || !expansion?.next;
         if (!unlock.hidden) {
             unlock.disabled = !expansion.canAffordNext;
             unlock.textContent = `Expand · ${expansion.nextCostLabel}`;

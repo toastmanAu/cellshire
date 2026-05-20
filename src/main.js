@@ -35,6 +35,7 @@ import { loadMinedState, pruneStaleMinedState } from './mining/minedStore.js';
 import { chainMiningEnabled, makeMiningAdapterFromParams } from './mining/miningAdapter.js';
 import { getEpochPriceSnapshot } from './mining/priceSnapshot.js';
 import { walletFeatureEnabled } from './wallet/walletIdentity.js';
+import { propertyVisitOwnerFromParams } from './visiting/propertyVisit.js';
 
 async function main() {
     document.body.dataset.cellshireBoot = 'loading';
@@ -66,6 +67,7 @@ async function main() {
     // property-zone / asset-pack work.
     const params = new URLSearchParams(location.search);
     const devMode = params.get('dev') === '1';
+    const visitOwner = propertyVisitOwnerFromParams(params);
     game.mode = devMode ? 'build' : 'play';
     game.miningAdapter = makeMiningAdapterFromParams({
         params,
@@ -111,7 +113,11 @@ async function main() {
         fetch: window.fetch.bind(window),
         defaultUrl: 'https://testnet.ckb.dev',
     });
-    game.configureMapRegistry({ epoch });
+    game.configureMapRegistry({
+        epoch,
+        propertyOwner: visitOwner ?? 'local',
+        propertyReadOnly: !!visitOwner,
+    });
     const priceSnapshot = await getEpochPriceSnapshot({
         epoch,
         storage: safeStorage,
@@ -177,8 +183,14 @@ async function main() {
                 catalog,
             });
             game.spawnPlayer(spawn.gx, spawn.gy, { assetId: chosen });
-            game.configureMapRegistry({ epoch, mineSpawn: spawn });
+            game.configureMapRegistry({
+                epoch,
+                mineSpawn: spawn,
+                propertyOwner: visitOwner ?? 'local',
+                propertyReadOnly: !!visitOwner,
+            });
             game.ensureMinePropertyPortal(spawn);
+            if (visitOwner) game.visitProperty(visitOwner);
             installEconomyHUD({
                 player: game.player,
                 game,
@@ -195,7 +207,7 @@ async function main() {
 
             // No stored / URL choice — show the first-load gate. World
             // is already rendering, so the picker overlays on top of it.
-            if (chosen === null) {
+            if (chosen === null && !visitOwner) {
                 installCharacterPicker({
                     catalog,
                     onConfirm: (assetId) => {

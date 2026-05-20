@@ -20,8 +20,10 @@ export function propertyMapIdForOwner(ownerId = 'local') {
 export function createMapRegistry({
     epoch = null,
     propertyOwner = 'local',
+    propertyReadOnly = false,
     mineSpawn = null,
 } = {}) {
+    const ownerId = propertyOwner || 'local';
     return [
         {
             id: mineMapIdForEpoch(epoch),
@@ -31,9 +33,11 @@ export function createMapRegistry({
             entrySpawn: validSpawn(mineSpawn) ? mineSpawn : null,
         },
         {
-            id: propertyMapIdForOwner(propertyOwner),
+            id: propertyMapIdForOwner(ownerId),
             kind: MAP_KINDS.property,
-            name: 'Home plot',
+            name: ownerId === 'local' ? 'Home plot' : 'Visited plot',
+            ownerId,
+            readOnly: !!propertyReadOnly,
             seedSource: 'player',
             entrySpawn: PROPERTY_SPAWN,
         },

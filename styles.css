@@ -39,7 +39,9 @@
 /* Play vs build mode. The placement toolbar + asset palette are hidden in
    the public mine and become visible in dev/property editing surfaces. */
 body.mode-play #toolbar,
-body.mode-play #palette {
+body.mode-play #palette,
+body.mode-visit #toolbar,
+body.mode-visit #palette {
     display: none !important;
 }
 
@@ -1151,6 +1153,10 @@ html, body {
 body.mode-property #property-hud {
     border-color: rgba(61, 115, 85, 0.28);
     background: rgba(244, 251, 237, 0.96);
+}
+body.mode-visit #property-hud {
+    border-color: rgba(34, 86, 151, 0.24);
+    background: rgba(239, 247, 255, 0.96);
 }
 
 #inventory-hud {
