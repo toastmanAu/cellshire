@@ -1,8 +1,19 @@
 # Cellshire Kanban
 
-Status captured 2026-05-20. This board tracks the next implementation
+Status captured 2026-05-21. This board tracks the next implementation
 cards needed to turn the current prototype into the game described in
 `docs/DESIGN.md`.
+
+## Session Wrap 2026-05-21
+
+- Completed the property snapshot write path from local fixture cells through
+  submit adapter status reporting.
+- Latest committed card: `Property Snapshot Save Status`.
+- Current Next card: `Chain Visit Smoke Fixtures`.
+- Known local-only file: untracked `cs_logo.png`.
+- Last full verification: browser harness `228 passed, 0 failed`,
+  `node netlify-build.mjs`, module import checks, and headless
+  `?propertySnapshotSubmit=ccc` boot smoke.
 
 ## Current Baseline
 
