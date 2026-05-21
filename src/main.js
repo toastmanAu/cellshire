@@ -15,10 +15,12 @@ import { installEpochHUD } from './ui/EpochHUD.js';
 import { installWalletHUD } from './ui/WalletHUD.js';
 import { installPropertyHUD } from './ui/PropertyHUD.js';
 import { installEconomyHUD } from './ui/EconomyHUD.js';
+import { installResourceHUD } from './ui/ResourceHUD.js';
 import { installOreDebugHUD } from './ui/OreDebugHUD.js';
 import { installTraderHUD } from './ui/TraderHUD.js';
 import { installGeneralStoreHUD } from './ui/GeneralStoreHUD.js';
 import { installMarketplaceHUD } from './ui/MarketplaceHUD.js';
+import { installBuildingInteriorHUD } from './ui/BuildingInteriorHUD.js';
 import { isWalkable } from './grid/walkability.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
 import { safeStorage } from './lib/safeStorage.js';
@@ -32,6 +34,7 @@ import {
 import { describeEpochModifier } from './chain/epochModifier.js';
 import { describeEpochValueRange } from './mining/epochValueRange.js';
 import { loadMinedState, pruneStaleMinedState } from './mining/minedStore.js';
+import { isHarvestResourceObject } from './resources/harvestCatalog.js';
 import { chainMiningEnabled, makeMiningAdapterFromParams } from './mining/miningAdapter.js';
 import { getEpochPriceSnapshot } from './mining/priceSnapshot.js';
 import { loadWalletIdentity, walletFeatureEnabled } from './wallet/walletIdentity.js';
@@ -176,7 +179,12 @@ async function main() {
         const obj = game.tileMap.objectAt(gx, gy);
         if (!obj) continue;
         const oreState = game.oreStates.get(obj.id);
-        if (!oreState) continue;
+        if (!oreState) {
+            if (remaining <= 0 && isHarvestResourceObject(obj)) {
+                game.tileMap.removeObjectAt(gx, gy);
+            }
+            continue;
+        }
         oreState.restoreCapacity(remaining);
         if (remaining <= 0) {
             game.tileMap.removeObjectAt(gx, gy);
@@ -206,6 +214,7 @@ async function main() {
                 propertyReadOnly: !!visitOwner,
             });
             game.ensureMinePropertyPortal(spawn);
+            game.ensureMineTownshipPortal(spawn);
             if (visitOwner) await game.visitProperty(visitOwner);
             installEconomyHUD({
                 player: game.player,
@@ -213,13 +222,16 @@ async function main() {
                 inventoryAdapter: game.inventoryAdapter,
                 priceSnapshot,
             });
-            installTraderHUD({
+            installResourceHUD(game);
+            game.hudPanels = game.hudPanels || {};
+            game.hudPanels.trader = installTraderHUD({
                 player: game.player,
                 game,
                 priceSnapshot,
             });
-            installGeneralStoreHUD(game);
-            installMarketplaceHUD(game);
+            game.hudPanels.store = installGeneralStoreHUD(game);
+            game.hudPanels.market = installMarketplaceHUD(game);
+            installBuildingInteriorHUD(game);
 
             // No stored / URL choice — show the first-load gate. World
             // is already rendering, so the picker overlays on top of it.

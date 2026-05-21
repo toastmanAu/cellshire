@@ -6,8 +6,15 @@ import {
     mapByKind,
     mineMapIdForEpoch,
     propertyMapIdForOwner,
+    townshipMapId,
     travelTargetForRole,
 } from './mapRegistry.js';
+import {
+    TOWNSHIP_MAP_ID,
+    TOWNSHIP_PORTAL_ROLE,
+    TOWNSHIP_MINE_PORTAL_ROLE,
+    TOWNSHIP_PROPERTY_PORTAL_ROLE,
+} from '../township/townshipZone.js';
 
 describe('mapRegistry', () => {
     it('builds deterministic mine and property map ids', () => {
@@ -15,9 +22,10 @@ describe('mapRegistry', () => {
         expect(mineMapIdForEpoch(null)).toBe('mine:local');
         expect(propertyMapIdForOwner()).toBe('property:local');
         expect(propertyMapIdForOwner('joyid:alice')).toBe('property:joyid%3Aalice');
+        expect(townshipMapId()).toBe(TOWNSHIP_MAP_ID);
     });
 
-    it('creates mine and property entries with seed sources and spawns', () => {
+    it('creates mine, township, and property entries with seed sources and spawns', () => {
         const registry = createMapRegistry({
             epoch: '14455',
             propertyOwner: 'joyid:alice',
@@ -25,10 +33,14 @@ describe('mapRegistry', () => {
             mineSpawn: { gx: 10, gy: 12 },
         });
         const mine = mapByKind(registry, MAP_KINDS.mine);
+        const township = mapByKind(registry, MAP_KINDS.township);
         const property = mapByKind(registry, MAP_KINDS.property);
         expect(mine.id).toBe('mine:14455');
         expect(mine.seedSource).toBe('epoch');
         expect(mine.entrySpawn).toEqual({ gx: 10, gy: 12 });
+        expect(township.id).toBe(TOWNSHIP_MAP_ID);
+        expect(township.name).toBe('Township');
+        expect(township.seedSource).toBe('communal');
         expect(property.id).toBe('property:joyid%3Aalice');
         expect(property.name).toBe('Visited plot');
         expect(property.ownerId).toBe('joyid:alice');
@@ -40,6 +52,9 @@ describe('mapRegistry', () => {
         const registry = createMapRegistry({ epoch: '14455' });
         expect(travelTargetForRole('property_portal', registry).kind).toBe('property');
         expect(travelTargetForRole('mine_portal', registry).kind).toBe('mine');
+        expect(travelTargetForRole(TOWNSHIP_PORTAL_ROLE, registry).kind).toBe('township');
+        expect(travelTargetForRole(TOWNSHIP_MINE_PORTAL_ROLE, registry).kind).toBe('mine');
+        expect(travelTargetForRole(TOWNSHIP_PROPERTY_PORTAL_ROLE, registry).kind).toBe('property');
         expect(travelTargetForRole('vendor', registry)).toBeNull();
     });
 

@@ -23,6 +23,7 @@
         import { runAll } from './src/test/harness.js';
         // Test imports — keep alphabetised, one per line.
         import './src/assets/openAssetStandard.test.js';
+        import './src/bank/bankLoans.test.js';
         import './src/characters/catalog.test.js';
         import './src/chain/cccJoyId.test.js';
         import './src/chain/epochModifier.test.js';
@@ -32,6 +33,8 @@
         import './src/chain/propertySnapshotTx.test.js';
         import './src/core/Player.test.js';
         import './src/core/mining-dispatch.test.js';
+        import './src/farm/farmState.test.js';
+        import './src/farm/farmZone.test.js';
         import './src/grid/walkability.test.js';
         import './src/inventory/inventoryAdapter.test.js';
         import './src/lib/safeStorage.test.js';
@@ -51,18 +54,25 @@
         import './src/property/propertySnapshotWriter.test.js';
         import './src/property/propertyStore.test.js';
         import './src/property/propertyZone.test.js';
+        import './src/resources/harvestCatalog.test.js';
+        import './src/resources/resourceInventory.test.js';
         import './src/store/generalStoreCatalog.test.js';
         import './src/test/sanity.test.js';
         import './src/trader/traderAdapter.test.js';
         import './src/trader/traderRates.test.js';
+        import './src/treasury/houseTreasury.test.js';
+        import './src/township/townshipZone.test.js';
+        import './src/ui/BuildingInteriorHUD.test.js';
         import './src/ui/CharacterPicker.test.js';
         import './src/ui/cursors.test.js';
         import './src/ui/EconomyHUD.test.js';
         import './src/ui/OreDebugHUD.test.js';
+        import './src/ui/ResourceHUD.test.js';
         import './src/ui/WalletHUD.test.js';
         import './src/visiting/propertyVisit.test.js';
         import './src/visiting/visitLinks.test.js';
         import './src/wallet/walletIdentity.test.js';
+        import './src/worldgen/procgen.test.js';
 
         const out = document.getElementById('results');
         const results = await runAll();

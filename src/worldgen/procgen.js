@@ -17,6 +17,7 @@
 
 import { PlacedObject } from '../building/PlacedObject.js';
 import { ASSET_INDEX } from '../assets/assetManifest.js';
+import { HARVEST_RESOURCE_ROLES } from '../resources/harvestCatalog.js';
 
 /* ── Seeded RNG (mulberry32) ────────────────────────────────────── */
 
@@ -165,8 +166,9 @@ export function generateWorld(tileMap, seed = 1337) {
         oresPlaced++;
     }
 
-    // A few signature trees so the world doesn't look all-rock-and-grass.
-    // Reuse cypress on grass tiles, sparsely.
+    // Epoch-refreshing local resources. These use existing visuals for now;
+    // the resource asset pass can swap in dedicated PNGs without touching
+    // harvesting logic.
     const treeRand = mulberry32(seed ^ 0xBEEF);
     let treesPlaced = 0;
     for (let gy = 0; gy < H; gy++)
@@ -179,10 +181,34 @@ export function generateWorld(tileMap, seed = 1337) {
             assetId: 'cypress',
             gx, gy,
             footprint: { w: 1, d: 1 },
+            role: HARVEST_RESOURCE_ROLES.wood,
         });
         tileMap.addObject(obj);
         treesPlaced++;
     }
 
-    return { ...counts, oresPlaced, treesPlaced, total: W * H };
+    const stoneRand = mulberry32(seed ^ 0x51A7E);
+    const stoneNoise = makeNoise2D(seed ^ 0x570E, 12);
+    let stoneResourcesPlaced = 0;
+    for (let gy = 0; gy < H; gy++)
+    for (let gx = 0; gx < W; gx++) {
+        if (tileMap.getTerrain(gx, gy) !== 'dark_stone') continue;
+        const density = 0.015 + stoneNoise(gx, gy) * 0.045;
+        if (stoneRand() > density) continue;
+        if (!tileMap.isFreeFor(gx, gy, 1, 1)) continue;
+        const assetId = stoneRand() > 0.5 ? 'boulder' : 'large_rock';
+        const asset = ASSET_INDEX[assetId];
+        if (!asset) continue;
+        const obj = new PlacedObject({
+            id: tileMap.nextId(),
+            assetId,
+            gx, gy,
+            footprint: asset.footprint,
+            role: HARVEST_RESOURCE_ROLES.stone,
+        });
+        tileMap.addObject(obj);
+        stoneResourcesPlaced++;
+    }
+
+    return { ...counts, oresPlaced, treesPlaced, stoneResourcesPlaced, total: W * H };
 }

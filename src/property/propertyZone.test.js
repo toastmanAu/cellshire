@@ -11,6 +11,8 @@ import {
     isStarterPropertyAsset,
 } from './propertyZone.js';
 import { TileMap } from '../grid/TileMap.js';
+import { TOWNSHIP_PORTAL_ROLE } from '../township/townshipZone.js';
+import { farmBoundsForTier } from '../farm/farmZone.js';
 
 describe('property zone starter map', () => {
     it('creates a bounded starter property with terrain and a return portal', () => {
@@ -18,7 +20,13 @@ describe('property zone starter map', () => {
         expect(map.width).toBe(PROPERTY_SIZE);
         expect(map.height).toBe(PROPERTY_SIZE);
         expect(map.getTerrain(PROPERTY_EDIT_BOUNDS.minGx, PROPERTY_EDIT_BOUNDS.minGy)).toBe('grass');
+        const farm = farmBoundsForTier(1);
+        expect(map.getTerrain(farm.minGx, farm.minGy)).toBe('dirt');
         expect(map.objectAt(12, PROPERTY_EDIT_BOUNDS.minGy).role).toBe(PROPERTY_MINE_PORTAL_ROLE);
+        expect(map.objectAt(PROPERTY_EDIT_BOUNDS.minGx + 2, PROPERTY_EDIT_BOUNDS.minGy + 1).role)
+            .toBe(TOWNSHIP_PORTAL_ROLE);
+        expect(map.objectAt(PROPERTY_EDIT_BOUNDS.minGx + 3, PROPERTY_EDIT_BOUNDS.minGy + 3).assetId)
+            .toBe('house');
     });
 
     it('allows edits only inside the starter claim bounds', () => {
@@ -28,6 +36,7 @@ describe('property zone starter map', () => {
 
     it('allows only starter-owned assets inside the claim footprint', () => {
         expect(isStarterPropertyAsset('bench')).toBe(true);
+        expect(isStarterPropertyAsset('house')).toBe(true);
         expect(canPlacePropertyAsset('bench', PROPERTY_EDIT_BOUNDS.minGx, PROPERTY_EDIT_BOUNDS.minGy)).toBe(true);
         expect(canPlacePropertyAsset('coal_seam', PROPERTY_EDIT_BOUNDS.minGx, PROPERTY_EDIT_BOUNDS.minGy)).toBe(false);
         expect(canPlacePropertyAsset('bench', PROPERTY_EDIT_BOUNDS.maxGx + 1, PROPERTY_EDIT_BOUNDS.maxGy)).toBe(false);

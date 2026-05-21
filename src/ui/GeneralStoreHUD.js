@@ -88,9 +88,18 @@ export function installGeneralStoreHUD(game) {
         panel.appendChild(list);
     }
 
+    function open() {
+        root.dataset.open = '1';
+        render();
+    }
+
+    function close() {
+        root.dataset.open = '0';
+    }
+
     toggle.addEventListener('click', () => {
-        root.dataset.open = root.dataset.open === '1' ? '0' : '1';
-        if (root.dataset.open === '1') render();
+        if (root.dataset.open === '1') close();
+        else open();
     });
 
     const offCurrency = game.player?.inventory?.onChange?.(() => {
@@ -107,6 +116,8 @@ export function installGeneralStoreHUD(game) {
     return {
         root,
         render,
+        open,
+        close,
         dismiss() {
             offCurrency?.();
             offProps?.();

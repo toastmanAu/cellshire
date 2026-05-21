@@ -29,6 +29,15 @@ export function installPropertyHUD(game) {
     });
     root.appendChild(unlock);
 
+    const farm = document.createElement('button');
+    farm.type = 'button';
+    farm.className = 'property-hud__farm';
+    farm.addEventListener('click', () => {
+        game.unlockNextFarmTier?.();
+        render();
+    });
+    root.appendChild(farm);
+
     const share = document.createElement('button');
     share.type = 'button';
     share.className = 'property-hud__share';
@@ -45,20 +54,27 @@ export function installPropertyHUD(game) {
 
     function render() {
         const home = game.mapKind === 'property';
+        const township = game.mapKind === 'township';
         const expansion = game.propertyExpansionState?.();
+        const farmState = game.farmExpansionState?.();
         const visiting = !!expansion?.readOnly;
-        root.dataset.map = home ? 'property' : 'mine';
+        root.dataset.map = home ? 'property' : township ? 'township' : 'mine';
         label.textContent = home
             ? visiting ? 'Visiting plot' : 'Home plot'
-            : 'Public mine';
+            : township ? 'Township' : 'Public mine';
         detail.textContent = home && expansion
-            ? visiting ? visitDetail(expansion) : homeDetail(expansion)
-            : 'Quarry shift';
+            ? visiting ? visitDetail(expansion) : homeDetail(expansion, farmState)
+            : township ? 'Store · Market · Bank · Gallery · Hall' : 'Quarry shift';
         action.textContent = home ? 'Return to mine' : 'Go home';
         unlock.hidden = !home || visiting || !expansion?.next;
         if (!unlock.hidden) {
             unlock.disabled = !expansion.canAffordNext;
             unlock.textContent = `Expand · ${expansion.nextCostLabel}`;
+        }
+        farm.hidden = !home || visiting || !farmState?.next;
+        if (!farm.hidden) {
+            farm.disabled = !farmState.canAffordNext;
+            farm.textContent = `Farm · ${farmState.nextCostLabel}`;
         }
         share.hidden = false;
         share.textContent = home ? 'Share' : 'Share home';
@@ -74,19 +90,24 @@ export function installPropertyHUD(game) {
         return `Owner ${expansion.ownerId} · ${status}`;
     }
 
-    function homeDetail(expansion) {
+    function homeDetail(expansion, farmState) {
         const save = expansion.saveStatus?.label ? ` · ${expansion.saveStatus.label}` : '';
-        return `${expansion.label} · ${expansion.name}${save}`;
+        const farm = farmState
+            ? ` · ${farmState.label} · ${farmState.ready}/${farmState.planted} ready`
+            : '';
+        return `${expansion.label} · ${expansion.name}${farm}${save}`;
     }
 
     const off = game.onMapChange?.(render);
     const offInventory = game.player?.inventory?.onChange?.(render);
+    const offResources = game.resourceInventory?.onChange?.(render);
     render();
     return {
         root,
         dismiss() {
             off?.();
             offInventory?.();
+            offResources?.();
             root.remove();
         },
     };

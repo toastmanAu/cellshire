@@ -1,0 +1,53 @@
+# Starter Homes + Building Progression
+
+Started May 22, 2026.
+
+## Direction
+
+Every user should begin with a baseline home building on their home plot. From
+there, progression should be driven by a standard set of functional buildings.
+The building itself unlocks capability; later markets can provide upgraded
+skins, specialist variants, and tradable building assets without making the
+base game dependent on market availability.
+
+## Baseline Building Set
+
+- `home`: default house, identity anchor, future rest/visit/home-management hub.
+- `workbench`: basic crafting and recipe discovery.
+- `tool_rack`: pickaxe/tool upgrades.
+- `sawmill`: wood processing and timber recipes.
+- `stone_yard`: stone processing and masonry recipes.
+- `farm_storage`: crop/herb storage and farm efficiency.
+- `bank_office` or `ledger_desk`: optional home-side treasury/loan extension
+  after township bank mechanics settle.
+
+## Progression Rules
+
+- Baseline buildings are unlockable through gameplay resources.
+- Each building has a functional level independent of its visual skin.
+- Levels improve efficiency, capacity, recipe access, cooldowns, or automation.
+- Asset-market purchases can later override visuals or add specializations,
+  but should not remove the standard local unlock path.
+- Market assets should map onto building slots, e.g. a rare `workbench` skin
+  attaches to the `workbench` capability rather than becoming a totally separate
+  progression system.
+
+## Asset Generation
+
+- Starter homes now use the cleaned HiDream house as the active `house` sprite.
+- Installed raw/game asset:
+  `assets/raw/house.png` -> `assets/house.png`
+- Generation scratch files remain local under `tmp/house-generation/`; the
+  committed source of truth is the installed raw PNG.
+- The cleaned version is warmer and more homely than the original reference
+  house while keeping the gameplay `house` id stable for starter homes,
+  store items, and future upgrade-slot mapping.
+
+## Open Questions
+
+- Should building levels be stored per owner globally, per placed building, or
+  derived from owned cells/assets?
+- Should market assets affect only visuals at first, or also add minor
+  functional modifiers?
+- Should home `house` upgrades gate property size, farm size, or purely home
+  management features?

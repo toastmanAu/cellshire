@@ -1,19 +1,20 @@
 # Cellshire Kanban
 
-Status captured 2026-05-21. This board tracks the next implementation
+Status captured 2026-05-22. This board tracks the next implementation
 cards needed to turn the current prototype into the game described in
 `docs/DESIGN.md`.
 
-## Session Wrap 2026-05-21
+## Session Wrap 2026-05-22
 
-- Completed the property snapshot write path from local fixture cells through
-  submit adapter status reporting.
-- Latest committed card: `Property Snapshot Save Status`.
-- Current Next card: `Chain Visit Smoke Fixtures`.
-- Known local-only file: untracked `cs_logo.png`.
-- Last full verification: browser harness `228 passed, 0 failed`,
-  `node netlify-build.mjs`, module import checks, and headless
-  `?propertySnapshotSubmit=ccc` boot smoke.
+- Completed chain visit fixture compatibility, the first communal township
+  plane, RPG-style building interior windows, and local house treasury fee
+  accounting, a local Bank loan prototype, expandable home farming, and the
+  cleaned HiDream starter-home asset integration.
+- Latest completed card: `Starter Home Visual Integration`.
+- Current Next card: `Crafting Building Unlocks`.
+- Known local-only files: untracked `cs_logo.png` and `tmp/`.
+- Last verification: browser harness `262 passed, 0 failed` and
+  `node netlify-build.mjs`.
 
 ## Current Baseline
 
@@ -26,6 +27,19 @@ cards needed to turn the current prototype into the game described in
   multiply mining yield and surface in the epoch HUD.
 - Local-first property zone with a fenced starter claim, mine/home travel,
   bounded placement, starter owned-asset allow-list, and local persistence.
+- Starter property maps now include a baseline `house` plus the reserved farm
+  soil footprint, using the cleaned HiDream house sprite.
+- Communal township map reachable by signposts from the mine and starter
+  property, with Store, Market, Bank, Gallery, and Community Hall hotspots.
+- Township landmark interactions open stylized interior windows that route into
+  Store, Market, and exchange flows or show future-only building actions.
+- Trader swap fees are recorded into a local house treasury visible from the
+  Bank interior window.
+- Bank loans can issue and repay local CKB credit from the Bank interior, with
+  tunable offer/fee/reserve constants.
+- Farming/resource/crafting progression is specified, including home farm
+  expansion, epoch-refreshing trees/stone, crafting buildings, and pickaxe
+  upgrade direction.
 - Twelve mineable deposit visuals/catalog entries, including silver,
   lithium, bismuth, cobalt, and silicon quartz.
 - Character picker, persisted character choice, starter character PNGs,
@@ -468,17 +482,251 @@ Verified with the browser test harness (`228 passed, 0 failed`),
 `node netlify-build.mjs`, module import checks, and a headless
 `?propertySnapshotSubmit=ccc` boot smoke.
 
-## Next
-
 ### Chain Visit Smoke Fixtures
 
+**Completed:** 2026-05-21
+
 **Goal:** prove wallet-owned snapshot saves can be visited through the chain snapshot read path.
+
+Added integration coverage that saves a wallet-owned property through the local
+fixture snapshot writer, then reads it back through
+`?visit=<owner>&visitSource=chain` via the same adapter factory the app uses.
+Missing owner and `visitMinBlock` stale fallback behavior are covered. The
+manual smoke flow is documented in
+[`2026-05-21-chain-visit-smoke-fixtures.md`](specs/2026-05-21-chain-visit-smoke-fixtures.md).
 
 **Acceptance:**
 - Saving a wallet-owned fixture snapshot produces a visit-readable chain source fixture.
 - A `?visit=<owner>&visitSource=chain` smoke loads the saved snapshot owner.
 - Tests cover writer-to-reader compatibility and missing/stale fallback behavior.
 - Docs capture the local fixture flow for manual testing.
+
+Verified with the browser test harness (`230 passed, 0 failed`) and
+`node netlify-build.mjs`.
+
+### Communal Township Plane
+
+**Completed:** 2026-05-21
+
+**Goal:** create a shared township map that acts as the social/economic hub
+outside the mine and private property planes.
+
+Added `township:communal` as a third map kind alongside mine and property.
+Mine boot now places a township signpost near the spawn, starter properties
+include a township signpost, and the township has exits back to the mine and
+active property. The deterministic `32x32` township map includes landmark
+hotspots for Store, Market, Bank, Gallery, and Community Hall. Landmark
+interactions currently show a lightweight coming-soon toast so the next card
+can replace them with RPG-style interior windows. The flow is documented in
+[`2026-05-21-communal-township-plane.md`](specs/2026-05-21-communal-township-plane.md).
+
+**Acceptance:**
+- Map registry includes a deterministic township entry and spawn.
+- Mine/property HUD or signpost travel can enter and leave the township.
+- Township buildings expose interaction hotspots without opening the current
+  HUD panels automatically.
+- Smoke test confirms township travel preserves mine/property runtime state.
+
+Verified with the browser test harness (`233 passed, 0 failed`) and
+`node netlify-build.mjs`.
+
+### RPG Building Interior Windows
+
+**Completed:** 2026-05-21
+
+**Goal:** make township buildings feel like old-school RPG storefronts instead
+of plain overlay panels.
+
+Added a shared building interior window for township landmarks. The window
+renders scene-specific Store, Market, Bank, Gallery, and Community Hall rooms,
+supports click-away/close-button/`Escape` dismissal, and returns focus to the
+game canvas. Store, Market, and Bank exchange actions open the existing Store,
+Marketplace, and Trader panels through small public HUD handles; future-only
+loan, gallery, and hall actions stay in the room and show scoped toasts. The
+flow is documented in
+[`2026-05-21-rpg-building-interior-windows.md`](specs/2026-05-21-rpg-building-interior-windows.md).
+
+**Acceptance:**
+- Building interaction opens a building-specific scene window.
+- Store and Market scene options can launch the existing Shop/Market flows.
+- Keyboard/mouse close behavior returns focus to township movement.
+- Scene window assets and actions are data-driven enough to add Bank, Gallery,
+  and Community Hall without bespoke UI code for each building.
+
+Verified with the browser test harness (`236 passed, 0 failed`) and
+`node netlify-build.mjs`.
+
+### Game House Treasury
+
+**Completed:** 2026-05-21
+
+**Goal:** route economy fees into an explicit game/house treasury that can fund
+later economic loops.
+
+Added a local house treasury ledger at `cellshire:house-treasury:v1`. Successful
+Trader swaps now record USD-denominated fee entries with source currency,
+amount, target currency, fee bps, timestamp, and swap mode context. The Bank
+interior window shows a compact treasury summary and a `House treasury` action
+with recent fee records. The local design keeps source currency context so a
+future chain treasury can settle as CKB, UDT balances, typed cells, or a hybrid.
+The flow is documented in
+[`2026-05-21-game-house-treasury.md`](specs/2026-05-21-game-house-treasury.md).
+
+**Acceptance:**
+- Trader fee accounting records fee source, currency, amount, and timestamp.
+- Treasury balance is inspectable in dev mode or a Bank/Community Hall view.
+- Existing trade quote math still clearly shows the player-facing fee.
+- Tests cover fee accumulation and no-fee/local fallback behavior.
+
+Verified with the browser test harness (`241 passed, 0 failed`) and
+`node netlify-build.mjs`.
+
+### Bank + Loan Economy
+
+**Completed:** 2026-05-21
+
+**Goal:** explore a SimCity-like bank that turns house treasury liquidity into
+player-facing loans and longer-term economic pressure.
+
+Added a local loan book at `cellshire:bank-loans:v1:local` with one active CKB
+loan at a time. The Bank `Loan office` now shows tunable offers, borrow actions,
+the current remaining debt, and a repay-balance action. Loan availability uses a
+prototype base reserve plus house treasury fees minus active principal; pricing
+constants live in `src/bank/bankLoans.js` so item/store/expansion pricing can
+move later without changing the UI flow. The flow is documented in
+[`2026-05-21-bank-loan-economy.md`](specs/2026-05-21-bank-loan-economy.md).
+
+**Acceptance:**
+- Spec defines loan terms, repayment cadence, interest/fee model, default
+  handling, and whether collateral is required.
+- Spec defines how house treasury funds loan reserves and receives repayments.
+- Spec identifies what must remain local-only for prototype safety.
+- Prototype lending UI stays local-only with no wallet-backed debt cells yet.
+
+Verified with the browser test harness (`247 passed, 0 failed`) and
+`node netlify-build.mjs`.
+
+### Resource Inventory + Wood/Stone Harvesting
+
+**Goal:** add local gameplay resources and epoch-refreshing harvest nodes before
+full farming/crafting.
+
+**Spec:** [`2026-05-21-resource-inventory-wood-stone-harvesting.md`](specs/2026-05-21-resource-inventory-wood-stone-harvesting.md)
+
+**Status:** shipped local material inventory plus epoch-refreshing wood/stone
+harvest nodes.
+
+**Notes:**
+- Added persistent local resource inventory and compact Resources HUD.
+- Tagged procgen trees as wood resources and added stone resource outcrops.
+- Harvesting walks adjacent, grants `wood`/`stone`, and locally depletes the
+  node using the existing epoch mined-state path.
+- Covered resource catalog, inventory persistence, walkability, HUD rendering,
+  and procgen placement with tests.
+
+Verified with the browser test harness (`256 passed, 0 failed`) and
+`node netlify-build.mjs`.
+
+### Expandable Farm Zone MVP
+
+**Goal:** add a farmable home-base area that expands independently from the
+decorative property claim.
+
+**Spec:** [`2026-05-21-expandable-farm-zone-mvp.md`](specs/2026-05-21-expandable-farm-zone-mvp.md)
+
+**Status:** shipped the local farm-zone MVP.
+
+**Notes:**
+- Added owner-keyed farm state with persistent tier and planted crop timers.
+- Home maps now reserve visible farm soil and draw an expandable farm overlay.
+- Farm tier expansion spends local `wood` and `stone`.
+- Pan-mode farm clicks plant starter crops; planted crops are interactable and
+  harvest into the local resource inventory as `crop`.
+- Decorative placement and erase operations do not overwrite active farm land.
+
+Verified with the browser test harness (`262 passed, 0 failed`) and
+`node netlify-build.mjs`.
+
+### Starter Home Visual Integration
+
+**Completed:** 2026-05-22
+
+**Goal:** make every new player home feel warmer and more personal while
+keeping the baseline `house` gameplay slot stable.
+
+**Spec:** [`2026-05-22-starter-homes-and-building-progression.md`](specs/2026-05-22-starter-homes-and-building-progression.md)
+
+**Status:** shipped the cleaned HiDream house as the active `house` sprite.
+
+**Notes:**
+- Replaced `assets/raw/house.png` and processed `assets/house.png`.
+- Starter homes still use the existing `house` asset id, so store/catalog,
+  placement, starter ownership, and future upgrade-slot logic stay stable.
+- Kept the original gameplay footprint at 2x2 for now; functional home levels
+  and market skins remain part of the next building progression pass.
+
+Verified with the browser test harness (`262 passed, 0 failed`),
+`node netlify-build.mjs`, and `git diff --check`.
+
+## Next
+
+### Crafting Building Unlocks
+
+**Goal:** let home-base buildings unlock useful capabilities.
+
+**Spec:** [`2026-05-22-starter-homes-and-building-progression.md`](specs/2026-05-22-starter-homes-and-building-progression.md)
+
+**Acceptance:**
+- Every user starts with a baseline `home` building on their home plot.
+- Add a standard local building set: `home`, `workbench`, `tool_rack`,
+  `sawmill`, `stone_yard`, and `farm_storage`.
+- Building unlocks consume local resources and grant capabilities.
+- Each building has an independent functional level for efficiency, capacity,
+  recipe access, cooldowns, or automation.
+- Future asset-market purchases attach as skins, variants, or specialist
+  modules to standard building slots instead of replacing the baseline
+  progression path.
+- Capability state derives from owned/unlocked/placed standard buildings, not
+  only from decorative props.
+
+## Backlog
+
+### Pickaxe Upgrade Progression
+
+**Goal:** give players long-term mining/harvesting progression without
+over-inflating crypto rewards.
+
+**Acceptance:**
+- Add local tool tier state and upgrade recipes.
+- Apply conservative modifiers to resource harvesting and/or ore extraction.
+- Keep multiplier constants isolated for future economy tuning.
+
+### Resource Asset Generation Pass
+
+**Goal:** generate and integrate farming/resource/crafting assets using
+ComfyUI/Wyltek Studio models.
+
+**Acceptance:**
+- Generate harvestable tree, stone resource, optional gold material node, farm
+  plot states, workbench, tool rack, sawmill, stone yard, farm storage, and
+  pickaxe upgrade visuals.
+- Use reference-image editing to preserve the current isometric voxel style.
+- Process generated PNGs through the existing transparent asset pipeline.
+
+### Economy Pricing Pass
+
+**Goal:** tune mined income, store prices, expansion costs, treasury fee flow,
+bank loan offers, farming outputs, crafting costs, and tool upgrade costs into
+a coherent early-game economy.
+
+**Acceptance:**
+- Capture target time-to-first-purchase, time-to-first-expansion, and loan
+  usefulness assumptions.
+- Review CKB-denominated store, expansion, and loan constants together.
+- Decide whether loan reserve should keep the prototype base reserve or rely
+  only on accumulated house treasury fees.
+- Include local resource and farm/crafting progression targets.
+- Tests update only after pricing targets are recorded.
 
 ## Needs Decision
 
@@ -488,3 +736,16 @@ Verified with the browser test harness (`228 passed, 0 failed`),
 - Epoch modifier algorithm and high-value epoch frequency.
 - Store integration order: Trader first, General Store first, or wallet inventory first.
 - Save-state storage: CKBFS V3 vs custom minimum-capacity state cell.
+- Township topology: one communal plane for all players vs owner/epoch-sharded
+  township instances.
+- House treasury policy: which fees accrue, who controls treasury spending, and
+  what can be automated safely.
+- Bank chain design: whether the local loan prototype becomes wallet-backed debt
+  cells, collateralized positions, or a hybrid.
+- Resource model: keep wood/stone/gold as local gameplay materials vs cell-backed
+  resources.
+- Gold material: separate local crafting material vs reuse the existing
+  `gold_ore`/BTC crypto mapping.
+- Farm timers: real elapsed time vs epoch-bucketed vs action-count based.
+- Crafting unlocks: capability from owned buildings, placed buildings, or both.
+- Tool upgrades: which pickaxe effects are safe before economy pricing is tuned.

@@ -30,6 +30,33 @@ import { playPlacementFor, playMineHit, playMineDeplete } from '../ui/Audio.js';
 import { CELL_CURSORS } from '../ui/cursors.js';
 import { recordMine } from '../mining/minedStore.js';
 import { LocalMiningAdapter } from '../mining/miningAdapter.js';
+import {
+    harvestResourceConfig,
+    isHarvestResourceObject,
+} from '../resources/harvestCatalog.js';
+import {
+    formatResourceAmount,
+    loadResourceInventory,
+    saveResourceInventory,
+} from '../resources/resourceInventory.js';
+import {
+    FARM_CROP_ROLE,
+    FARM_CROPS,
+    FARM_STARTER_CROP_ID,
+    canAffordFarmExpansion,
+    farmBoundsForTier,
+    farmExpansionPreview,
+    farmTierSummary,
+    formatFarmExpansionCost,
+    isFarmCell,
+    nextFarmTier,
+    spendFarmExpansionCost,
+} from '../farm/farmZone.js';
+import {
+    clearFarmState,
+    loadFarmState,
+    saveFarmState,
+} from '../farm/farmState.js';
 import { safeStorage } from '../lib/safeStorage.js';
 import {
     addMinePropertyPortal,
@@ -74,6 +101,13 @@ import {
     generalStoreItem,
 } from '../store/generalStoreCatalog.js';
 import {
+    bankLoanSummary,
+    borrowBankLoan,
+    loadBankLoanBook,
+    repayBankLoan,
+    saveBankLoanBook,
+} from '../bank/bankLoans.js';
+import {
     buyMarketplaceListing,
     cancelMarketplaceListing,
     createMarketplaceListing,
@@ -82,6 +116,11 @@ import {
     saveMarketplaceState,
 } from '../marketplace/playerMarketplace.js';
 import {
+    houseTreasurySummary,
+    loadHouseTreasury,
+    saveHouseTreasury,
+} from '../treasury/houseTreasury.js';
+import {
     createMapRegistry,
     entrySpawnForMap,
     mapByKind,
@@ -89,6 +128,16 @@ import {
     mineMapIdForEpoch,
     travelTargetForRole,
 } from '../maps/mapRegistry.js';
+import {
+    addMineTownshipPortal,
+    createTownshipMap,
+    isTownshipBuildingRole,
+    townshipBuildingLabel,
+    TOWNSHIP_MINE_PORTAL_ROLE,
+    TOWNSHIP_PORTAL_ROLE,
+    TOWNSHIP_PROPERTY_PORTAL_ROLE,
+    TOWNSHIP_SPAWN,
+} from '../township/townshipZone.js';
 
 export class Game {
     constructor(canvas, ui = null) {
@@ -123,14 +172,30 @@ export class Game {
         this.propertySnapshotWriter = new LocalStoragePropertySnapshotWriter({ storage: safeStorage });
         this.propertySnapshotSaveResult = null;
         this.propInventory = loadPropInventory(safeStorage);
+        this.resourceInventory = loadResourceInventory(safeStorage);
+        this.farmState = loadFarmState(safeStorage, this.propertyOwner);
         this.inventoryAdapter = new LocalInventoryAdapter({
             props: this.propInventory,
         });
         this.marketplaceState = loadMarketplaceState(safeStorage);
+        this.houseTreasury = loadHouseTreasury(safeStorage);
+        this.houseTreasury.onChange(() => {
+            saveHouseTreasury(safeStorage, this.houseTreasury);
+            this.ui?.update();
+        });
+        this.bankLoanBook = loadBankLoanBook(safeStorage);
+        this.bankLoanBook.onChange(() => {
+            saveBankLoanBook(safeStorage, this.bankLoanBook);
+            this.ui?.update();
+        });
         this.propInventory.onChange(() => {
             savePropInventory(safeStorage, this.propInventory);
             this.ui?.update();
             this.renderer.markDirty();
+        });
+        this.resourceInventory.onChange(() => {
+            saveResourceInventory(safeStorage, this.resourceInventory);
+            this.ui?.update();
         });
 
         // Player avatar — created lazily by main.js once procgen has run
@@ -338,6 +403,8 @@ export class Game {
                 return;
             }
             clearPropertyZone(safeStorage);
+            clearFarmState(safeStorage, this.propertyOwner);
+            this.farmState = loadFarmState(safeStorage, this.propertyOwner);
             this._loadPropertyMap(null);
             this.ui?.showToast('Property reset');
             return;
@@ -518,6 +585,7 @@ export class Game {
             return;
         }
         if (this.tool === 'pan') {
+            if (this._handleFarmClick(gx, gy)) return;
             this._handlePlayClick(gx, gy);
             return;
         }
@@ -570,11 +638,54 @@ export class Game {
 
     _canPlacePropertyAt(assetId, gx, gy) {
         if (this.propertyReadOnly) return false;
+        if (this._footprintIntersectsFarm(assetId, gx, gy)) return false;
         const bounds = this._propertyBounds();
         return canPlacePropertyAsset(assetId, gx, gy, bounds, {
             isOwned: id => this.propInventory.get(id) > 0,
         })
             && this.placement.canPlace(assetId, gx, gy);
+    }
+
+    _handleFarmClick(gx, gy) {
+        if (this.mapKind !== 'property' || this.propertyReadOnly) return false;
+        const obj = this.tileMap.objectAt(gx, gy);
+        if (obj?.role === FARM_CROP_ROLE) return false;
+        if (!this._canPlantFarmAt(gx, gy)) return false;
+        return this._plantFarmCrop(gx, gy);
+    }
+
+    _canPlantFarmAt(gx, gy) {
+        if (this.mapKind !== 'property' || this.propertyReadOnly) return false;
+        if (!isFarmCell(gx, gy, this.farmState.tier)) return false;
+        if (!this.tileMap.inBounds(gx, gy)) return false;
+        if (!this.tileMap.isFreeFor(gx, gy, 1, 1)) return false;
+        return !!this.tileMap.getTerrain(gx, gy);
+    }
+
+    _plantFarmCrop(gx, gy) {
+        const planted = this.farmState.plant(gx, gy, { cropId: FARM_STARTER_CROP_ID });
+        if (!planted.ok) return false;
+        const crop = FARM_CROPS[planted.plot.cropId];
+        this.tileMap.setTerrain(gx, gy, 'dirt');
+        const result = this.placement.place(crop.assetId, gx, gy, { role: FARM_CROP_ROLE });
+        if (!result?.object) {
+            this.farmState.harvest(gx, gy, { now: Number.MAX_SAFE_INTEGER });
+            return false;
+        }
+        const obj = result.object;
+        this.renderer.spawnAnim(`obj-${obj.id}`, {
+            gx: obj.gx,
+            gy: obj.gy,
+            w: obj.footprint?.w ?? 1,
+            d: obj.footprint?.d ?? 1,
+        });
+        playPlacementFor(obj.assetId);
+        saveFarmState(safeStorage, this.propertyOwner, this.farmState);
+        this._autosaveProperty();
+        this._syncFarmZonePreview();
+        this._emitMapChange();
+        this.ui?.showToast?.('Planted starter crop', 1400);
+        return true;
     }
 
     _propertyPlacementBlockedMessage(assetId, gx, gy) {
@@ -583,6 +694,9 @@ export class Game {
         if (!footprintWithinBounds(assetId, gx, gy, bounds)) {
             return 'That spot is outside your claim';
         }
+        if (this._footprintIntersectsFarm(assetId, gx, gy)) {
+            return 'That spot is farm land';
+        }
         if (!isStarterPropertyAsset(assetId) && this.propInventory.get(assetId) <= 0) {
             const item = generalStoreItem(assetId);
             return item ? `Buy ${item.name} at the store` : 'That prop is not owned';
@@ -590,11 +704,23 @@ export class Game {
         return 'That spot is blocked';
     }
 
+    _footprintIntersectsFarm(assetId, gx, gy) {
+        if (this.mapKind !== 'property' || this.propertyReadOnly) return false;
+        const asset = assetDefinitionFor(assetId);
+        const fp = asset?.footprint ?? { w: 1, d: 1 };
+        for (let ix = 0; ix < fp.w; ix++)
+        for (let iy = 0; iy < fp.d; iy++) {
+            if (isFarmCell(gx + ix, gy + iy, this.farmState.tier)) return true;
+        }
+        return false;
+    }
+
     _canErasePropertyAt(gx, gy) {
         if (this.propertyReadOnly) return false;
         const bounds = this._propertyBounds();
         const obj = this.tileMap.objectAt(gx, gy);
         if (obj?.role) return false;
+        if (!obj && isFarmCell(gx, gy, this.farmState.tier)) return false;
         if (obj) {
             const fp = obj.footprint || { w: 1, d: 1 };
             for (let ix = 0; ix < fp.w; ix++)
@@ -615,11 +741,13 @@ export class Game {
             this.canvas.style.cursor = CELL_CURSORS.blocked;
             return;
         }
-        if (this.tool === 'pan') {
-            this.canvas.style.cursor = CELL_CURSORS.pan;
-            return;
-        }
         if (this.mapKind === 'property') {
+            if (this.tool === 'pan') {
+                this.canvas.style.cursor = isInteractable(this.tileMap, cell.gx, cell.gy) || this._canPlantFarmAt(cell.gx, cell.gy)
+                    ? CELL_CURSORS.interact
+                    : CELL_CURSORS.pan;
+                return;
+            }
             if (this.tool === 'erase') {
                 this.canvas.style.cursor = this._canErasePropertyAt(cell.gx, cell.gy)
                     ? CELL_CURSORS.erase
@@ -629,6 +757,10 @@ export class Game {
             this.canvas.style.cursor = this._canPlacePropertyAt(this.selectedAssetId, cell.gx, cell.gy)
                 ? CELL_CURSORS.place
                 : CELL_CURSORS.blocked;
+            return;
+        }
+        if (this.tool === 'pan') {
+            this.canvas.style.cursor = CELL_CURSORS.pan;
             return;
         }
 
@@ -680,8 +812,26 @@ export class Game {
             this.travelToMapRole(obj.role);
             return;
         }
+        if (obj?.role === TOWNSHIP_PORTAL_ROLE
+            || obj?.role === TOWNSHIP_MINE_PORTAL_ROLE
+            || obj?.role === TOWNSHIP_PROPERTY_PORTAL_ROLE) {
+            this.travelToMapRole(obj.role);
+            return;
+        }
+        if (isTownshipBuildingRole(obj?.role)) {
+            this.openTownshipBuilding(obj.role);
+            return;
+        }
         if (obj && isOre(obj.assetId)) {
             this._mineOre(obj);
+            return;
+        }
+        if (isHarvestResourceObject(obj)) {
+            this._harvestResource(obj);
+            return;
+        }
+        if (obj?.role === FARM_CROP_ROLE) {
+            this._harvestFarmCrop(obj);
             return;
         }
         const name = obj ? obj.assetId : this.tileMap.getTerrain(gx, gy);
@@ -801,6 +951,70 @@ export class Game {
         }
     }
 
+    _harvestResource(obj) {
+        if (this._pendingDepletions.has(obj.id)) return;
+        const cfg = harvestResourceConfig(obj.role);
+        if (!cfg) return;
+        this.resourceInventory.add(cfg.resourceId, cfg.yieldAmount);
+        recordMine(safeStorage, this.currentEpoch, obj.gx, obj.gy, 0);
+
+        const rewardText = `+${formatResourceAmount(cfg.resourceId, cfg.yieldAmount)}`;
+        const c = cellToScreen(obj.gx + 0.5, obj.gy + 0.5);
+        this.renderer.spawnPlayerStrike(c.x, c.y, { color: cfg.dustColor });
+        this.renderer.spawnFloatingText(c.x, c.y - 10, rewardText, {
+            color: cfg.textColor,
+            durationMs: 900,
+            rise: 30,
+            font: 'bold 15px system-ui, sans-serif',
+        });
+        this.renderer.spawnDustPuff(c.x, c.y, {
+            color: cfg.dustColor,
+            count: 9,
+            speed: 70,
+            durationMs: 650,
+            sizeRange: [2, 4],
+        });
+        playMineDeplete();
+        this._startDepletion(obj);
+        this.ui?.showToast?.(`Harvested ${formatResourceAmount(cfg.resourceId, cfg.yieldAmount)}`, 1600);
+    }
+
+    _harvestFarmCrop(obj) {
+        const result = this.farmState.harvest(obj.gx, obj.gy);
+        if (!result.ok) {
+            if (result.reason === 'not-ready') {
+                this.ui?.showToast?.(`Crop ready in ${formatFarmRemaining(result.remainingMs)}`, 1600);
+            }
+            return;
+        }
+        this.resourceInventory.add(result.output.resourceId, result.output.amount);
+        saveFarmState(safeStorage, this.propertyOwner, this.farmState);
+
+        const label = formatResourceAmount(result.output.resourceId, result.output.amount);
+        const c = cellToScreen(obj.gx + 0.5, obj.gy + 0.5);
+        this.renderer.spawnPlayerStrike(c.x, c.y, { color: '#3d7355' });
+        this.renderer.spawnFloatingText(c.x, c.y - 10, `+${label}`, {
+            color: '#3d7355',
+            durationMs: 900,
+            rise: 28,
+            font: 'bold 15px system-ui, sans-serif',
+        });
+        this.renderer.spawnDustPuff(c.x, c.y, {
+            color: '#7b9f55',
+            count: 8,
+            speed: 58,
+            durationMs: 600,
+            sizeRange: [2, 4],
+        });
+        playPlacementFor(obj.assetId);
+        this.tileMap.removeObjectAt(obj.gx, obj.gy);
+        this.renderer.markDirty();
+        this._autosaveProperty();
+        this._syncFarmZonePreview();
+        this._emitMapChange();
+        this.ui?.showToast?.(`Harvested ${label}`, 1600);
+    }
+
     /**
      * Kick off the crumble animation on an ore and queue its actual
      * removal one frame before the anim ends. The renderer treats the
@@ -873,10 +1087,28 @@ export class Game {
         return obj;
     }
 
+    ensureMineTownshipPortal(nearCell) {
+        if (this.tileMap.objects.some(o => o.role === TOWNSHIP_PORTAL_ROLE)) return null;
+        const obj = addMineTownshipPortal(this.tileMap, nearCell);
+        if (obj) {
+            this.renderer.spawnAnim(`obj-${obj.id}`, {
+                gx: obj.gx,
+                gy: obj.gy,
+                w: obj.footprint?.w ?? 1,
+                d: obj.footprint?.d ?? 1,
+            }, 520);
+            this.renderer.markDirty();
+        }
+        return obj;
+    }
+
     configureMapRegistry(opts = {}) {
         this.mapRegistry = createMapRegistry(opts);
         const property = mapByKind(this.mapRegistry, 'property');
-        if (property?.ownerId) this.propertyOwner = property.ownerId;
+        if (property?.ownerId) {
+            this.propertyOwner = property.ownerId;
+            this.farmState = loadFarmState(safeStorage, this.propertyOwner);
+        }
         const mine = mapByKind(this.mapRegistry, 'mine');
         if (this.mapKind === 'mine' && mine) this.currentMapId = mine.id;
         this._emitMapChange();
@@ -886,6 +1118,12 @@ export class Game {
         const target = travelTargetForRole(role, this.mapRegistry);
         if (!target) return false;
         return this.travelToMap(target.id);
+    }
+
+    openTownshipBuilding(role) {
+        if (this.townshipInterior?.open?.(role)) return true;
+        this.ui?.showToast?.(`${townshipBuildingLabel(role)} · coming soon`, 1800);
+        return false;
     }
 
     async travelToMap(mapId) {
@@ -906,8 +1144,36 @@ export class Game {
             this.travelToMine();
             return true;
         }
+        if (target.kind === 'township') {
+            this.travelToTownship();
+            return true;
+        }
         this.ui?.showToast?.('Map is not available');
         return false;
+    }
+
+    travelToTownship() {
+        if (this.mapKind === 'township') return true;
+        if (this.mapKind === 'property' && !this.propertyReadOnly) this._autosaveProperty();
+        this._mapRuntime.set(this.currentMapId, this._captureRuntime());
+        const townshipDef = mapByKind(this.mapRegistry, 'township');
+        const townshipId = townshipDef?.id ?? 'township:communal';
+        const township = this._mapRuntime.get(townshipId);
+        if (township) {
+            this._restoreRuntime(township);
+        } else {
+            this._loadTownshipMap();
+        }
+        this.currentMapId = townshipId;
+        this.mapKind = 'township';
+        this.mode = 'play';
+        this.propertyReadOnly = false;
+        this._syncPropertyExpansionPreview();
+        this._syncFarmZonePreview();
+        this._syncBodyModeClass();
+        this._emitMapChange();
+        this.ui?.showToast?.('Township square', 1600);
+        return true;
     }
 
     async travelToProperty(opts = {}) {
@@ -969,6 +1235,7 @@ export class Game {
         } else {
             this.propertyOwner = nextOwner;
             this.propertyReadOnly = false;
+            this.farmState = loadFarmState(safeStorage, this.propertyOwner);
             this.propertySnapshotSource = 'local';
             this.propertySnapshotStatus = 'missing';
             this.propertySnapshotStale = false;
@@ -981,8 +1248,9 @@ export class Game {
     }
 
     travelToMine() {
-        if (this.mapKind !== 'property') return;
-        if (!this.propertyReadOnly) this._autosaveProperty();
+        if (this.mapKind !== 'property' && this.mapKind !== 'township') return;
+        if (this.mapKind === 'property' && !this.propertyReadOnly) this._autosaveProperty();
+        this._mapRuntime.set(this.currentMapId, this._captureRuntime());
         const mineDef = mapByKind(this.mapRegistry, 'mine');
         const mineId = mineDef?.id ?? mineMapIdForEpoch(this.currentEpoch);
         const mine = this._mapRuntime.get(mineId);
@@ -995,7 +1263,9 @@ export class Game {
         this.propertyReadOnly = false;
         this.currentMapId = mineId;
         this.mode = 'play';
+        this.tool = 'place';
         this._syncPropertyExpansionPreview();
+        this._syncFarmZonePreview();
         this._syncBodyModeClass();
         this._emitMapChange();
         this.ui?.showToast?.('Back to the mine', 1600);
@@ -1029,6 +1299,22 @@ export class Game {
         };
     }
 
+    farmExpansionState() {
+        const summary = farmTierSummary(this.farmState.tier);
+        const next = nextFarmTier(this.farmState.tier);
+        const now = Date.now();
+        return {
+            ...summary,
+            ownerId: this.propertyOwner,
+            readOnly: this.propertyReadOnly,
+            planted: this.farmState.entries().length,
+            ready: this.farmState.readyCount(now),
+            next: this.propertyReadOnly ? null : next,
+            canAffordNext: !this.propertyReadOnly && canAffordFarmExpansion(this.resourceInventory, this.farmState.tier),
+            nextCostLabel: next?.cost ? formatFarmExpansionCost(next.cost) : 'Max tier',
+        };
+    }
+
     propertySnapshotSaveStatus({ compact = true } = {}) {
         if (!this.propertySnapshotSaveResult) return null;
         return {
@@ -1056,10 +1342,39 @@ export class Game {
 
         this.propertyTier = result.tier;
         this._syncPropertyExpansionPreview();
+        this._syncFarmZonePreview();
         this._autosaveProperty();
         this.renderer.markDirty();
         this._emitMapChange();
         this.ui?.showToast?.(`Expanded to ${propertyTierSummary(this.propertyTier).name}`, 2200);
+        return result;
+    }
+
+    unlockNextFarmTier() {
+        if (this.mapKind !== 'property') return { ok: false, reason: 'not-property' };
+        if (this.propertyReadOnly) {
+            this.ui?.showToast?.('Visited properties are read-only', 2200);
+            return { ok: false, reason: 'read-only' };
+        }
+        const result = spendFarmExpansionCost(this.resourceInventory, this.farmState.tier);
+        if (!result.ok) {
+            const next = result.next ?? nextFarmTier(this.farmState.tier);
+            const cost = next?.cost ? formatFarmExpansionCost(next.cost) : 'Max tier';
+            const message = result.reason === 'max-tier'
+                ? 'Farm is fully expanded'
+                : `Need ${cost} to expand farm`;
+            this.ui?.showToast?.(message, 2200);
+            return result;
+        }
+
+        this.farmState.setTier(result.tier);
+        saveFarmState(safeStorage, this.propertyOwner, this.farmState);
+        this._applyFarmZoneToMap();
+        this._syncFarmZonePreview();
+        this._autosaveProperty();
+        this.renderer.markDirty();
+        this._emitMapChange();
+        this.ui?.showToast?.(`Expanded farm to ${farmTierSummary(this.farmState.tier).name}`, 2200);
         return result;
     }
 
@@ -1088,6 +1403,63 @@ export class Game {
 
     marketplaceListings() {
         return marketplaceListings(this.marketplaceState);
+    }
+
+    recordTraderFee({ quote, swap } = {}) {
+        const entry = this.houseTreasury?.recordTraderFee?.({ quote, swap });
+        if (entry) {
+            saveHouseTreasury(safeStorage, this.houseTreasury);
+        }
+        return entry;
+    }
+
+    houseTreasurySummary() {
+        return houseTreasurySummary(this.houseTreasury);
+    }
+
+    bankLoanSummary() {
+        return bankLoanSummary({
+            loanBook: this.bankLoanBook,
+            treasury: this.houseTreasury,
+            priceSnapshot: this.priceSnapshot,
+        });
+    }
+
+    borrowBankLoan(offerId) {
+        const result = borrowBankLoan({
+            offerId,
+            loanBook: this.bankLoanBook,
+            inventory: this.player?.inventory,
+            treasury: this.houseTreasury,
+            priceSnapshot: this.priceSnapshot,
+        });
+        if (!result.ok) {
+            this.ui?.showToast?.(bankLoanFailureMessage(result.reason), 2200);
+            return result;
+        }
+        saveBankLoanBook(safeStorage, this.bankLoanBook);
+        this.ui?.showToast?.(`Borrowed ${formatCurrencyAmount(result.loan.currency, result.loan.principal)}`, 2200);
+        this.ui?.update();
+        return result;
+    }
+
+    repayBankLoan(amount = 'max') {
+        const result = repayBankLoan({
+            loanBook: this.bankLoanBook,
+            inventory: this.player?.inventory,
+            amount,
+        });
+        if (!result.ok) {
+            this.ui?.showToast?.(bankLoanFailureMessage(result.reason), 2200);
+            return result;
+        }
+        saveBankLoanBook(safeStorage, this.bankLoanBook);
+        this.ui?.showToast?.(
+            result.paid ? 'Loan repaid' : `Paid ${formatCurrencyAmount(result.loan.currency, result.payment)}`,
+            2200,
+        );
+        this.ui?.update();
+        return result;
     }
 
     listMarketplaceItem({ assetId, price, account }) {
@@ -1183,6 +1555,7 @@ export class Game {
         this.propertyTier = saved?.propertyTier ?? 1;
         this.propertyOwner = opts.ownerId ?? propertyDef?.ownerId ?? saved?.ownerId ?? 'local';
         this.propertyReadOnly = !!opts.readOnly;
+        this.farmState = loadFarmState(safeStorage, this.propertyOwner);
         this.propertySnapshotSource = opts.snapshotSource ?? 'local';
         this.propertySnapshotStatus = opts.snapshotStatus ?? (saved ? 'found' : 'missing');
         this.propertySnapshotStale = !!opts.snapshotStale;
@@ -1194,6 +1567,7 @@ export class Game {
         this.currentMapId = propertyDef?.id ?? 'property:local';
         this.mapKind = 'property';
         this.mode = this.propertyReadOnly ? 'visit' : 'property';
+        if (!this.propertyReadOnly) this._applyFarmZoneToMap();
         this.selectedAssetId = isStarterPropertyAsset(this.selectedAssetId)
             ? this.selectedAssetId
             : 'path';
@@ -1209,6 +1583,31 @@ export class Game {
         }
         this._syncBodyModeClass();
         this._syncPropertyExpansionPreview();
+        this._syncFarmZonePreview();
+        this.ui?.update();
+        this._emitMapChange();
+    }
+
+    _loadTownshipMap() {
+        const townshipDef = mapByKind(this.mapRegistry, 'township');
+        const entrySpawn = entrySpawnForMap(townshipDef, TOWNSHIP_SPAWN);
+        const townshipMap = createTownshipMap();
+        this.tileMap.deserialize(townshipMap.serialize(), d => new PlacedObject(d));
+        this.oreStates.clear();
+        this._pendingInteract = null;
+        this._pendingDepletions.clear();
+        this.currentEpoch = null;
+        this.priceSnapshot = null;
+        this.currentMapId = townshipDef?.id ?? 'township:communal';
+        this.mapKind = 'township';
+        this.mode = 'play';
+        this.tool = 'place';
+        this._resetFlip();
+        this.renderer.markDirty();
+        this.movePlayerTo(entrySpawn.gx, entrySpawn.gy);
+        this._syncBodyModeClass();
+        this._syncPropertyExpansionPreview();
+        this._syncFarmZonePreview();
         this.ui?.update();
         this._emitMapChange();
     }
@@ -1220,6 +1619,7 @@ export class Game {
     }
 
     async _savePropertyWithSnapshot() {
+        saveFarmState(safeStorage, this.propertyOwner, this.farmState);
         const result = await savePropertyZoneWithSnapshotWriter({
             storage: safeStorage,
             writer: this.propertySnapshotWriter,
@@ -1308,6 +1708,7 @@ export class Game {
         this._pendingInteract = null;
         this._pendingDepletions.clear();
         this._syncPropertyExpansionPreview();
+        this._syncFarmZonePreview();
         this.renderer.markDirty();
         if (runtime.playerCell) this.movePlayerTo(runtime.playerCell.gx, runtime.playerCell.gy);
         this.ui?.update();
@@ -1326,6 +1727,38 @@ export class Game {
             ? propertyExpansionPreview(this.propertyTier)
             : null;
         this.renderer.markDirty();
+    }
+
+    _syncFarmZonePreview() {
+        this.renderer.farmZonePreview = this.mapKind === 'property' && !this.propertyReadOnly
+            ? farmExpansionPreview(this.farmState.tier)
+            : null;
+        this.renderer.markDirty();
+    }
+
+    _applyFarmZoneToMap() {
+        if (this.mapKind !== 'property' || this.propertyReadOnly) return;
+        const bounds = farmBoundsForTier(this.farmState.tier);
+        for (let gy = bounds.minGy; gy <= bounds.maxGy; gy++)
+        for (let gx = bounds.minGx; gx <= bounds.maxGx; gx++) {
+            if (this.tileMap.inBounds(gx, gy)) this.tileMap.setTerrain(gx, gy, 'dirt');
+        }
+
+        const activeKeys = new Set(this.farmState.entries().map(plot => `${plot.gx},${plot.gy}`));
+        for (const obj of [...this.tileMap.objects]) {
+            if (obj.role !== FARM_CROP_ROLE) continue;
+            const key = `${obj.gx},${obj.gy}`;
+            if (!activeKeys.has(key) || !isFarmCell(obj.gx, obj.gy, this.farmState.tier)) {
+                this.tileMap.removeObjectAt(obj.gx, obj.gy);
+            }
+        }
+
+        for (const plot of this.farmState.entries()) {
+            if (!isFarmCell(plot.gx, plot.gy, this.farmState.tier)) continue;
+            if (this.tileMap.objectAt(plot.gx, plot.gy)) continue;
+            const crop = FARM_CROPS[plot.cropId] ?? FARM_CROPS[FARM_STARTER_CROP_ID];
+            this.placement.place(crop.assetId, plot.gx, plot.gy, { role: FARM_CROP_ROLE });
+        }
     }
 
     _emitMapChange() {
@@ -1410,6 +1843,21 @@ function marketplaceFailureMessage(reason) {
     return 'Marketplace action failed';
 }
 
+function bankLoanFailureMessage(reason) {
+    if (reason === 'active-loan') return 'Repay the current loan first';
+    if (reason === 'insufficient-reserve') return 'House reserve is too low';
+    if (reason === 'insufficient-funds') return 'Not enough CKB to repay';
+    if (reason === 'no-active-loan') return 'No active loan';
+    if (reason === 'invalid-amount') return 'Enter a valid repayment';
+    return 'Bank action failed';
+}
+
 function homeOwnerToast(ownerId) {
     return ownerId === 'local' ? 'Using local home' : 'Using wallet home';
+}
+
+function formatFarmRemaining(ms) {
+    const seconds = Math.max(1, Math.ceil(Number(ms) / 1000));
+    if (seconds < 60) return `${seconds}s`;
+    return `${Math.ceil(seconds / 60)}m`;
 }

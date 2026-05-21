@@ -161,6 +161,123 @@ Example (ore cart):
 > dark iron wheels at the corners. Inside the cart sits a small pile of
 > dark grey ore cubes. The cart sits flat on the ground.
 
+### Cellshire resource / farm / crafting assets
+
+Use these for the farming/resource progression pass. Prefer reference-image
+editing with the closest Mykonos/Cellshire source asset.
+
+#### Harvestable tree / wood resource
+
+Reference: `olive.png` or `cypress.png`.
+
+```
+Same isometric voxel tree style as the reference image, identical
+Minecraft-style pixel cube construction, identical 30-degree isometric
+viewing angle, identical scale, identical lighting direction.
+
+Replace the object with a harvestable timber tree for a cozy mining town.
+The trunk is chunky warm brown voxel wood, the canopy is compact deep green
+voxel leaves, and there are a few cuttable branch cubes visible. Keep it
+readable as a resource node, not a decorative garden tree.
+
+Keep the cubic pixel-grid look exact, no smoothing, no rounding. Plain
+solid light grey background.
+```
+
+#### Stone resource outcrop
+
+Reference: `large_rock.png` or `boulder.png`.
+
+```
+Same isometric voxel rock cluster style as the reference image, identical
+Minecraft-style pixel cube mound shape, identical 30-degree isometric
+viewing angle, identical proportions, identical lighting direction.
+
+Change only the material: a harvestable stone outcrop for building
+materials. The cluster is made of grey limestone and dark slate voxel cubes,
+with chipped angular blocks and a few lighter freshly-broken faces. It must
+look like construction stone, not a crypto ore deposit.
+
+Keep the cubic pixel-grid look exact, no smoothing, no rounding. Plain
+solid light grey background.
+```
+
+#### Gold crafting material node
+
+Reference: `mossy_stone.png` or `large_rock.png`.
+
+```
+Same isometric voxel cluster style as the reference image, identical
+Minecraft-style pixel cube mound shape, identical 30-degree isometric
+viewing angle, identical proportions, identical lighting direction.
+
+Change only the colour and material: a small gold nugget resource node for
+crafting. Use warm metallic yellow-gold voxel cubes as distinct nuggets in
+a dark stone matrix. Keep the gold concentrated in a few chunky visible
+nuggets rather than coating the whole rock.
+
+Keep the cubic pixel-grid look exact, no smoothing, no rounding. Plain
+solid light grey background.
+```
+
+#### Farm plot states
+
+Reference: `garden_bed.png`, `crop_patch.png`, or `veg_garden.png`.
+
+```
+Same isometric voxel garden bed style as the reference image, identical
+Minecraft-style pixel cube construction, identical 30-degree isometric
+viewing angle, identical footprint, identical lighting direction.
+
+Change the plot state to <EMPTY SOIL / STARTER CROP / HERB PATCH / SAPLING
+PLOT>. The bed has clear voxel soil rows, small blocky plant growth, and a
+simple readable farm-game silhouette. Keep the top-down isometric farm plot
+composition compact and placeable.
+
+Keep the cubic pixel-grid look exact, no smoothing, no rounding. Plain
+solid light grey background.
+```
+
+#### Crafting buildings
+
+Reference: `bench.png`, `storage_box.png`, `house.png`, or `pergola_house.png`
+depending on scale.
+
+```
+Same isometric voxel prop/building style as the reference image, identical
+Minecraft-style pixel cube construction, identical 30-degree isometric
+viewing angle, identical lighting direction.
+
+Replace the object entirely: a <WORKBENCH / TOOL RACK / SAWMILL / STONE
+YARD / FARM STORAGE> for a cozy mining settlement. Built from voxel cubes in
+<WOOD / STONE / IRON> materials, with clear functional details: tools,
+planks, stone blocks, storage bins, or a small saw frame. Keep it compact,
+readable, and placeable in a home base.
+
+Keep the cubic pixel-grid look exact, no smoothing, no rounding. Plain
+solid light grey background.
+```
+
+#### Starter home / house upgrade variants
+
+Reference: `house.png`.
+
+```
+Same isometric voxel building style as the reference image, identical
+Minecraft-style pixel cube construction, identical 30-degree isometric
+viewing angle, identical compact 2x2 footprint, identical lighting direction.
+
+Replace the object with a <STARTER HOMESTEAD / WORKER COTTAGE / FARMHOUSE
+UPGRADE / MARKET-SKIN HOUSE> for Cellshire, a cozy mining and farming
+settlement. Built from voxel cubes in <WARM TIMBER / PALE PLASTER / STONE /
+TERRACOTTA> materials, with one readable front door, small windows, a modest
+chimney, and a tiny stoop. Keep it clearly placeable as a player home and
+compatible with later visual upgrade skins.
+
+Keep the cubic pixel-grid look exact, no smoothing, no rounding. Plain
+solid light grey background.
+```
+
 ### Character skin
 
 Use a Mykonos cypress or olive tree as a vertical silhouette anchor —

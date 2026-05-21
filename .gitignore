@@ -28,3 +28,4 @@ assets/newAsset/*.webp
 # Asset-gen workspace — temporary cuts before installation
 assets/raw_pending/
 assets/raw_mining_originals/
+tmp/

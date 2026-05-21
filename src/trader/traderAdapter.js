@@ -15,6 +15,8 @@ export class LocalTraderAdapter {
             fromAmount: quote.fromAmount,
             toCurrency: quote.toCurrency,
             toAmount: quote.toAmount,
+            feeUsd: quote.feeUsd,
+            feeBps: quote.feeBps,
         };
     }
 }

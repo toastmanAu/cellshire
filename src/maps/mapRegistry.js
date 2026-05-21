@@ -1,8 +1,16 @@
 import { PROPERTY_MAP_ID, PROPERTY_MINE_PORTAL_ROLE, PROPERTY_SPAWN } from '../property/propertyZone.js';
+import {
+    TOWNSHIP_MAP_ID,
+    TOWNSHIP_MINE_PORTAL_ROLE,
+    TOWNSHIP_PORTAL_ROLE,
+    TOWNSHIP_PROPERTY_PORTAL_ROLE,
+    TOWNSHIP_SPAWN,
+} from '../township/townshipZone.js';
 
 export const MAP_KINDS = Object.freeze({
     mine: 'mine',
     property: 'property',
+    township: 'township',
 });
 
 export function mineMapIdForEpoch(epochNumber) {
@@ -15,6 +23,10 @@ export function propertyMapIdForOwner(ownerId = 'local') {
     return ownerId === 'local'
         ? PROPERTY_MAP_ID
         : `property:${encodeURIComponent(ownerId)}`;
+}
+
+export function townshipMapId() {
+    return TOWNSHIP_MAP_ID;
 }
 
 export function createMapRegistry({
@@ -31,6 +43,13 @@ export function createMapRegistry({
             name: 'Public mine',
             seedSource: 'epoch',
             entrySpawn: validSpawn(mineSpawn) ? mineSpawn : null,
+        },
+        {
+            id: TOWNSHIP_MAP_ID,
+            kind: MAP_KINDS.township,
+            name: 'Township',
+            seedSource: 'communal',
+            entrySpawn: TOWNSHIP_SPAWN,
         },
         {
             id: propertyMapIdForOwner(ownerId),
@@ -59,6 +78,9 @@ export function entrySpawnForMap(mapDef, fallback = null) {
 export function travelTargetForRole(role, registry) {
     if (role === 'property_portal') return mapByKind(registry, MAP_KINDS.property);
     if (role === PROPERTY_MINE_PORTAL_ROLE) return mapByKind(registry, MAP_KINDS.mine);
+    if (role === TOWNSHIP_PORTAL_ROLE) return mapByKind(registry, MAP_KINDS.township);
+    if (role === TOWNSHIP_MINE_PORTAL_ROLE) return mapByKind(registry, MAP_KINDS.mine);
+    if (role === TOWNSHIP_PROPERTY_PORTAL_ROLE) return mapByKind(registry, MAP_KINDS.property);
     return null;
 }
 

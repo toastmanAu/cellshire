@@ -18,6 +18,8 @@ describe('LocalTraderAdapter', () => {
         expect(out.ok).toBe(true);
         expect(inventory.get('ckb')).toBe(0);
         expect(inventory.get('doge')).toBe(13.55952315);
+        expect(Number(out.feeUsd.toFixed(4))).toBe(0.0144);
+        expect(out.feeBps).toBe(100);
     });
 
     it('rejects swaps when the balance is short', async () => {

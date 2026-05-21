@@ -158,9 +158,18 @@ export function installTraderHUD({
         renderQuote();
     }
 
+    function open() {
+        root.dataset.open = '1';
+        render();
+    }
+
+    function close() {
+        root.dataset.open = '0';
+    }
+
     toggle.addEventListener('click', () => {
-        root.dataset.open = root.dataset.open === '1' ? '0' : '1';
-        if (root.dataset.open === '1') render();
+        if (root.dataset.open === '1') close();
+        else open();
     });
 
     fromSelect.addEventListener('change', () => {
@@ -188,6 +197,7 @@ export function installTraderHUD({
             renderQuote();
             return;
         }
+        game?.recordTraderFee?.({ quote, swap: out });
         game?.ui?.showToast?.(`Swapped to ${formatCurrencyAmount(out.toCurrency, out.toAmount)}`, 2200);
         amountInput.value = '';
         render();
@@ -201,6 +211,8 @@ export function installTraderHUD({
     return {
         root,
         render,
+        open,
+        close,
         dismiss() {
             off();
             root.remove();

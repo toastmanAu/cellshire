@@ -11,6 +11,11 @@ import {
     propertySnapshotSourceFromParams,
     savePropertySnapshotCellsFixture,
 } from './propertySnapshotAdapter.js';
+import {
+    LocalStoragePropertySnapshotWriter,
+    buildPropertySnapshotPayload,
+    savePropertyZoneWithSnapshotWriter,
+} from './propertySnapshotWriter.js';
 
 function fakeStorage(initial = {}) {
     const data = new Map(Object.entries(initial));
@@ -27,6 +32,13 @@ function snapshot(ownerId = 'joyid:alice') {
         propertyTier: 2,
         tileMap: createStarterPropertyMap().serialize(),
         camera: { offsetX: 1, offsetY: 2, zoom: 1.25 },
+    };
+}
+
+function wallet(address = 'joyid:alice') {
+    return {
+        status: 'connected',
+        account: { provider: 'joyid', address, label: 'JoyID Dev' },
     };
 }
 
@@ -87,6 +99,67 @@ describe('property snapshot adapter', () => {
         expect(read.status).toBe('found');
         expect(read.snapshot.ownerId).toBe('joyid:alice');
         expect(read.snapshot.tileMap.objects.length > 0).toBe(true);
+    });
+
+    it('reads a writer-saved wallet fixture through visit chain params', async () => {
+        const storage = fakeStorage();
+        const writer = new LocalStoragePropertySnapshotWriter({ storage });
+        const map = createStarterPropertyMap();
+        const save = await savePropertyZoneWithSnapshotWriter({
+            storage,
+            writer,
+            walletState: wallet('joyid:alice'),
+            ownerId: 'joyid:alice',
+            tileMap: map,
+            camera: { offsetX: 7, offsetY: 8, zoom: 1.5 },
+            propertyTier: 3,
+            savedAt: 456,
+        });
+        expect(save.snapshotWrite.ok).toBe(true);
+
+        const adapter = makePropertySnapshotAdapterFromParams({
+            params: new URLSearchParams('?visit=joyid%3Aalice&visitSource=chain'),
+            storage,
+        });
+        const read = await adapter.read({ ownerId: 'joyid:alice' });
+        expect(read.source).toBe('chain');
+        expect(read.status).toBe('found');
+        expect(read.ownerId).toBe('joyid:alice');
+        expect(read.snapshot.ownerId).toBe('joyid:alice');
+        expect(read.snapshot.propertyTier).toBe(3);
+        expect(read.snapshot.camera.zoom).toBe(1.5);
+        expect(read.snapshot.tileMap.width).toBe(map.width);
+    });
+
+    it('falls back cleanly for missing or stale visit chain fixtures', async () => {
+        const storage = fakeStorage();
+        const missing = makePropertySnapshotAdapterFromParams({
+            params: new URLSearchParams('?visit=joyid%3Amissing&visitSource=chain'),
+            storage,
+        });
+        const missingRead = await missing.read({ ownerId: 'joyid:missing' });
+        expect(missingRead.status).toBe('missing');
+        expect(missingRead.snapshot).toBeNull();
+        expect(missingRead.stale).toBe(false);
+
+        const writer = new LocalStoragePropertySnapshotWriter({ storage });
+        await writer.write({
+            snapshot: buildPropertySnapshotPayload({
+                ownerId: 'joyid:alice',
+                tileMap: createStarterPropertyMap(),
+                savedAt: 123,
+            }),
+            walletState: wallet('joyid:alice'),
+        });
+        const stale = makePropertySnapshotAdapterFromParams({
+            params: new URLSearchParams('?visit=joyid%3Aalice&visitSource=chain&visitMinBlock=2'),
+            storage,
+        });
+        const staleRead = await stale.read({ ownerId: 'joyid:alice' });
+        expect(staleRead.status).toBe('stale');
+        expect(staleRead.snapshot).toBeNull();
+        expect(staleRead.stale).toBe(true);
+        expect(staleRead.staleCells.length).toBe(1);
     });
 
     it('selects local or chain source from visit params', () => {

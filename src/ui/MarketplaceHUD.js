@@ -153,9 +153,18 @@ export function installMarketplaceHUD(game, { storage = safeStorage } = {}) {
         panel.appendChild(list);
     }
 
+    function open() {
+        root.dataset.open = '1';
+        render();
+    }
+
+    function close() {
+        root.dataset.open = '0';
+    }
+
     toggle.addEventListener('click', () => {
-        root.dataset.open = root.dataset.open === '1' ? '0' : '1';
-        if (root.dataset.open === '1') render();
+        if (root.dataset.open === '1') close();
+        else open();
     });
 
     const rerenderOpen = () => {
@@ -171,6 +180,8 @@ export function installMarketplaceHUD(game, { storage = safeStorage } = {}) {
     return {
         root,
         render,
+        open,
+        close,
         dismiss() {
             offCurrency?.();
             offProps?.();

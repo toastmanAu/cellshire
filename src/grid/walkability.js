@@ -22,6 +22,7 @@ const WALKABLE_TERRAIN = new Set([
     // Mykonos legacy tiles that procgen can produce via seedExampleVillage.
     'grass',
     'path',
+    'stone',
 ]);
 
 const INTERACTABLE_OBJECTS = new Set([
@@ -32,6 +33,17 @@ const INTERACTABLE_OBJECTS = new Set([
 const INTERACTABLE_ROLES = new Set([
     'property_portal',
     'mine_portal',
+    'township_portal',
+    'township_mine_portal',
+    'township_property_portal',
+    'township_store',
+    'township_market',
+    'township_bank',
+    'township_gallery',
+    'township_community_hall',
+    'wood_resource',
+    'stone_resource',
+    'farm_crop',
 ]);
 
 /** True if a cell can be walked into (in-bounds, walkable terrain, no object). */

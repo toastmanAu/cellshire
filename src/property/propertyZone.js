@@ -1,6 +1,8 @@
 import { assetDefinitionFor } from '../assets/assetRegistry.js';
 import { PlacedObject } from '../building/PlacedObject.js';
 import { TileMap } from '../grid/TileMap.js';
+import { TOWNSHIP_PORTAL_ROLE } from '../township/townshipZone.js';
+import { farmBoundsForTier } from '../farm/farmZone.js';
 
 export const PROPERTY_MAP_ID = 'property:local';
 export const PROPERTY_SIZE = 24;
@@ -25,6 +27,7 @@ export const STARTER_PROPERTY_ASSETS = Object.freeze([
     'flower_pot',
     'low_wall',
     'gate_fence',
+    'house',
     'lantern_post',
     'bench',
     'signpost',
@@ -84,6 +87,11 @@ export function createStarterPropertyMap() {
     for (let gy = PROPERTY_EDIT_BOUNDS.minGy; gy <= PROPERTY_EDIT_BOUNDS.maxGy; gy++) {
         tileMap.setTerrain(PROPERTY_SPAWN.gx, gy, 'path');
     }
+    const farmBounds = farmBoundsForTier(1);
+    for (let gy = farmBounds.minGy; gy <= farmBounds.maxGy; gy++)
+    for (let gx = farmBounds.minGx; gx <= farmBounds.maxGx; gx++) {
+        tileMap.setTerrain(gx, gy, 'dirt');
+    }
 
     const fenceMinX = PROPERTY_EDIT_BOUNDS.minGx - 1;
     const fenceMinY = PROPERTY_EDIT_BOUNDS.minGy - 1;
@@ -103,6 +111,10 @@ export function createStarterPropertyMap() {
     addObject(tileMap, 'signpost', PROPERTY_SPAWN.gx, PROPERTY_EDIT_BOUNDS.minGy, {
         role: PROPERTY_MINE_PORTAL_ROLE,
     });
+    addObject(tileMap, 'signpost', PROPERTY_EDIT_BOUNDS.minGx + 2, PROPERTY_EDIT_BOUNDS.minGy + 1, {
+        role: TOWNSHIP_PORTAL_ROLE,
+    });
+    addObject(tileMap, 'house', PROPERTY_EDIT_BOUNDS.minGx + 3, PROPERTY_EDIT_BOUNDS.minGy + 3);
     addObject(tileMap, 'storage_box', PROPERTY_EDIT_BOUNDS.minGx + 1, PROPERTY_EDIT_BOUNDS.maxGy - 1);
     addObject(tileMap, 'crate', PROPERTY_EDIT_BOUNDS.minGx + 2, PROPERTY_EDIT_BOUNDS.maxGy - 1);
     addObject(tileMap, 'flower_pot', PROPERTY_EDIT_BOUNDS.maxGx - 1, PROPERTY_EDIT_BOUNDS.minGy + 1);

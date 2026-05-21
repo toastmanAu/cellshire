@@ -20,4 +20,13 @@ describe('walkability interactions', () => {
     it('does not treat inert blockers as interactable', () => {
         expect(isInteractable(mapWithObject({ assetId: 'boulder' }), 0, 0)).toBe(false);
     });
+
+    it('treats harvest resource roles as interactable', () => {
+        expect(isInteractable(mapWithObject({ assetId: 'cypress', role: 'wood_resource' }), 0, 0)).toBe(true);
+        expect(isInteractable(mapWithObject({ assetId: 'boulder', role: 'stone_resource' }), 0, 0)).toBe(true);
+    });
+
+    it('treats planted farm crops as interactable', () => {
+        expect(isInteractable(mapWithObject({ assetId: 'crop_patch', role: 'farm_crop' }), 0, 0)).toBe(true);
+    });
 });
