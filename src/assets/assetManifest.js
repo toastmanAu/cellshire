@@ -58,6 +58,7 @@ export const ASSET_MANIFEST = [
     { ...N('cypress',       'Cypress',       { w: 1, d: 1 }, 0.65), builder: A.cypressCluster },
     { ...N('bougainvillea', 'Bougainvillea', { w: 1, d: 1 }, 0.80), builder: A.bougainvilleaTree },
     { ...N('olive',         'Olive Tree',    { w: 1, d: 1 }, 0.90), builder: A.oliveTree },
+    { ...N('harvest_tree',  'Harvest Tree',  { w: 1, d: 1 }, 0.90), flatBase: true, noShadow: true, builder: A.oliveTree },
     { ...N('agave',         'Agave',         { w: 1, d: 1 }, 0.60), builder: A.agavePlant },
     { ...N('dry_grass',     'Dry Grass',     { w: 1, d: 1 }, 0.55), builder: A.dryGrassTuft },
     { ...N('flower_pot',    'Flower Pot',    { w: 1, d: 1 }, 0.35), builder: A.flowerPot },
@@ -100,6 +101,8 @@ export const ASSET_MANIFEST = [
     { ...P('pebbles',         'Pebbles',         { w: 1, d: 1 }, 0.45), builder: A.pebbles },
     { ...P('stone_pile',      'Stone Pile',      { w: 1, d: 1 }, 0.55), builder: A.stonePile },
     { ...P('boulder',         'Boulder',         { w: 1, d: 1 }, 0.75), builder: A.boulder },
+    { ...P('stone_outcrop',   'Stone Outcrop',   { w: 1, d: 1 }, 0.75), noShadow: true, builder: A.stonePile },
+    { ...P('gold_nugget_node','Gold Nugget Node',{ w: 1, d: 1 }, 0.75), noShadow: true, builder: A.mossyStone },
 
     // Mining-theme ore deposits — generated via HiDream-O1 ref-image edits
     { ...P('coal_seam',       'Coal Seam',       { w: 1, d: 1 }, 0.80), builder: A.boulder },
@@ -124,9 +127,17 @@ export const ASSET_MANIFEST = [
     { ...W('garden_bed',   'Garden Bed', { w: 1, d: 1 }, 0.95), filename: 'newAsset/Garden Bed.png', fitCell: true, flatBase: true, noShadow: true, builder: A.plantedGardenBed },
     { ...W('crop_patch',   'Crop Patch', { w: 1, d: 1 }, 0.95), filename: 'newAsset/Crop Patch.png', fitCell: true, flatBase: true, noShadow: true, builder: A.cropPatch },
     { ...W('veg_garden',   'Veg Garden', { w: 1, d: 1 }, 0.95), filename: 'newAsset/Veg Garden.png', fitCell: true, flatBase: true, noShadow: true, builder: A.vegetableGarden },
+    { ...W('farm_plot_ready_crop', 'Ready Crop Plot', { w: 1, d: 1 }, 0.95), fitCell: true, flatBase: true, noShadow: true, builder: A.vegetableGarden },
 
     // ── BUILDINGS ─────────────────────────────────────────────────
     { ...B('house',         'House',         { w: 2, d: 2 }), builder: A.smallMykonosHouse },
+    // Standard home-base progression buildings generated via the local
+    // Cellshire Flux asset pass.
+    { ...B('workbench',     'Workbench',     { w: 1, d: 1 }, 0.78), flatBase: true, noShadow: true, builder: A.blueBench },
+    { ...B('tool_rack',     'Tool Rack',     { w: 1, d: 1 }, 0.72), flatBase: true, noShadow: true, builder: A.storageBox },
+    { ...B('sawmill',       'Sawmill',       { w: 1, d: 1 }, 0.90), noShadow: true, builder: A.woodPile },
+    { ...B('stone_yard',    'Stone Yard',    { w: 1, d: 1 }, 0.90), noShadow: true, builder: A.stonePile },
+    { ...B('farm_storage',  'Farm Storage',  { w: 1, d: 1 }, 0.90), noShadow: true, builder: A.storageBox },
     { ...B('two_story',     'Two-Story',     { w: 3, d: 3 }), builder: A.twoStoryHouse },
     { ...B('cube_house',    'Cube House',    { w: 2, d: 2 }), builder: A.whiteCubeHouse },
     { ...B('terrace_house', 'Terrace House', { w: 3, d: 2 }), builder: A.terraceHouse },

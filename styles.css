@@ -1612,6 +1612,14 @@ html, body {
     gap: 8px;
     align-items: center;
 }
+.property-hud__craft-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding-left: 10px;
+    border-left: 2px solid rgba(155, 113, 62, 0.24);
+}
 .property-hud__building-name {
     font-size: 11px;
     font-weight: 850;
@@ -1635,6 +1643,23 @@ html, body {
     white-space: nowrap;
 }
 .property-hud__building-action:disabled {
+    cursor: default;
+    opacity: 0.48;
+    filter: saturate(0.5);
+}
+.property-hud__craft-action {
+    min-width: 74px;
+    border: 0;
+    border-radius: 6px;
+    background: rgba(123, 87, 52, 0.92);
+    color: #fff;
+    font-weight: 850;
+    font-size: 10px;
+    padding: 7px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.property-hud__craft-action:disabled {
     cursor: default;
     opacity: 0.48;
     filter: saturate(0.5);

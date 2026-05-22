@@ -38,6 +38,14 @@ function fixtureCell() {
 }
 
 describe('open asset standard', () => {
+    it('registers standard home-base building visuals in the manifest', () => {
+        for (const assetId of ['workbench', 'tool_rack', 'sawmill', 'stone_yard', 'farm_storage']) {
+            const def = assetDefinitionFor(assetId);
+            expect(def.category).toBe('buildings');
+            expect(def.kind).toBe('object');
+        }
+    });
+
     it('maps a compliant prop cell to a runtime asset definition', () => {
         clearOpenAssetDefinitions();
         const out = definitionFromOpenAssetCell(fixtureCell());

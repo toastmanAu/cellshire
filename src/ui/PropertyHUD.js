@@ -143,6 +143,83 @@ export function installPropertyHUD(game) {
             row.appendChild(action);
             buildingPanel.appendChild(row);
         }
+        renderRecipes(state.recipes ?? []);
+        renderTools(state.tools ?? null);
+    }
+
+    function renderRecipes(recipes) {
+        const unlocked = recipes.filter(recipe => recipe.unlocked);
+        if (unlocked.length === 0) return;
+        buildingPanel.appendChild(sectionTitle('Workbench recipes'));
+        for (const recipe of unlocked) {
+            const row = document.createElement('div');
+            row.className = 'property-hud__craft-row';
+            const meta = document.createElement('div');
+            meta.className = 'property-hud__building-meta';
+            const name = document.createElement('div');
+            name.className = 'property-hud__building-name';
+            name.textContent = `${recipe.name} · +${recipe.outputLabel}`;
+            const detail = document.createElement('div');
+            detail.className = 'property-hud__building-cost';
+            detail.textContent = recipe.costLabel;
+            meta.appendChild(name);
+            meta.appendChild(detail);
+            const action = document.createElement('button');
+            action.type = 'button';
+            action.className = 'property-hud__craft-action';
+            action.textContent = 'Craft';
+            action.disabled = !recipe.canCraft;
+            action.addEventListener('click', () => {
+                game.craftRecipe?.(recipe.id);
+                render();
+            });
+            row.appendChild(meta);
+            row.appendChild(action);
+            buildingPanel.appendChild(row);
+        }
+    }
+
+    function renderTools(tools) {
+        if (!tools) return;
+        buildingPanel.appendChild(sectionTitle('Tool rack'));
+        const lines = Array.isArray(tools.lines) ? tools.lines : [tools];
+        for (const tool of lines) renderToolLine(tool);
+    }
+
+    function renderToolLine(tool) {
+        const row = document.createElement('div');
+        row.className = 'property-hud__craft-row';
+        const meta = document.createElement('div');
+        meta.className = 'property-hud__building-meta';
+        const name = document.createElement('div');
+        name.className = 'property-hud__building-name';
+        name.textContent = tool.label;
+        const detail = document.createElement('div');
+        detail.className = 'property-hud__building-cost';
+        detail.textContent = tool.next
+            ? `${tool.effectLabel} · ${tool.nextRequiredLabel} · ${tool.nextCostLabel}`
+            : `${tool.effectLabel} · Max tier`;
+        meta.appendChild(name);
+        meta.appendChild(detail);
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.className = 'property-hud__craft-action';
+        action.textContent = tool.next ? 'Upgrade' : 'Max';
+        action.disabled = !tool.canUpgrade;
+        action.addEventListener('click', () => {
+            game.upgradeTool?.(tool.id);
+            render();
+        });
+        row.appendChild(meta);
+        row.appendChild(action);
+        buildingPanel.appendChild(row);
+    }
+
+    function sectionTitle(text) {
+        const title = document.createElement('div');
+        title.className = 'property-hud__building-title';
+        title.textContent = text;
+        return title;
     }
 
     function visitDetail(expansion) {
@@ -166,6 +243,7 @@ export function installPropertyHUD(game) {
     const off = game.onMapChange?.(render);
     const offInventory = game.player?.inventory?.onChange?.(render);
     const offResources = game.resourceInventory?.onChange?.(render);
+    const offProps = game.propInventory?.onChange?.(render);
     render();
     return {
         root,
@@ -173,6 +251,7 @@ export function installPropertyHUD(game) {
             off?.();
             offInventory?.();
             offResources?.();
+            offProps?.();
             root.remove();
         },
     };

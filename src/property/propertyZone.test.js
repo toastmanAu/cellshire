@@ -49,6 +49,13 @@ describe('property zone starter map', () => {
         })).toBe(true);
     });
 
+    it('allows unlocked standard building assets through the owned predicate', () => {
+        expect(canPlacePropertyAsset('workbench', PROPERTY_EDIT_BOUNDS.minGx, PROPERTY_EDIT_BOUNDS.minGy)).toBe(false);
+        expect(canPlacePropertyAsset('workbench', PROPERTY_EDIT_BOUNDS.minGx, PROPERTY_EDIT_BOUNDS.minGy, PROPERTY_EDIT_BOUNDS, {
+            isOwned: assetId => assetId === 'workbench',
+        })).toBe(true);
+    });
+
     it('adds a mine-side property portal near a target cell', () => {
         const map = new TileMap(8, 8);
         for (let gy = 0; gy < 8; gy++)

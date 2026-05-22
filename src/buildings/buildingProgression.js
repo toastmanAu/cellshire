@@ -6,6 +6,7 @@ export const BUILDING_PROGRESS_STORAGE_PREFIX = 'cellshire:buildings:v1:';
 export const STANDARD_BUILDINGS = Object.freeze([
     Object.freeze({
         id: 'home',
+        assetId: 'house',
         name: 'Home',
         capability: 'Home management',
         starterLevel: 1,
@@ -17,6 +18,7 @@ export const STANDARD_BUILDINGS = Object.freeze([
     }),
     Object.freeze({
         id: 'workbench',
+        assetId: 'workbench',
         name: 'Workbench',
         capability: 'Basic crafting',
         starterLevel: 0,
@@ -28,17 +30,22 @@ export const STANDARD_BUILDINGS = Object.freeze([
     }),
     Object.freeze({
         id: 'tool_rack',
+        assetId: 'tool_rack',
         name: 'Tool Rack',
         capability: 'Tool upgrades',
         starterLevel: 0,
-        maxLevel: 2,
+        maxLevel: 5,
         levels: Object.freeze({
             1: Object.freeze({ resources: Object.freeze({ wood: 10, stone: 6, crop: 3 }), ckb: 1800 }),
             2: Object.freeze({ resources: Object.freeze({ wood: 24, stone: 18, crop: 8 }), ckb: 5500 }),
+            3: Object.freeze({ resources: Object.freeze({ wood: 56, stone: 42, crop: 18 }), ckb: 15000 }),
+            4: Object.freeze({ resources: Object.freeze({ wood: 105, stone: 80, crop: 36 }), ckb: 36000 }),
+            5: Object.freeze({ resources: Object.freeze({ wood: 190, stone: 150, crop: 75 }), ckb: 82000 }),
         }),
     }),
     Object.freeze({
         id: 'sawmill',
+        assetId: 'sawmill',
         name: 'Sawmill',
         capability: 'Wood processing',
         starterLevel: 0,
@@ -50,6 +57,7 @@ export const STANDARD_BUILDINGS = Object.freeze([
     }),
     Object.freeze({
         id: 'stone_yard',
+        assetId: 'stone_yard',
         name: 'Stone Yard',
         capability: 'Masonry processing',
         starterLevel: 0,
@@ -61,6 +69,7 @@ export const STANDARD_BUILDINGS = Object.freeze([
     }),
     Object.freeze({
         id: 'farm_storage',
+        assetId: 'farm_storage',
         name: 'Farm Storage',
         capability: 'Farm capacity',
         starterLevel: 0,
@@ -73,8 +82,12 @@ export const STANDARD_BUILDINGS = Object.freeze([
 ]);
 
 export const STANDARD_BUILDING_IDS = Object.freeze(STANDARD_BUILDINGS.map(entry => entry.id));
+export const STANDARD_BUILDING_ASSET_IDS = Object.freeze(
+    Array.from(new Set(STANDARD_BUILDINGS.map(entry => entry.assetId)))
+);
 
 const BUILDING_INDEX = new Map(STANDARD_BUILDINGS.map(entry => [entry.id, entry]));
+const BUILDING_ASSET_INDEX = new Map(STANDARD_BUILDINGS.map(entry => [entry.assetId, entry.id]));
 
 export function buildingProgressStorageKey(ownerId = 'local') {
     return `${BUILDING_PROGRESS_STORAGE_PREFIX}${ownerId || 'local'}`;
@@ -82,6 +95,20 @@ export function buildingProgressStorageKey(ownerId = 'local') {
 
 export function buildingDefinition(buildingId) {
     return BUILDING_INDEX.get(buildingId) ?? null;
+}
+
+export function standardBuildingIdForAsset(assetId) {
+    return BUILDING_ASSET_INDEX.get(assetId) ?? null;
+}
+
+export function isStandardBuildingAsset(assetId) {
+    return BUILDING_ASSET_INDEX.has(assetId);
+}
+
+export function isStandardBuildingAssetUnlocked(progression, assetId) {
+    const buildingId = standardBuildingIdForAsset(assetId);
+    if (!buildingId) return false;
+    return (progression?.getLevel?.(buildingId) ?? 0) > 0;
 }
 
 export class BuildingProgression {
@@ -141,6 +168,7 @@ export function buildingStateFor(progression, buildingId) {
     const nextCost = nextLevel ? def.levels[nextLevel] ?? null : null;
     return {
         id: def.id,
+        assetId: def.assetId,
         name: def.name,
         capability: def.capability,
         level,

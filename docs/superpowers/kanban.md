@@ -9,12 +9,12 @@ cards needed to turn the current prototype into the game described in
 - Completed chain visit fixture compatibility, the first communal township
   plane, RPG-style building interior windows, and local house treasury fee
   accounting, a local Bank loan prototype, expandable home farming, and the
-  cleaned HiDream starter-home asset integration, plus the first home building
-  unlock/effects pass.
-- Latest completed card: `Crafting Building Unlocks`.
-- Current Next card: `Workbench Recipes + Tool Rack Upgrades`.
+  cleaned HiDream starter-home asset integration, the first home building
+  unlock/effects pass, and Workbench recipe plus Tool Rack upgrade loops.
+- Latest completed card: `Workbench Recipes + Tool Rack Upgrades`.
+- Current Next card: `Resource Asset Generation Pass`.
 - Known local-only files: untracked `cs_logo.png` and `tmp/`.
-- Last verification: browser harness `269 passed, 0 failed` and
+- Last verification: browser harness `285 passed, 0 failed` and
   `node netlify-build.mjs`.
 
 ## Current Baseline
@@ -701,12 +701,20 @@ and first resource-yield effects.
 Verified with the browser test harness (`269 passed, 0 failed`),
 `node netlify-build.mjs`, and `git diff --check`.
 
-## Next
-
 ### Workbench Recipes + Tool Rack Upgrades
+
+**Completed:** 2026-05-22
+
+**Status:** shipped recipe catalog, crafted prop outputs, owner-keyed
+resource-specific tool tier state, local harvest modifiers, and Home Buildings
+panel actions.
 
 **Goal:** turn the newly unlocked `workbench` and `tool_rack` capability tiers
 into player-facing crafting and tool progression.
+
+**Spec:** [`2026-05-22-workbench-recipes-tool-rack-upgrades.md`](specs/2026-05-22-workbench-recipes-tool-rack-upgrades.md)
+
+**Tool family spec:** [`2026-05-22-tool-family-progression.md`](specs/2026-05-22-tool-family-progression.md)
 
 **Acceptance:**
 - Add a small recipe catalog gated by `workbench` level.
@@ -716,9 +724,116 @@ into player-facing crafting and tool progression.
   crypto ore changes stay behind an explicit pricing decision.
 - Home Buildings panel links clearly to the recipe/tool actions.
 
+**Notes:**
+- Workbench recipes currently craft local resources plus placeable `crate`,
+  `stone_lantern`, and `stone_basin` props.
+- Tool tiers currently add local Wood/Stone/Crop harvest bonuses only.
+- Tool progression is now split into `pickaxe` for Stone, `woodaxe` for Wood,
+  and `hoe_scythe` for Crop. Each line upgrades independently through the Tool
+  Rack and old single-tier saves migrate across all three lines.
+
+Verified with the browser test harness (`283 passed, 0 failed`),
+`node netlify-build.mjs`, and `git diff --check`.
+
+## Next
+
+### Resource Asset Generation Pass
+
+**Status:** in progress; first gameplay-facing asset wiring shipped.
+
+**Goal:** generate and integrate farming/resource/crafting assets using
+ComfyUI/Wyltek Studio models.
+
+**Spec:** [`2026-05-22-standard-building-placement-assets.md`](specs/2026-05-22-standard-building-placement-assets.md)
+
+**Prompt sheet:** [`2026-05-22-flux-asset-comparison-prompts.md`](specs/2026-05-22-flux-asset-comparison-prompts.md)
+
+**Acceptance:**
+- Generate harvestable tree, stone resource, optional gold material node, farm
+  plot states, workbench, tool rack, sawmill, stone yard, farm storage, and
+  pickaxe upgrade visuals.
+- Use reference-image editing to preserve the current isometric voxel style.
+- Process generated PNGs through the existing transparent asset pipeline.
+- Keep standard building ids stable so generated art can replace temporary
+  manifest sprites without changing progression or saves.
+
+**Notes:**
+- Added manifest entries for `workbench`, `tool_rack`, `sawmill`,
+  `stone_yard`, and `farm_storage`; these now use selected generated PNGs.
+- Unlocked standard buildings now appear in the property palette and can be
+  placed without consuming or minting prop inventory.
+- Dedicated generated art remains outstanding for the resource/farm/building
+  asset set.
+- Added a Flux/Flux.2 comparison prompt sheet covering resource nodes, farm
+  plot states, standard buildings, and pickaxe upgrade visuals.
+- Generated the first local Flux.1 Schnell vs Flux.2 Klein comparison batch
+  for 13 assets. Review sheet:
+  `tmp/resource-asset-generation/contact-sheet.png`; individual outputs live
+  under `tmp/resource-asset-generation/<asset-id>/`.
+- Flux.2 comparison outputs looked misconfigured, so the current usable lane is
+  Flux.1 Schnell. Added a refinement pass for `farm_plot_empty`,
+  `farm_plot_starter_crop`, and pickaxe upgrade variants. Review sheet:
+  `tmp/resource-asset-generation/refinement/contact-sheet.png`.
+- `farm_plot_empty_v2` and `farm_plot_starter_crop_v2` were accepted as
+  better candidates. Pickaxe variants need a standalone UI/marketplace base
+  rather than a placeable tile asset. Generated six Flux.1 base candidates at
+  `tmp/resource-asset-generation/pickaxe-base-candidates/contact-sheet.png`;
+  do not generate reinforced/steel variants until one base is selected.
+- Pickaxe base `pickaxe_base_c_threequarter` selected. Generated upgrade
+  variants from that exact base at
+  `tmp/resource-asset-generation/pickaxe-selected-variants/contact-sheet.png`.
+- Plain img2img was rejected because variants stayed identical; adaptor was not
+  configured correctly. Added a corrected Flux.2 `ReferenceLatent` edit pass at
+  `tmp/resource-asset-generation/pickaxe-flux2-edit-variants/contact-sheet.png`.
+  It differentiates material tiers, but still inherits the selected base's small
+  support slab, so a cleaner no-slab base may be needed before final export.
+- Generated fresh Flux.1 Schnell base candidates for all three tool families:
+  pickaxe, woodaxe, and hoe/scythe. Review sheet:
+  `tmp/resource-asset-generation/tool-base-candidates/contact-sheet.png`.
+- Selected the B-side bases for all three tool families:
+  `pickaxe_b_side`, `woodaxe_b_side`, and `hoe_b_side`.
+- Expanded the tool asset ladder to six tiers: baseline, reinforced, steel,
+  silver, gold, and diamond. Generated a Flux.2 `ReferenceLatent` approval
+  sheet at
+  `tmp/resource-asset-generation/selected-tool-variants/contact-sheet.png`.
+  Once visuals are locked, table cost/yield tuning across CKB, Wood, Stone, and
+  Crop.
+- Diamond v1 variants were rejected for being too bumpy and bright blue.
+  Generated smoother clear-glass diamond v2 comparisons at
+  `tmp/resource-asset-generation/tool-diamond-v2/contact-sheet.png`.
+- Promoted diamond v2 into the main selected tool ladder sheet and updated the
+  generation manifest. Main review sheet:
+  `tmp/resource-asset-generation/selected-tool-variants/contact-sheet.png`.
+- Expanded live tool progression to six tiers per family and Tool Rack gating to
+  level 5. Initial placeholder cost/yield table is documented in
+  `docs/superpowers/specs/2026-05-22-tool-family-progression.md`.
+- Generated three Flux.1 Schnell candidates each for `workbench`, `tool_rack`,
+  `sawmill`, `stone_yard`, and `farm_storage`. Review sheet:
+  `tmp/resource-asset-generation/building-candidates/contact-sheet.png`.
+- Selected `workbench_c_sturdy`, `tool_rack_b_wall`, `sawmill_c_logs`,
+  `stone_yard_c_crane`, and `farm_storage_c_harvest`. Installed transparent
+  PNGs into `assets/raw/` and `assets/`, then wired the manifest to the stable
+  building asset ids. Transparent preview sheet:
+  `tmp/resource-asset-generation/building-candidates/installed/contact-sheet.png`.
+- Generated three Flux.1 Schnell candidates each for `harvest_tree`,
+  `stone_outcrop`, `gold_nugget_node`, and `farm_plot_ready_crop`. Review sheet:
+  `tmp/resource-asset-generation/resource-candidates/contact-sheet.png`.
+- Selected `harvest_tree_c_stump`, `stone_outcrop_b_stack`,
+  `gold_nugget_node_a_matrix`, and `farm_plot_ready_crop_c_full`. Installed
+  transparent PNGs into `assets/raw/` and `assets/`. Worldgen now uses
+  `harvest_tree` and `stone_outcrop` for epoch-refreshing local Wood/Stone
+  resources. Transparent preview sheet:
+  `tmp/resource-asset-generation/resource-candidates/installed/contact-sheet.png`.
+
+Verified with the browser test harness (`285 passed, 0 failed`),
+`node netlify-build.mjs`, and `git diff --check`.
+
 ## Backlog
 
 ### Pickaxe Upgrade Progression
+
+**Status:** covered by `Workbench Recipes + Tool Rack Upgrades`; keep this
+only for a later ore-specific mining balance pass.
 
 **Goal:** give players long-term mining/harvesting progression without
 over-inflating crypto rewards.
@@ -727,18 +842,6 @@ over-inflating crypto rewards.
 - Add local tool tier state and upgrade recipes.
 - Apply conservative modifiers to resource harvesting and/or ore extraction.
 - Keep multiplier constants isolated for future economy tuning.
-
-### Resource Asset Generation Pass
-
-**Goal:** generate and integrate farming/resource/crafting assets using
-ComfyUI/Wyltek Studio models.
-
-**Acceptance:**
-- Generate harvestable tree, stone resource, optional gold material node, farm
-  plot states, workbench, tool rack, sawmill, stone yard, farm storage, and
-  pickaxe upgrade visuals.
-- Use reference-image editing to preserve the current isometric voxel style.
-- Process generated PNGs through the existing transparent asset pipeline.
 
 ### Economy Pricing Pass
 

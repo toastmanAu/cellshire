@@ -166,9 +166,7 @@ export function generateWorld(tileMap, seed = 1337) {
         oresPlaced++;
     }
 
-    // Epoch-refreshing local resources. These use existing visuals for now;
-    // the resource asset pass can swap in dedicated PNGs without touching
-    // harvesting logic.
+    // Epoch-refreshing local resources.
     const treeRand = mulberry32(seed ^ 0xBEEF);
     let treesPlaced = 0;
     for (let gy = 0; gy < H; gy++)
@@ -178,7 +176,7 @@ export function generateWorld(tileMap, seed = 1337) {
         if (!tileMap.isFreeFor(gx, gy, 1, 1)) continue;
         const obj = new PlacedObject({
             id: tileMap.nextId(),
-            assetId: 'cypress',
+            assetId: 'harvest_tree',
             gx, gy,
             footprint: { w: 1, d: 1 },
             role: HARVEST_RESOURCE_ROLES.wood,
@@ -196,7 +194,7 @@ export function generateWorld(tileMap, seed = 1337) {
         const density = 0.015 + stoneNoise(gx, gy) * 0.045;
         if (stoneRand() > density) continue;
         if (!tileMap.isFreeFor(gx, gy, 1, 1)) continue;
-        const assetId = stoneRand() > 0.5 ? 'boulder' : 'large_rock';
+        const assetId = 'stone_outcrop';
         const asset = ASSET_INDEX[assetId];
         if (!asset) continue;
         const obj = new PlacedObject({

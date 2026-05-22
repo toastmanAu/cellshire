@@ -11,5 +11,7 @@ describe('generateWorld resources', () => {
         expect(stats.stoneResourcesPlaced > 0).toBe(true);
         expect(map.objects.some(o => o.role === HARVEST_RESOURCE_ROLES.wood)).toBe(true);
         expect(map.objects.some(o => o.role === HARVEST_RESOURCE_ROLES.stone)).toBe(true);
+        expect(map.objects.some(o => o.role === HARVEST_RESOURCE_ROLES.wood && o.assetId === 'harvest_tree')).toBe(true);
+        expect(map.objects.some(o => o.role === HARVEST_RESOURCE_ROLES.stone && o.assetId === 'stone_outcrop')).toBe(true);
     });
 });

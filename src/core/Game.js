@@ -125,10 +125,25 @@ import {
     buildingProgressSummary,
     clearBuildingProgression,
     formatBuildingCost,
+    isStandardBuildingAsset,
+    isStandardBuildingAssetUnlocked,
     loadBuildingProgression,
     saveBuildingProgression,
     unlockOrUpgradeBuilding as advanceBuildingProgression,
 } from '../buildings/buildingProgression.js';
+import {
+    craftRecipe as craftWorkbenchRecipe,
+    formatRecipeCost,
+    recipeSummaries,
+} from '../crafting/recipeCatalog.js';
+import {
+    clearToolProgression,
+    loadToolProgression,
+    saveToolProgression,
+    toolProgressSummary,
+    toolResourceYieldAmount,
+    upgradeTool as advanceToolProgression,
+} from '../tools/toolProgression.js';
 import {
     createMapRegistry,
     entrySpawnForMap,
@@ -185,6 +200,8 @@ export class Game {
         this.farmState = loadFarmState(safeStorage, this.propertyOwner);
         this._buildingProgressOff = null;
         this._loadBuildingProgressionForOwner(this.propertyOwner);
+        this._toolProgressOff = null;
+        this._loadToolProgressionForOwner(this.propertyOwner);
         this.inventoryAdapter = new LocalInventoryAdapter({
             props: this.propInventory,
         });
@@ -416,8 +433,10 @@ export class Game {
             clearPropertyZone(safeStorage);
             clearFarmState(safeStorage, this.propertyOwner);
             clearBuildingProgression(safeStorage, this.propertyOwner);
+            clearToolProgression(safeStorage, this.propertyOwner);
             this.farmState = loadFarmState(safeStorage, this.propertyOwner);
             this._loadBuildingProgressionForOwner(this.propertyOwner);
+            this._loadToolProgressionForOwner(this.propertyOwner);
             this._loadPropertyMap(null);
             this.ui?.showToast('Property reset');
             return;
@@ -608,7 +627,7 @@ export class Game {
             const terrainHere = this.tileMap.getTerrain(gx, gy);
             const targetId = objHere ? objHere.assetId : terrainHere;
             if (this.placement.erase(gx, gy)) {
-                if (objHere && !isStarterPropertyAsset(objHere.assetId)) {
+                if (objHere && !isStarterPropertyAsset(objHere.assetId) && !this._isUnlockedStandardBuildingAsset(objHere.assetId)) {
                     this.propInventory.add(objHere.assetId, 1);
                 }
                 this.renderer.markDirty();
@@ -628,7 +647,9 @@ export class Game {
         });
         if (result?.kind === 'object') {
             const o = result.object;
-            if (!isStarterPropertyAsset(o.assetId)) this.propInventory.consume(o.assetId, 1);
+            if (!isStarterPropertyAsset(o.assetId) && !this._isUnlockedStandardBuildingAsset(o.assetId)) {
+                this.propInventory.consume(o.assetId, 1);
+            }
             this.renderer.spawnAnim(`obj-${o.id}`, {
                 gx: o.gx,
                 gy: o.gy,
@@ -654,7 +675,7 @@ export class Game {
         if (this._footprintIntersectsFarm(assetId, gx, gy)) return false;
         const bounds = this._propertyBounds();
         return canPlacePropertyAsset(assetId, gx, gy, bounds, {
-            isOwned: id => this.propInventory.get(id) > 0,
+            isOwned: id => this.propInventory.get(id) > 0 || this._isUnlockedStandardBuildingAsset(id),
         })
             && this.placement.canPlace(assetId, gx, gy);
     }
@@ -710,7 +731,11 @@ export class Game {
         if (this._footprintIntersectsFarm(assetId, gx, gy)) {
             return 'That spot is farm land';
         }
-        if (!isStarterPropertyAsset(assetId) && this.propInventory.get(assetId) <= 0) {
+        if (!isStarterPropertyAsset(assetId)
+            && !this._isUnlockedStandardBuildingAsset(assetId)
+            && this.propInventory.get(assetId) <= 0
+        ) {
+            if (isStandardBuildingAsset(assetId)) return 'Unlock that building first';
             const item = generalStoreItem(assetId);
             return item ? `Buy ${item.name} at the store` : 'That prop is not owned';
         }
@@ -1031,8 +1056,9 @@ export class Game {
     }
 
     _resourceYieldAmount(resourceId, baseAmount) {
-        return buildingCapabilityEffects(this.buildingProgression)
+        const buildingAmount = buildingCapabilityEffects(this.buildingProgression)
             .resourceYieldAmount(resourceId, baseAmount);
+        return toolResourceYieldAmount(this.toolProgression, resourceId, buildingAmount);
     }
 
     /**
@@ -1129,6 +1155,7 @@ export class Game {
             this.propertyOwner = property.ownerId;
             this.farmState = loadFarmState(safeStorage, this.propertyOwner);
             this._loadBuildingProgressionForOwner(this.propertyOwner);
+            this._loadToolProgressionForOwner(this.propertyOwner);
         }
         const mine = mapByKind(this.mapRegistry, 'mine');
         if (this.mapKind === 'mine' && mine) this.currentMapId = mine.id;
@@ -1140,6 +1167,16 @@ export class Game {
         this.buildingProgression = loadBuildingProgression(safeStorage, ownerId);
         this._buildingProgressOff = this.buildingProgression.onChange(() => {
             saveBuildingProgression(safeStorage, this.propertyOwner, this.buildingProgression);
+            this.ui?.update();
+            this._emitMapChange();
+        });
+    }
+
+    _loadToolProgressionForOwner(ownerId = 'local') {
+        this._toolProgressOff?.();
+        this.toolProgression = loadToolProgression(safeStorage, ownerId);
+        this._toolProgressOff = this.toolProgression.onChange(() => {
+            saveToolProgression(safeStorage, this.propertyOwner, this.toolProgression);
             this.ui?.update();
             this._emitMapChange();
         });
@@ -1268,6 +1305,7 @@ export class Game {
             this.propertyReadOnly = false;
             this.farmState = loadFarmState(safeStorage, this.propertyOwner);
             this._loadBuildingProgressionForOwner(this.propertyOwner);
+            this._loadToolProgressionForOwner(this.propertyOwner);
             this.propertySnapshotSource = 'local';
             this.propertySnapshotStatus = 'missing';
             this.propertySnapshotStale = false;
@@ -1307,7 +1345,12 @@ export class Game {
         if (assetId.startsWith('player_') && assetId.endsWith('_back')) return false;
         return this.mapKind !== 'property'
             || isStarterPropertyAsset(assetId)
+            || this._isUnlockedStandardBuildingAsset(assetId)
             || this.propInventory.get(assetId) > 0;
+    }
+
+    _isUnlockedStandardBuildingAsset(assetId) {
+        return isStandardBuildingAssetUnlocked(this.buildingProgression, assetId);
     }
 
     assetName(assetId) {
@@ -1352,6 +1395,17 @@ export class Game {
             ownerId: this.propertyOwner,
             readOnly: this.propertyReadOnly,
             buildings: buildingProgressSummary(this.buildingProgression, {
+                resourceInventory: this.resourceInventory,
+                currencyInventory: this.player?.inventory,
+            }),
+            recipes: recipeSummaries({
+                buildingProgression: this.buildingProgression,
+                resourceInventory: this.resourceInventory,
+                currencyInventory: this.player?.inventory,
+            }),
+            tools: toolProgressSummary({
+                toolProgression: this.toolProgression,
+                buildingProgression: this.buildingProgression,
                 resourceInventory: this.resourceInventory,
                 currencyInventory: this.player?.inventory,
             }),
@@ -1446,6 +1500,63 @@ export class Game {
         saveBuildingProgression(safeStorage, this.propertyOwner, this.buildingProgression);
         this._emitMapChange();
         this.ui?.showToast?.(`${result.state.name} ${result.state.label}`, 2200);
+        return result;
+    }
+
+    craftRecipe(recipeId) {
+        if (this.mapKind !== 'property') return { ok: false, reason: 'not-property' };
+        if (this.propertyReadOnly) {
+            this.ui?.showToast?.('Visited properties are read-only', 2200);
+            return { ok: false, reason: 'read-only' };
+        }
+        const result = craftWorkbenchRecipe({
+            recipeId,
+            buildingProgression: this.buildingProgression,
+            resourceInventory: this.resourceInventory,
+            currencyInventory: this.player?.inventory,
+            propInventory: this.propInventory,
+        });
+        if (!result.ok) {
+            const message = result.reason === 'locked'
+                ? `Need Workbench ${result.requiredLevel}`
+                : result.recipe?.cost
+                    ? `Need ${formatRecipeCost(result.recipe.cost)}`
+                    : 'Recipe unavailable';
+            this.ui?.showToast?.(message, 2200);
+            return result;
+        }
+        this._emitMapChange();
+        this.ui?.showToast?.(`Crafted ${result.recipe.name}`, 1800);
+        return result;
+    }
+
+    upgradeTool(toolId = 'pickaxe') {
+        if (this.mapKind !== 'property') return { ok: false, reason: 'not-property' };
+        if (this.propertyReadOnly) {
+            this.ui?.showToast?.('Visited properties are read-only', 2200);
+            return { ok: false, reason: 'read-only' };
+        }
+        const result = advanceToolProgression({
+            toolProgression: this.toolProgression,
+            buildingProgression: this.buildingProgression,
+            resourceInventory: this.resourceInventory,
+            currencyInventory: this.player?.inventory,
+            toolId,
+        });
+        if (!result.ok) {
+            const message = result.reason === 'max-tier'
+                ? 'Tool is max tier'
+                : result.reason === 'locked'
+                    ? `Need Tool Rack ${result.requiredToolRackLevel}`
+                    : result.next?.cost
+                        ? `Need ${formatBuildingCost(result.next.cost)}`
+                        : 'Tool upgrade unavailable';
+            this.ui?.showToast?.(message, 2200);
+            return result;
+        }
+        saveToolProgression(safeStorage, this.propertyOwner, this.toolProgression);
+        this._emitMapChange();
+        this.ui?.showToast?.(`Upgraded ${result.current.name}`, 1800);
         return result;
     }
 
@@ -1628,6 +1739,7 @@ export class Game {
         this.propertyReadOnly = !!opts.readOnly;
         this.farmState = loadFarmState(safeStorage, this.propertyOwner);
         this._loadBuildingProgressionForOwner(this.propertyOwner);
+        this._loadToolProgressionForOwner(this.propertyOwner);
         this.propertySnapshotSource = opts.snapshotSource ?? 'local';
         this.propertySnapshotStatus = opts.snapshotStatus ?? (saved ? 'found' : 'missing');
         this.propertySnapshotStale = !!opts.snapshotStale;

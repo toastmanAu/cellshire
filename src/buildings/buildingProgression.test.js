@@ -3,12 +3,16 @@ import { ResourceInventory } from '../resources/resourceInventory.js';
 import {
     BuildingProgression,
     STANDARD_BUILDINGS,
+    STANDARD_BUILDING_ASSET_IDS,
     buildingCapabilityEffects,
     buildingProgressStorageKey,
     buildingProgressSummary,
     formatBuildingCost,
+    isStandardBuildingAsset,
+    isStandardBuildingAssetUnlocked,
     loadBuildingProgression,
     saveBuildingProgression,
+    standardBuildingIdForAsset,
     unlockOrUpgradeBuilding,
 } from './buildingProgression.js';
 import { describe, expect, it } from '../test/harness.js';
@@ -21,6 +25,19 @@ describe('building progression', () => {
         expect(progression.getLevel('workbench')).toBe(0);
         expect(progression.entries().map(entry => entry.id))
             .toEqual(STANDARD_BUILDINGS.map(entry => entry.id));
+    });
+
+    it('maps progression buildings to placeable home-base asset ids', () => {
+        const progression = new BuildingProgression({ workbench: 1 });
+
+        expect(STANDARD_BUILDING_ASSET_IDS.includes('house')).toBe(true);
+        expect(STANDARD_BUILDING_ASSET_IDS.includes('workbench')).toBe(true);
+        expect(standardBuildingIdForAsset('house')).toBe('home');
+        expect(standardBuildingIdForAsset('workbench')).toBe('workbench');
+        expect(isStandardBuildingAsset('workbench')).toBe(true);
+        expect(isStandardBuildingAssetUnlocked(progression, 'house')).toBe(true);
+        expect(isStandardBuildingAssetUnlocked(progression, 'workbench')).toBe(true);
+        expect(isStandardBuildingAssetUnlocked(progression, 'tool_rack')).toBe(false);
     });
 
     it('requires wood, stone, crop, and CKB for every paid building step', () => {
