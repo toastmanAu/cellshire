@@ -23,7 +23,10 @@ base game dependent on market availability.
 
 ## Progression Rules
 
-- Baseline buildings are unlockable through gameplay resources.
+- Baseline buildings are unlockable through gameplay resources plus CKB.
+- Every paid building unlock or level upgrade must require Wood, Stone, Crop,
+  and a designated CKB amount. This intentionally keeps trading, bank credit,
+  and treasury-generating fee loops relevant to home-base progression.
 - Each building has a functional level independent of its visual skin.
 - Levels improve efficiency, capacity, recipe access, cooldowns, or automation.
 - Asset-market purchases can later override visuals or add specializations,
@@ -31,6 +34,14 @@ base game dependent on market availability.
 - Market assets should map onto building slots, e.g. a rare `workbench` skin
   attaches to the `workbench` capability rather than becoming a totally separate
   progression system.
+
+## First Capability Effects
+
+- `sawmill` levels add conservative bonus Wood per wood-resource harvest.
+- `stone_yard` levels add conservative bonus Stone per stone-resource harvest.
+- `farm_storage` levels add conservative bonus Crop per farm harvest.
+- `workbench` and `tool_rack` expose their capability tiers for the next
+  recipe/tool-upgrade pass but do not inflate crypto ore output yet.
 
 ## Asset Generation
 
@@ -51,3 +62,5 @@ base game dependent on market availability.
   functional modifiers?
 - Should home `house` upgrades gate property size, farm size, or purely home
   management features?
+- What CKB/material cost curve keeps early unlocks reachable while making
+  loans/trading materially useful?

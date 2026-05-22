@@ -38,6 +38,20 @@ export function installPropertyHUD(game) {
     });
     root.appendChild(farm);
 
+    const buildings = document.createElement('button');
+    buildings.type = 'button';
+    buildings.className = 'property-hud__buildings';
+    buildings.textContent = 'Buildings';
+    buildings.addEventListener('click', () => {
+        root.dataset.buildingsOpen = root.dataset.buildingsOpen === '1' ? '0' : '1';
+        render();
+    });
+    root.appendChild(buildings);
+
+    const buildingPanel = document.createElement('div');
+    buildingPanel.className = 'property-hud__building-panel';
+    root.appendChild(buildingPanel);
+
     const share = document.createElement('button');
     share.type = 'button';
     share.className = 'property-hud__share';
@@ -76,8 +90,59 @@ export function installPropertyHUD(game) {
             farm.disabled = !farmState.canAffordNext;
             farm.textContent = `Farm · ${farmState.nextCostLabel}`;
         }
+        buildings.hidden = !home || visiting;
+        renderBuildings(home && !visiting ? game.buildingProgressionState?.() : null);
         share.hidden = false;
         share.textContent = home ? 'Share' : 'Share home';
+    }
+
+    function renderBuildings(state) {
+        const open = root.dataset.buildingsOpen === '1';
+        buildingPanel.hidden = !open || !state;
+        if (!state) {
+            root.dataset.buildingsOpen = '0';
+            clear(buildingPanel);
+            return;
+        }
+        buildings.textContent = open ? 'Hide buildings' : 'Buildings';
+        if (!open) return;
+        clear(buildingPanel);
+        const title = document.createElement('div');
+        title.className = 'property-hud__building-title';
+        title.textContent = 'Home buildings';
+        buildingPanel.appendChild(title);
+        for (const entry of state.buildings ?? []) {
+            const row = document.createElement('div');
+            row.className = 'property-hud__building-row';
+
+            const meta = document.createElement('div');
+            meta.className = 'property-hud__building-meta';
+            const name = document.createElement('div');
+            name.className = 'property-hud__building-name';
+            name.textContent = `${entry.name} · ${entry.label}`;
+            const detail = document.createElement('div');
+            detail.className = 'property-hud__building-cost';
+            const effect = entry.effectLabel ? `${entry.effectLabel} · ` : '';
+            detail.textContent = entry.nextLevel
+                ? `${effect}${entry.nextCostLabel}`
+                : `${effect}Max level`;
+            meta.appendChild(name);
+            meta.appendChild(detail);
+
+            const action = document.createElement('button');
+            action.type = 'button';
+            action.className = 'property-hud__building-action';
+            action.textContent = entry.actionLabel;
+            action.disabled = !entry.nextLevel || !entry.canAffordNext;
+            action.addEventListener('click', () => {
+                game.unlockOrUpgradeBuilding?.(entry.id);
+                render();
+            });
+
+            row.appendChild(meta);
+            row.appendChild(action);
+            buildingPanel.appendChild(row);
+        }
     }
 
     function visitDetail(expansion) {
@@ -111,6 +176,10 @@ export function installPropertyHUD(game) {
             root.remove();
         },
     };
+}
+
+function clear(node) {
+    while (node.firstChild) node.firstChild.remove();
 }
 
 async function copyText(text) {

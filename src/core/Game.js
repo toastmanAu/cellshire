@@ -121,6 +121,15 @@ import {
     saveHouseTreasury,
 } from '../treasury/houseTreasury.js';
 import {
+    buildingCapabilityEffects,
+    buildingProgressSummary,
+    clearBuildingProgression,
+    formatBuildingCost,
+    loadBuildingProgression,
+    saveBuildingProgression,
+    unlockOrUpgradeBuilding as advanceBuildingProgression,
+} from '../buildings/buildingProgression.js';
+import {
     createMapRegistry,
     entrySpawnForMap,
     mapByKind,
@@ -174,6 +183,8 @@ export class Game {
         this.propInventory = loadPropInventory(safeStorage);
         this.resourceInventory = loadResourceInventory(safeStorage);
         this.farmState = loadFarmState(safeStorage, this.propertyOwner);
+        this._buildingProgressOff = null;
+        this._loadBuildingProgressionForOwner(this.propertyOwner);
         this.inventoryAdapter = new LocalInventoryAdapter({
             props: this.propInventory,
         });
@@ -404,7 +415,9 @@ export class Game {
             }
             clearPropertyZone(safeStorage);
             clearFarmState(safeStorage, this.propertyOwner);
+            clearBuildingProgression(safeStorage, this.propertyOwner);
             this.farmState = loadFarmState(safeStorage, this.propertyOwner);
+            this._loadBuildingProgressionForOwner(this.propertyOwner);
             this._loadPropertyMap(null);
             this.ui?.showToast('Property reset');
             return;
@@ -955,10 +968,11 @@ export class Game {
         if (this._pendingDepletions.has(obj.id)) return;
         const cfg = harvestResourceConfig(obj.role);
         if (!cfg) return;
-        this.resourceInventory.add(cfg.resourceId, cfg.yieldAmount);
+        const yieldAmount = this._resourceYieldAmount(cfg.resourceId, cfg.yieldAmount);
+        this.resourceInventory.add(cfg.resourceId, yieldAmount);
         recordMine(safeStorage, this.currentEpoch, obj.gx, obj.gy, 0);
 
-        const rewardText = `+${formatResourceAmount(cfg.resourceId, cfg.yieldAmount)}`;
+        const rewardText = `+${formatResourceAmount(cfg.resourceId, yieldAmount)}`;
         const c = cellToScreen(obj.gx + 0.5, obj.gy + 0.5);
         this.renderer.spawnPlayerStrike(c.x, c.y, { color: cfg.dustColor });
         this.renderer.spawnFloatingText(c.x, c.y - 10, rewardText, {
@@ -976,7 +990,7 @@ export class Game {
         });
         playMineDeplete();
         this._startDepletion(obj);
-        this.ui?.showToast?.(`Harvested ${formatResourceAmount(cfg.resourceId, cfg.yieldAmount)}`, 1600);
+        this.ui?.showToast?.(`Harvested ${formatResourceAmount(cfg.resourceId, yieldAmount)}`, 1600);
     }
 
     _harvestFarmCrop(obj) {
@@ -987,10 +1001,11 @@ export class Game {
             }
             return;
         }
-        this.resourceInventory.add(result.output.resourceId, result.output.amount);
+        const yieldAmount = this._resourceYieldAmount(result.output.resourceId, result.output.amount);
+        this.resourceInventory.add(result.output.resourceId, yieldAmount);
         saveFarmState(safeStorage, this.propertyOwner, this.farmState);
 
-        const label = formatResourceAmount(result.output.resourceId, result.output.amount);
+        const label = formatResourceAmount(result.output.resourceId, yieldAmount);
         const c = cellToScreen(obj.gx + 0.5, obj.gy + 0.5);
         this.renderer.spawnPlayerStrike(c.x, c.y, { color: '#3d7355' });
         this.renderer.spawnFloatingText(c.x, c.y - 10, `+${label}`, {
@@ -1013,6 +1028,11 @@ export class Game {
         this._syncFarmZonePreview();
         this._emitMapChange();
         this.ui?.showToast?.(`Harvested ${label}`, 1600);
+    }
+
+    _resourceYieldAmount(resourceId, baseAmount) {
+        return buildingCapabilityEffects(this.buildingProgression)
+            .resourceYieldAmount(resourceId, baseAmount);
     }
 
     /**
@@ -1108,10 +1128,21 @@ export class Game {
         if (property?.ownerId) {
             this.propertyOwner = property.ownerId;
             this.farmState = loadFarmState(safeStorage, this.propertyOwner);
+            this._loadBuildingProgressionForOwner(this.propertyOwner);
         }
         const mine = mapByKind(this.mapRegistry, 'mine');
         if (this.mapKind === 'mine' && mine) this.currentMapId = mine.id;
         this._emitMapChange();
+    }
+
+    _loadBuildingProgressionForOwner(ownerId = 'local') {
+        this._buildingProgressOff?.();
+        this.buildingProgression = loadBuildingProgression(safeStorage, ownerId);
+        this._buildingProgressOff = this.buildingProgression.onChange(() => {
+            saveBuildingProgression(safeStorage, this.propertyOwner, this.buildingProgression);
+            this.ui?.update();
+            this._emitMapChange();
+        });
     }
 
     travelToMapRole(role) {
@@ -1236,6 +1267,7 @@ export class Game {
             this.propertyOwner = nextOwner;
             this.propertyReadOnly = false;
             this.farmState = loadFarmState(safeStorage, this.propertyOwner);
+            this._loadBuildingProgressionForOwner(this.propertyOwner);
             this.propertySnapshotSource = 'local';
             this.propertySnapshotStatus = 'missing';
             this.propertySnapshotStale = false;
@@ -1315,6 +1347,17 @@ export class Game {
         };
     }
 
+    buildingProgressionState() {
+        return {
+            ownerId: this.propertyOwner,
+            readOnly: this.propertyReadOnly,
+            buildings: buildingProgressSummary(this.buildingProgression, {
+                resourceInventory: this.resourceInventory,
+                currencyInventory: this.player?.inventory,
+            }),
+        };
+    }
+
     propertySnapshotSaveStatus({ compact = true } = {}) {
         if (!this.propertySnapshotSaveResult) return null;
         return {
@@ -1375,6 +1418,34 @@ export class Game {
         this.renderer.markDirty();
         this._emitMapChange();
         this.ui?.showToast?.(`Expanded farm to ${farmTierSummary(this.farmState.tier).name}`, 2200);
+        return result;
+    }
+
+    unlockOrUpgradeBuilding(buildingId) {
+        if (this.mapKind !== 'property') return { ok: false, reason: 'not-property' };
+        if (this.propertyReadOnly) {
+            this.ui?.showToast?.('Visited properties are read-only', 2200);
+            return { ok: false, reason: 'read-only' };
+        }
+        const result = advanceBuildingProgression({
+            progression: this.buildingProgression,
+            buildingId,
+            resourceInventory: this.resourceInventory,
+            currencyInventory: this.player?.inventory,
+        });
+        if (!result.ok) {
+            const state = result.state;
+            const message = result.reason === 'max-level'
+                ? `${state?.name ?? 'Building'} is max level`
+                : state?.nextCost
+                    ? `Need ${formatBuildingCost(state.nextCost)}`
+                    : 'Building unavailable';
+            this.ui?.showToast?.(message, 2400);
+            return result;
+        }
+        saveBuildingProgression(safeStorage, this.propertyOwner, this.buildingProgression);
+        this._emitMapChange();
+        this.ui?.showToast?.(`${result.state.name} ${result.state.label}`, 2200);
         return result;
     }
 
@@ -1556,6 +1627,7 @@ export class Game {
         this.propertyOwner = opts.ownerId ?? propertyDef?.ownerId ?? saved?.ownerId ?? 'local';
         this.propertyReadOnly = !!opts.readOnly;
         this.farmState = loadFarmState(safeStorage, this.propertyOwner);
+        this._loadBuildingProgressionForOwner(this.propertyOwner);
         this.propertySnapshotSource = opts.snapshotSource ?? 'local';
         this.propertySnapshotStatus = opts.snapshotStatus ?? (saved ? 'found' : 'missing');
         this.propertySnapshotStale = !!opts.snapshotStale;

@@ -9,11 +9,12 @@ cards needed to turn the current prototype into the game described in
 - Completed chain visit fixture compatibility, the first communal township
   plane, RPG-style building interior windows, and local house treasury fee
   accounting, a local Bank loan prototype, expandable home farming, and the
-  cleaned HiDream starter-home asset integration.
-- Latest completed card: `Starter Home Visual Integration`.
-- Current Next card: `Crafting Building Unlocks`.
+  cleaned HiDream starter-home asset integration, plus the first home building
+  unlock/effects pass.
+- Latest completed card: `Crafting Building Unlocks`.
+- Current Next card: `Workbench Recipes + Tool Rack Upgrades`.
 - Known local-only files: untracked `cs_logo.png` and `tmp/`.
-- Last verification: browser harness `262 passed, 0 failed` and
+- Last verification: browser harness `269 passed, 0 failed` and
   `node netlify-build.mjs`.
 
 ## Current Baseline
@@ -668,9 +669,12 @@ keeping the baseline `house` gameplay slot stable.
 Verified with the browser test harness (`262 passed, 0 failed`),
 `node netlify-build.mjs`, and `git diff --check`.
 
-## Next
-
 ### Crafting Building Unlocks
+
+**Completed:** 2026-05-22
+
+**Status:** shipped the building state, mixed material/CKB costs, Buildings HUD,
+and first resource-yield effects.
 
 **Goal:** let home-base buildings unlock useful capabilities.
 
@@ -680,7 +684,9 @@ Verified with the browser test harness (`262 passed, 0 failed`),
 - Every user starts with a baseline `home` building on their home plot.
 - Add a standard local building set: `home`, `workbench`, `tool_rack`,
   `sawmill`, `stone_yard`, and `farm_storage`.
-- Building unlocks consume local resources and grant capabilities.
+- Building unlocks and upgrades consume Wood, Stone, Crop, and a designated
+  CKB amount so trading, loans, and treasury fee generation remain tied into
+  home-base progression.
 - Each building has an independent functional level for efficiency, capacity,
   recipe access, cooldowns, or automation.
 - Future asset-market purchases attach as skins, variants, or specialist
@@ -688,6 +694,27 @@ Verified with the browser test harness (`262 passed, 0 failed`),
   progression path.
 - Capability state derives from owned/unlocked/placed standard buildings, not
   only from decorative props.
+- First capability effects keep crypto ore rewards untouched: `sawmill`
+  improves Wood harvests, `stone_yard` improves Stone harvests, and
+  `farm_storage` improves Crop harvests.
+
+Verified with the browser test harness (`269 passed, 0 failed`),
+`node netlify-build.mjs`, and `git diff --check`.
+
+## Next
+
+### Workbench Recipes + Tool Rack Upgrades
+
+**Goal:** turn the newly unlocked `workbench` and `tool_rack` capability tiers
+into player-facing crafting and tool progression.
+
+**Acceptance:**
+- Add a small recipe catalog gated by `workbench` level.
+- Add local pickaxe/tool tier state gated by `tool_rack` level.
+- Recipes consume Wood, Stone, Crop, and CKB where they affect the economy.
+- Tool upgrades apply conservative local-resource harvest modifiers first;
+  crypto ore changes stay behind an explicit pricing decision.
+- Home Buildings panel links clearly to the recipe/tool actions.
 
 ## Backlog
 
