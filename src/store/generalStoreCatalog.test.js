@@ -20,7 +20,7 @@ describe('generalStoreCatalog', () => {
 
     it('checks unlock tier and local CKB balance before purchase', () => {
         const inventory = new Inventory();
-        inventory.add('ckb', 1000);
+        inventory.add('ckb', 850);
         expect(canBuyStoreItem({
             item: generalStoreItem('stone_lantern'),
             propertyTier: 1,
@@ -49,11 +49,11 @@ describe('generalStoreCatalog', () => {
             propertyTier: 1,
         });
         expect(out.ok).toBe(true);
-        expect(inventory.get('ckb')).toBe(500);
+        expect(inventory.get('ckb')).toBe(650);
         expect(props.get('blue_railing')).toBe(1);
     });
 
     it('formats store prices through the economy display layer', () => {
-        expect(formatStorePrice(generalStoreItem('blue_railing'))).toBe('500.00 CKB');
+        expect(formatStorePrice(generalStoreItem('blue_railing'))).toBe('350.00 CKB');
     });
 });

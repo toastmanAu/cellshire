@@ -8,6 +8,7 @@ import {
     ToolProgression,
     loadToolProgression,
     saveToolProgression,
+    toolIconSrc,
     toolProgressStorageKey,
     toolProgressSummary,
     toolResourceYieldAmount,
@@ -27,6 +28,13 @@ describe('tool progression', () => {
             .toEqual(['Rusted Pickaxe', 'Rusted Woodaxe', 'Worn Hoe']);
         expect(summary.lines.every(line => line.canUpgrade === false)).toBe(true);
         expect(summary.lines[0].nextRequiredLabel).toBe('Tool Rack 1');
+        expect(summary.lines[0].iconSrc).toBe('assets/tool_pickaxe_t1.png');
+        expect(summary.lines[1].nextIconSrc).toBe('assets/tool_woodaxe_t2.png');
+    });
+
+    it('maps tool tiers to installed icon assets', () => {
+        expect(toolIconSrc('pickaxe', 6)).toBe('assets/tool_pickaxe_t6.png');
+        expect(toolIconSrc('hoe_scythe', 4)).toBe('assets/tool_hoe_scythe_t4.png');
     });
 
     it('defines six paid/earned tiers for every tool family', () => {
@@ -45,12 +53,12 @@ describe('tool progression', () => {
     it('spends materials and CKB to upgrade one selected tool line', () => {
         const tools = new ToolProgression();
         const resources = new ResourceInventory([
-            ['wood', 12],
-            ['stone', 8],
-            ['crop', 4],
+            ['wood', 7],
+            ['stone', 5],
+            ['crop', 3],
         ]);
         const currencies = new Inventory();
-        currencies.add('ckb', 2300);
+        currencies.add('ckb', 1100);
 
         const result = upgradeTool({
             toolProgression: tools,

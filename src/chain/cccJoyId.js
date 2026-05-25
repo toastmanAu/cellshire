@@ -81,20 +81,22 @@ export function miningReceiptPayload(miningTx) {
     const input = miningTx?.inputs?.ore_cell;
     const next = miningTx?.outputs?.ore_cell;
     const output = miningTx?.outputs?.yield_cell;
-    if (!input?.ore_id || !output) throw new Error('mining transaction receipt payload required');
+    const receipt = miningTx?.witness?.mining_receipt;
+    const source = input || next || receipt;
+    if (!source?.ore_id || !output) throw new Error('mining transaction receipt payload required');
     return {
         protocol: 'cellshire.mining',
         version: 1,
         action: miningTx.action || 'mine',
         tx_nonce: miningTx.tx_nonce,
-        ore_id: input.ore_id,
-        map_id: input.map_id,
-        epoch: input.epoch,
-        gx: input.gx,
-        gy: input.gy,
-        ore_type: input.ore_type,
-        capacity_before: input.capacity_remaining,
-        capacity_after: next?.capacity_remaining || 0,
+        ore_id: source.ore_id,
+        map_id: source.map_id,
+        epoch: source.epoch,
+        gx: source.gx,
+        gy: source.gy,
+        ore_type: source.ore_type,
+        capacity_before: input?.capacity_remaining ?? receipt?.mined_capacity_before ?? next?.capacity_max ?? null,
+        capacity_after: next?.capacity_remaining ?? receipt?.mined_capacity_after ?? 0,
         yield_currency: output.currency,
         yield_amount: output.amount,
         yield_usd_value: output.usd_value,
@@ -116,6 +118,81 @@ export function propertySnapshotReceiptPayload(propertySnapshotTx) {
         property_tier: cell.propertyTier,
         camera: cell.camera ?? null,
         tile_map: cell.tileMap,
+    };
+}
+
+export function bankLoanReceiptPayload(bankTx) {
+    const receipt = bankTx?.witness?.bank_receipt;
+    if (!receipt?.action || bankTx?.kind !== 'cellshire_bank_loan_tx') {
+        throw new Error('bank loan transaction payload required');
+    }
+    const debt = bankTx.outputs?.debt_cell?.debt
+        ?? bankTx.inputs?.debt_cell?.debt
+        ?? null;
+    return {
+        protocol: 'cellshire.bank.loan',
+        version: 1,
+        action: bankTx.action,
+        tx_nonce: bankTx.tx_nonce,
+        offer_id: receipt.offer_id,
+        loan_id: receipt.loan_id ?? null,
+        principal: receipt.principal,
+        fee: receipt.fee,
+        payment: receipt.payment ?? null,
+        total_owed: receipt.total_owed ?? null,
+        collateral_kind: receipt.collateral_kind ?? debt?.collateralKind ?? null,
+        collateral_amount: receipt.collateral_amount,
+        collateral_outpoint: debt?.collateralOutpoint ?? null,
+        due_epoch: receipt.due_epoch ?? debt?.dueEpoch ?? null,
+    };
+}
+
+export function traderSwapReceiptPayload(traderTx) {
+    const quote = traderTx?.witness?.trader_quote;
+    if (!quote || traderTx?.kind !== 'cellshire_trader_swap_tx') {
+        throw new Error('trader swap transaction payload required');
+    }
+    const source = traderTx.inputs?.source_balance_cell;
+    const target = traderTx.outputs?.target_balance_cell;
+    const fee = traderTx.outputs?.treasury_fee_receipt;
+    return {
+        protocol: 'cellshire.trader.swap',
+        version: 1,
+        action: traderTx.action || 'swap',
+        tx_nonce: traderTx.tx_nonce,
+        owner: traderTx.witness?.address ?? source?.owner ?? target?.owner ?? null,
+        from_currency: quote.from_currency,
+        from_amount: quote.from_amount,
+        to_currency: quote.to_currency,
+        to_amount: quote.to_amount,
+        rate: quote.rate,
+        fee_bps: quote.fee_bps ?? fee?.fee_bps ?? null,
+        fee_usd: fee?.fee_usd ?? null,
+        gross_usd: fee?.gross_usd ?? null,
+        net_usd: fee?.net_usd ?? null,
+    };
+}
+
+export function storePurchaseReceiptPayload(storeTx) {
+    const purchase = storeTx?.witness?.store_purchase;
+    if (!purchase || storeTx?.kind !== 'cellshire_store_purchase_tx') {
+        throw new Error('store purchase transaction payload required');
+    }
+    const payment = storeTx.inputs?.payment_balance_cell;
+    const prop = storeTx.outputs?.prop_receipt;
+    const treasury = storeTx.outputs?.treasury_receipt;
+    return {
+        protocol: 'cellshire.store.purchase',
+        version: 1,
+        action: storeTx.action || 'purchase',
+        tx_nonce: storeTx.tx_nonce,
+        owner: storeTx.witness?.address ?? payment?.owner ?? prop?.owner ?? null,
+        asset_id: purchase.asset_id,
+        quantity: prop?.quantity ?? 1,
+        price_currency: purchase.price_currency,
+        price_amount: purchase.price_amount,
+        treasury_currency: treasury?.currency ?? purchase.price_currency,
+        treasury_amount: treasury?.amount ?? purchase.price_amount,
     };
 }
 
@@ -188,6 +265,99 @@ export async function buildCccMiningTransaction({
     return { tx, payload, payloadHex };
 }
 
+export async function buildCccBankLoanTransaction({
+    ccc,
+    client,
+    signer,
+    bankTx,
+    receiptCapacityCkb = 61,
+}) {
+    const address = await signer.getRecommendedAddress();
+    const expected = bankTx?.witness?.address;
+    if (expected && expected !== address) {
+        throw new Error('connected JoyID address does not match bank wallet');
+    }
+
+    const { script: lock } = await ccc.Address.fromString(address, client);
+    const payload = bankLoanReceiptPayload(bankTx);
+    const payloadHex = utf8ToHex(JSON.stringify(payload));
+    const tx = ccc.Transaction.from({
+        outputs: [{
+            capacity: ccc.fixedPointFrom(receiptCapacityCkb),
+            lock,
+        }],
+    });
+
+    await tx.completeInputsByCapacity(signer);
+    if (!Array.isArray(tx.witnesses)) tx.witnesses = [];
+    if (tx.witnesses.length === 0) tx.witnesses.push('0x');
+    tx.witnesses.push(payloadHex);
+    await tx.completeFeeBy(signer);
+    return { tx, payload, payloadHex };
+}
+
+export async function buildCccTraderSwapTransaction({
+    ccc,
+    client,
+    signer,
+    traderTx,
+    receiptCapacityCkb = 61,
+}) {
+    const address = await signer.getRecommendedAddress();
+    const expected = traderTx?.witness?.address;
+    if (expected && expected !== address) {
+        throw new Error('connected JoyID address does not match trader wallet');
+    }
+
+    const { script: lock } = await ccc.Address.fromString(address, client);
+    const payload = traderSwapReceiptPayload(traderTx);
+    const payloadHex = utf8ToHex(JSON.stringify(payload));
+    const tx = ccc.Transaction.from({
+        outputs: [{
+            capacity: ccc.fixedPointFrom(receiptCapacityCkb),
+            lock,
+        }],
+    });
+
+    await tx.completeInputsByCapacity(signer);
+    if (!Array.isArray(tx.witnesses)) tx.witnesses = [];
+    if (tx.witnesses.length === 0) tx.witnesses.push('0x');
+    tx.witnesses.push(payloadHex);
+    await tx.completeFeeBy(signer);
+    return { tx, payload, payloadHex };
+}
+
+export async function buildCccStorePurchaseTransaction({
+    ccc,
+    client,
+    signer,
+    storeTx,
+    receiptCapacityCkb = 61,
+}) {
+    const address = await signer.getRecommendedAddress();
+    const expected = storeTx?.witness?.address;
+    if (expected && expected !== address) {
+        throw new Error('connected JoyID address does not match store wallet');
+    }
+
+    const { script: lock } = await ccc.Address.fromString(address, client);
+    const payload = storePurchaseReceiptPayload(storeTx);
+    const payloadHex = utf8ToHex(JSON.stringify(payload));
+    const tx = ccc.Transaction.from({
+        outputs: [{
+            capacity: ccc.fixedPointFrom(receiptCapacityCkb),
+            lock,
+        }],
+    });
+
+    await tx.completeInputsByCapacity(signer);
+    if (!Array.isArray(tx.witnesses)) tx.witnesses = [];
+    if (tx.witnesses.length === 0) tx.witnesses.push('0x');
+    tx.witnesses.push(payloadHex);
+    await tx.completeFeeBy(signer);
+    return { tx, payload, payloadHex };
+}
+
 export async function submitCccJoyIdPropertySnapshotTx(propertySnapshotTx, {
     params,
     location,
@@ -222,6 +392,120 @@ export async function submitCccJoyIdPropertySnapshotTx(propertySnapshotTx, {
             ok: false,
             reason: classifyCccJoyIdError(err),
             message: err?.message || 'CCC/JoyID property snapshot submit failed',
+        };
+    }
+}
+
+export async function submitCccJoyIdBankLoanTx(bankTx, {
+    params,
+    location,
+    ccc,
+    importModule,
+    shouldFail = false,
+    receiptCapacityCkb,
+} = {}) {
+    try {
+        if (shouldFail) throw new Error('JoyID signature cancelled');
+        const config = resolveCccJoyIdConfig({ params, location });
+        const cccModule = await loadCcc({ ccc, cccUrl: config.cccUrl, importModule });
+        const client = createCccClient(cccModule, config);
+        const signer = new cccModule.JoyId.CkbSigner(client, config.name, config.logo);
+        await signer.connect();
+        const prepared = await buildCccBankLoanTransaction({
+            ccc: cccModule,
+            client,
+            signer,
+            bankTx,
+            receiptCapacityCkb,
+        });
+        const txHash = await signer.sendTransaction(prepared.tx);
+        return {
+            ok: true,
+            mode: 'ccc-joyid',
+            txHash,
+            payload: prepared.payload,
+        };
+    } catch (err) {
+        return {
+            ok: false,
+            reason: classifyCccJoyIdError(err),
+            message: err?.message || 'CCC/JoyID bank loan submit failed',
+        };
+    }
+}
+
+export async function submitCccJoyIdTraderSwapTx(traderTx, {
+    params,
+    location,
+    ccc,
+    importModule,
+    shouldFail = false,
+    receiptCapacityCkb,
+} = {}) {
+    try {
+        if (shouldFail) throw new Error('JoyID signature cancelled');
+        const config = resolveCccJoyIdConfig({ params, location });
+        const cccModule = await loadCcc({ ccc, cccUrl: config.cccUrl, importModule });
+        const client = createCccClient(cccModule, config);
+        const signer = new cccModule.JoyId.CkbSigner(client, config.name, config.logo);
+        await signer.connect();
+        const prepared = await buildCccTraderSwapTransaction({
+            ccc: cccModule,
+            client,
+            signer,
+            traderTx,
+            receiptCapacityCkb,
+        });
+        const txHash = await signer.sendTransaction(prepared.tx);
+        return {
+            ok: true,
+            mode: 'ccc-joyid',
+            txHash,
+            payload: prepared.payload,
+        };
+    } catch (err) {
+        return {
+            ok: false,
+            reason: classifyCccJoyIdError(err),
+            message: err?.message || 'CCC/JoyID trader swap submit failed',
+        };
+    }
+}
+
+export async function submitCccJoyIdStorePurchaseTx(storeTx, {
+    params,
+    location,
+    ccc,
+    importModule,
+    shouldFail = false,
+    receiptCapacityCkb,
+} = {}) {
+    try {
+        if (shouldFail) throw new Error('JoyID signature cancelled');
+        const config = resolveCccJoyIdConfig({ params, location });
+        const cccModule = await loadCcc({ ccc, cccUrl: config.cccUrl, importModule });
+        const client = createCccClient(cccModule, config);
+        const signer = new cccModule.JoyId.CkbSigner(client, config.name, config.logo);
+        await signer.connect();
+        const prepared = await buildCccStorePurchaseTransaction({
+            ccc: cccModule,
+            client,
+            signer,
+            storeTx,
+            receiptCapacityCkb,
+        });
+        const txHash = await signer.sendTransaction(prepared.tx);
+        return {
+            ok: true,
+            mode: 'ccc-joyid',
+            txHash,
+            payload: prepared.payload,
+        };
+    } catch (err) {
+        return {
+            ok: false,
+            reason: classifyCccJoyIdError(err),
+            message: err?.message || 'CCC/JoyID store purchase submit failed',
         };
     }
 }
@@ -270,6 +554,18 @@ export function createCccJoyIdPropertySnapshotSubmitter(options = {}) {
 
 export function createCccJoyIdMiningSubmitter(options = {}) {
     return (tx, runtime = {}) => submitCccJoyIdMiningTx(tx, { ...options, ...runtime });
+}
+
+export function createCccJoyIdBankLoanSubmitter(options = {}) {
+    return (tx, runtime = {}) => submitCccJoyIdBankLoanTx(tx, { ...options, ...runtime });
+}
+
+export function createCccJoyIdTraderSwapSubmitter(options = {}) {
+    return (tx, runtime = {}) => submitCccJoyIdTraderSwapTx(tx, { ...options, ...runtime });
+}
+
+export function createCccJoyIdStorePurchaseSubmitter(options = {}) {
+    return (tx, runtime = {}) => submitCccJoyIdStorePurchaseTx(tx, { ...options, ...runtime });
 }
 
 export function classifyCccJoyIdError(err) {

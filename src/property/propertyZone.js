@@ -2,7 +2,7 @@ import { assetDefinitionFor } from '../assets/assetRegistry.js';
 import { PlacedObject } from '../building/PlacedObject.js';
 import { TileMap } from '../grid/TileMap.js';
 import { TOWNSHIP_PORTAL_ROLE } from '../township/townshipZone.js';
-import { farmBoundsForTier } from '../farm/farmZone.js';
+import { FARM_EMPTY_PLOT_ASSET_ID, farmBoundsForTier } from '../farm/farmZone.js';
 
 export const PROPERTY_MAP_ID = 'property:local';
 export const PROPERTY_SIZE = 24;
@@ -90,7 +90,7 @@ export function createStarterPropertyMap() {
     const farmBounds = farmBoundsForTier(1);
     for (let gy = farmBounds.minGy; gy <= farmBounds.maxGy; gy++)
     for (let gx = farmBounds.minGx; gx <= farmBounds.maxGx; gx++) {
-        tileMap.setTerrain(gx, gy, 'dirt');
+        tileMap.setTerrain(gx, gy, FARM_EMPTY_PLOT_ASSET_ID);
     }
 
     const fenceMinX = PROPERTY_EDIT_BOUNDS.minGx - 1;

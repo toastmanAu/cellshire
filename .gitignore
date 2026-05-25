@@ -26,6 +26,13 @@ dist/
 assets/newAsset/*.webp
 
 # Asset-gen workspace — temporary cuts before installation
+cs_logo.png
 assets/raw_pending/
 assets/raw_mining_originals/
+assets/assets_cellshire.zip
 tmp/
+scripts/_sa3_stubs/
+
+# Python tooling cache
+__pycache__/
+*.py[cod]

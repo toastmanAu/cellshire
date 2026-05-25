@@ -29,27 +29,27 @@ describe('propertyExpansion tiers', () => {
         const summary = propertyTierSummary(1);
         expect(summary.label).toBe('Tier 1 · 16x16');
         expect(summary.next.name).toBe('Garden claim');
-        expect(formatExpansionCost(summary.next.cost)).toBe('10000.00 CKB');
+        expect(formatExpansionCost(summary.next.cost)).toBe('7500.00 CKB');
         expect(nextPropertyTier(4)).toBeNull();
     });
 
     it('spends local CKB to unlock the next tier', () => {
         const inv = new Inventory();
-        inv.add('ckb', 12000);
+        inv.add('ckb', 9000);
         expect(canAffordExpansion(inv, 1)).toBe(true);
         const result = spendExpansionCost(inv, 1);
         expect(result.ok).toBe(true);
         expect(result.tier).toBe(2);
-        expect(inv.get('ckb')).toBe(2000);
+        expect(inv.get('ckb')).toBe(1500);
     });
 
     it('rejects expansion when the local balance is short', () => {
         const inv = new Inventory();
-        inv.add('ckb', 9999);
+        inv.add('ckb', 7499);
         const result = spendExpansionCost(inv, 1);
         expect(result.ok).toBe(false);
         expect(result.reason).toBe('insufficient-funds');
-        expect(inv.get('ckb')).toBe(9999);
+        expect(inv.get('ckb')).toBe(7499);
     });
 
     it('builds a renderer preview for current and next bounds', () => {

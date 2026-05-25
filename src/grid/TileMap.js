@@ -90,6 +90,13 @@ export class TileMap {
         return target;
     }
 
+    setObjectAsset(obj, assetId) {
+        if (!obj || obj.assetId === assetId) return false;
+        obj.assetId = assetId;
+        this.objectsVersion++;
+        return true;
+    }
+
     clearAll() {
         this.terrain.fill(null);
         this._occupancy.fill(null);

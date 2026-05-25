@@ -1,5 +1,6 @@
 import { assetDefinitionFor } from '../assets/assetRegistry.js';
 import { formatCurrencyAmount } from '../mining/cryptoEconomy.js';
+import { RESOURCE_CATALOG } from '../resources/resourceInventory.js';
 
 export const MARKETPLACE_STORAGE_KEY = 'cellshire:marketplace:v1:local';
 
@@ -147,6 +148,7 @@ export function createMarketplaceListing({
     now = Date.now,
 } = {}) {
     if (!seller?.address) return { ok: false, reason: 'wallet-disconnected' };
+    if (RESOURCE_CATALOG[assetId]) return { ok: false, reason: 'raw-resource-not-listable' };
     if (!assetDefinitionFor(assetId)) return { ok: false, reason: 'missing-asset' };
     if (itemType !== 'prop' && itemType !== 'skin') return { ok: false, reason: 'invalid-item-type' };
     const amount = Number(price?.amount);
@@ -193,6 +195,17 @@ export function buyMarketplaceListing({
     inventory.add(listing.price.currency, -listing.price.amount);
     if (listing.itemType === 'prop') {
         propInventory.add(listing.assetId, 1);
+    } else if (listing.itemType === 'skin' && !state.ownedSkinIds.includes(listing.assetId)) {
+        state.ownedSkinIds.push(listing.assetId);
+    }
+    closeListing(state, listing);
+    return { ok: true, listing };
+}
+
+export function grantMarketplaceListing({ listing, propInventory, state } = {}) {
+    if (!listing) return { ok: false, reason: 'missing-listing' };
+    if (listing.itemType === 'prop') {
+        propInventory?.add?.(listing.assetId, 1);
     } else if (listing.itemType === 'skin' && !state.ownedSkinIds.includes(listing.assetId)) {
         state.ownedSkinIds.push(listing.assetId);
     }

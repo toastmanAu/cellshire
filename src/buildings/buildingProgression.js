@@ -24,7 +24,7 @@ export const STANDARD_BUILDINGS = Object.freeze([
         starterLevel: 0,
         maxLevel: 2,
         levels: Object.freeze({
-            1: Object.freeze({ resources: Object.freeze({ wood: 8, stone: 4, crop: 3 }), ckb: 1500 }),
+            1: Object.freeze({ resources: Object.freeze({ wood: 6, stone: 3, crop: 2 }), ckb: 900 }),
             2: Object.freeze({ resources: Object.freeze({ wood: 22, stone: 12, crop: 8 }), ckb: 5000 }),
         }),
     }),
@@ -36,7 +36,7 @@ export const STANDARD_BUILDINGS = Object.freeze([
         starterLevel: 0,
         maxLevel: 5,
         levels: Object.freeze({
-            1: Object.freeze({ resources: Object.freeze({ wood: 10, stone: 6, crop: 3 }), ckb: 1800 }),
+            1: Object.freeze({ resources: Object.freeze({ wood: 7, stone: 4, crop: 2 }), ckb: 1000 }),
             2: Object.freeze({ resources: Object.freeze({ wood: 24, stone: 18, crop: 8 }), ckb: 5500 }),
             3: Object.freeze({ resources: Object.freeze({ wood: 56, stone: 42, crop: 18 }), ckb: 15000 }),
             4: Object.freeze({ resources: Object.freeze({ wood: 105, stone: 80, crop: 36 }), ckb: 36000 }),
@@ -51,7 +51,7 @@ export const STANDARD_BUILDINGS = Object.freeze([
         starterLevel: 0,
         maxLevel: 2,
         levels: Object.freeze({
-            1: Object.freeze({ resources: Object.freeze({ wood: 18, stone: 8, crop: 5 }), ckb: 2800 }),
+            1: Object.freeze({ resources: Object.freeze({ wood: 8, stone: 4, crop: 3 }), ckb: 1200 }),
             2: Object.freeze({ resources: Object.freeze({ wood: 42, stone: 20, crop: 12 }), ckb: 8500 }),
         }),
     }),
@@ -63,7 +63,7 @@ export const STANDARD_BUILDINGS = Object.freeze([
         starterLevel: 0,
         maxLevel: 2,
         levels: Object.freeze({
-            1: Object.freeze({ resources: Object.freeze({ wood: 12, stone: 18, crop: 5 }), ckb: 3000 }),
+            1: Object.freeze({ resources: Object.freeze({ wood: 5, stone: 8, crop: 3 }), ckb: 1200 }),
             2: Object.freeze({ resources: Object.freeze({ wood: 25, stone: 44, crop: 12 }), ckb: 9000 }),
         }),
     }),
@@ -75,7 +75,7 @@ export const STANDARD_BUILDINGS = Object.freeze([
         starterLevel: 0,
         maxLevel: 2,
         levels: Object.freeze({
-            1: Object.freeze({ resources: Object.freeze({ wood: 14, stone: 8, crop: 10 }), ckb: 2400 }),
+            1: Object.freeze({ resources: Object.freeze({ wood: 6, stone: 4, crop: 6 }), ckb: 1100 }),
             2: Object.freeze({ resources: Object.freeze({ wood: 32, stone: 20, crop: 24 }), ckb: 7600 }),
         }),
     }),
@@ -166,6 +166,7 @@ export function buildingStateFor(progression, buildingId) {
     const level = progression?.getLevel?.(buildingId) ?? def.starterLevel;
     const nextLevel = level >= def.maxLevel ? null : level + 1;
     const nextCost = nextLevel ? def.levels[nextLevel] ?? null : null;
+    const tierGate = buildingTierGate(progression, buildingId, nextLevel);
     return {
         id: def.id,
         assetId: def.assetId,
@@ -179,7 +180,36 @@ export function buildingStateFor(progression, buildingId) {
         nextLevel,
         nextCost,
         nextCostLabel: nextCost ? formatBuildingCost(nextCost) : 'Max level',
+        tierGate,
+        tierGateLabel: tierGate.ok ? null : formatBuildingTierGate(tierGate),
     };
+}
+
+export function buildingTierGate(progression, buildingId, nextLevel) {
+    if (!nextLevel || nextLevel <= 1) return { ok: true, requiredLevel: 0, blockers: [] };
+    const def = buildingDefinition(buildingId);
+    if (!def) return { ok: false, requiredLevel: nextLevel - 1, blockers: [] };
+    const requiredLevel = nextLevel - 1;
+    const blockers = STANDARD_BUILDINGS
+        .filter(entry => entry.maxLevel >= requiredLevel)
+        .filter(entry => (progression?.getLevel?.(entry.id) ?? entry.starterLevel) < requiredLevel)
+        .map(entry => ({
+            id: entry.id,
+            name: entry.name,
+            level: progression?.getLevel?.(entry.id) ?? entry.starterLevel,
+        }));
+    return {
+        ok: blockers.length === 0,
+        requiredLevel,
+        blockers,
+    };
+}
+
+export function formatBuildingTierGate(gate) {
+    if (!gate || gate.ok) return '';
+    const names = gate.blockers.slice(0, 3).map(entry => entry.name).join(', ');
+    const more = gate.blockers.length > 3 ? ` +${gate.blockers.length - 3} more` : '';
+    return `Need all buildings Level ${gate.requiredLevel}: ${names}${more}`;
 }
 
 export function buildingProgressSummary(progression, { resourceInventory, currencyInventory } = {}) {
@@ -189,7 +219,7 @@ export function buildingProgressSummary(progression, { resourceInventory, curren
         return {
             ...state,
             effectLabel: effects.buildingEffects[def.id] ?? null,
-            canAffordNext: !!state.nextCost && canAffordBuildingCost({
+            canAffordNext: !!state.nextCost && state.tierGate.ok && canAffordBuildingCost({
                 resourceInventory,
                 currencyInventory,
                 cost: state.nextCost,
@@ -258,6 +288,9 @@ export function unlockOrUpgradeBuilding({ progression, buildingId, resourceInven
     if (!state) return { ok: false, reason: 'missing-building' };
     if (!state.nextLevel || !state.nextCost) {
         return { ok: false, reason: 'max-level', state };
+    }
+    if (!state.tierGate.ok) {
+        return { ok: false, reason: 'tier-gate', state, gate: state.tierGate };
     }
     const spend = spendBuildingCost({
         resourceInventory,

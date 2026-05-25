@@ -4,6 +4,7 @@ import {
     formatCurrencyAmount,
 } from '../mining/cryptoEconomy.js';
 import { LocalTraderAdapter } from '../trader/traderAdapter.js';
+import { hudMount } from './hudMount.js';
 import {
     buildTraderRateTable,
     formatPairRate,
@@ -28,6 +29,7 @@ export function installTraderHUD({
     game = null,
     priceSnapshot = null,
     adapter = new LocalTraderAdapter(),
+    balanceAdapter = null,
 } = {}) {
     const rateTable = buildTraderRateTable(priceSnapshot);
     const root = document.createElement('section');
@@ -44,7 +46,7 @@ export function installTraderHUD({
     panel.className = 'trader-hud__panel';
     root.appendChild(panel);
 
-    document.body.appendChild(root);
+    hudMount('actions').appendChild(root);
 
     const fromSelect = document.createElement('select');
     const toSelect = document.createElement('select');
@@ -71,6 +73,7 @@ export function installTraderHUD({
     submit.textContent = 'Swap';
 
     let lastQuote = null;
+    let balanceInventory = player.inventory;
 
     function currencyLabel(id) {
         return `${currencySymbol(id)} · ${currencyDisplayName(id)}`;
@@ -82,7 +85,7 @@ export function installTraderHUD({
         clear(fromSelect);
         clear(toSelect);
 
-        const balances = player.inventory.entries()
+        const balances = balanceInventory.entries()
             .filter(([, amount]) => amount > 0)
             .map(([currency]) => currency);
         const fromIds = balances.length > 0 ? balances : traderCurrencyIds();
@@ -110,8 +113,8 @@ export function installTraderHUD({
 
     function renderQuote() {
         lastQuote = currentQuote();
-        const balance = player.inventory.get(fromSelect.value);
-        if (!player.inventory.entries().length) {
+        const balance = balanceInventory.get(fromSelect.value);
+        if (!balanceInventory.entries().length) {
             quoteLine.textContent = 'Mine a deposit before trading.';
             rateLine.textContent = '';
             submit.disabled = true;
@@ -158,8 +161,19 @@ export function installTraderHUD({
         renderQuote();
     }
 
-    function open() {
+    async function refreshBalances() {
+        if (!balanceAdapter?.read) {
+            balanceInventory = player.inventory;
+            return null;
+        }
+        const snapshot = await balanceAdapter.read();
+        balanceInventory = snapshot?.currencies ?? player.inventory;
+        return snapshot;
+    }
+
+    async function open() {
         root.dataset.open = '1';
+        await refreshBalances();
         render();
     }
 
@@ -169,7 +183,10 @@ export function installTraderHUD({
 
     toggle.addEventListener('click', () => {
         if (root.dataset.open === '1') close();
-        else open();
+        else open().catch(err => {
+            console.warn('[cellshire] trader balance refresh failed', err);
+            render();
+        });
     });
 
     fromSelect.addEventListener('change', () => {
@@ -181,24 +198,29 @@ export function installTraderHUD({
     toSelect.addEventListener('change', renderQuote);
     amountInput.addEventListener('input', renderQuote);
     maxButton.addEventListener('click', () => {
-        const balance = player.inventory.get(fromSelect.value);
+        const balance = balanceInventory.get(fromSelect.value);
         amountInput.value = balance > 0 ? String(balance) : '';
         renderQuote();
     });
 
     panel.addEventListener('submit', async (ev) => {
         ev.preventDefault();
+        await refreshBalances();
         const quote = lastQuote ?? currentQuote();
-        const out = await adapter.swap({ inventory: player.inventory, quote });
+        const out = await adapter.swap({ inventory: balanceInventory, quote });
         if (!out.ok) {
             game?.ui?.showToast?.(out.reason === 'insufficient-funds'
                 ? 'Trader balance is too low'
-                : 'Trader swap failed');
+                : out.message || 'Trader swap failed');
             renderQuote();
             return;
         }
         game?.recordTraderFee?.({ quote, swap: out });
         game?.ui?.showToast?.(`Swapped to ${formatCurrencyAmount(out.toCurrency, out.toAmount)}`, 2200);
+        game?.hudPanels?.economy?.refresh?.().catch?.(err => {
+            console.warn('[cellshire] economy refresh failed after trader swap', err);
+        });
+        await refreshBalances();
         amountInput.value = '';
         render();
     });
@@ -213,6 +235,7 @@ export function installTraderHUD({
         render,
         open,
         close,
+        refreshBalances,
         dismiss() {
             off();
             root.remove();

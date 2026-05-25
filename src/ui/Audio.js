@@ -67,23 +67,23 @@ export async function registerClip(name, url, { minIntervalMs = 18 } = {}) {
 }
 
 /**
- * Trigger a registered clip. No-op when audio is disabled, the buffer
- * hasn't loaded yet, or the AudioContext is still suspended waiting for
- * a user gesture (the very first interaction primes it).
+ * Trigger a registered clip. Returns false when audio is disabled, the
+ * buffer has not loaded yet, or playback fails. Callers with critical
+ * feedback can use that to fall back to direct HTMLAudioElement playback.
  */
 export function play(name, volume = DEFAULT_VOLUME) {
-    if (!_enabled) return;
+    if (!_enabled) return false;
     const entry = _clips.get(name);
-    if (!entry || !entry.buffer) return;
+    if (!entry || !entry.buffer) return false;
     const ctx = getCtx();
-    if (!ctx) return;
+    if (!ctx) return false;
 
     if (ctx.state === 'suspended') {
         ctx.resume().catch(() => {});
     }
 
     const now = performance.now();
-    if (now - entry.lastPlayAt < entry.minIntervalMs) return;
+    if (now - entry.lastPlayAt < entry.minIntervalMs) return false;
     entry.lastPlayAt = now;
 
     try {
@@ -93,8 +93,21 @@ export function play(name, volume = DEFAULT_VOLUME) {
         gain.gain.value = volume;
         src.connect(gain).connect(ctx.destination);
         src.start(0);
+        return true;
     } catch {
-        /* swallow — sound failures are non-fatal */
+        return false;
+    }
+}
+
+function playDirect(url, volume = DEFAULT_VOLUME) {
+    if (!_enabled) return false;
+    try {
+        const audio = new Audio(url);
+        audio.volume = volume;
+        audio.play().catch(() => {});
+        return true;
+    } catch {
+        return false;
     }
 }
 
@@ -116,8 +129,45 @@ export async function loadUiAudio() {
         registerClip('placementWood',     'fence-woodenDecorations.ogg',  { minIntervalMs: 35 }),
         registerClip('placementVeg',      'small-vegetations.ogg',        { minIntervalMs: 30 }),
         registerClip('placementTree',     'large-vegetations.ogg',        { minIntervalMs: 40 }),
+        ...CELLSHIRE_SFX.map(([name, minIntervalMs]) =>
+            registerClip(name, `assets/sfx/${name}.ogg`, { minIntervalMs })
+        ),
     ]);
 }
+
+const CELLSHIRE_SFX = [
+    ['wood_chop', 90],
+    ['stone_strike', 70],
+    ['crop_harvest', 80],
+    ['herb_pluck', 70],
+    ['mine_strike', 60],
+    ['mine_deplete', 220],
+    ['ore_yield', 80],
+    ['craft_success', 120],
+    ['tool_upgrade', 200],
+    ['building_unlock', 240],
+    ['recipe_fail', 160],
+    ['coin_chime', 80],
+    ['coin_shuffle', 140],
+    ['loan_borrow', 180],
+    ['loan_repay', 180],
+    ['purchase_done', 160],
+    ['portal_whoosh', 200],
+    ['arrive_mine', 240],
+    ['arrive_property', 240],
+    ['arrive_township', 240],
+    ['tier_unlock', 260],
+    ['save_success', 120],
+    ['toast_success', 90],
+    ['toast_error', 120],
+    ['toast_info', 90],
+    ['wallet_connect', 140],
+    ['modal_open', 90],
+    ['footstep_grass', 120],
+    ['footstep_stone', 120],
+    ['shift_change', 260],
+    ['high_value_sting', 260],
+];
 
 export function playUiClick(volume = DEFAULT_VOLUME)   { play('ui',             volume); }
 export function playPlacement(volume = 0.6)            { play('placement',      volume); }
@@ -127,24 +177,71 @@ export function playWoodPlacement(volume = 0.6)        { play('placementWood',  
 export function playVegPlacement(volume = 0.6)         { play('placementVeg',   volume); }
 export function playTreePlacement(volume = 0.6)        { play('placementTree',  volume); }
 
-/**
- * One pickaxe hit on an ore deposit. Reuses the brick-stone clip — its
- * chunky knock reads as mining without needing a dedicated asset.
- */
-export function playMineHit(volume = 0.55) {
-    play('placementStone', volume);
+/** One pickaxe hit on an ore deposit, layered so it reads apart from placement. */
+export function playMineHit(volume = 0.62) {
+    if (!play('mine_strike', volume)) {
+        playDirect('assets/sfx/mine_strike.ogg', volume);
+    }
+    setTimeout(() => {
+        if (!play('ore_yield', 0.22)) playDirect('assets/sfx/ore_yield.ogg', 0.22);
+    }, 70);
 }
 
-/**
- * Crumble sound for ore depletion — two stone hits staggered by ~110ms
- * so the second lands after the first finishes its attack envelope.
- * The clip's debounce defaults to 35ms which is well under our gap so
- * the second hit always fires.
- */
+/** Crumble sound for ore depletion, with a small yield sparkle layered in. */
 export function playMineDeplete() {
-    play('placementStone', 0.55);
-    setTimeout(() => play('placementStone', 0.7), 110);
+    if (!play('mine_deplete', 0.72)) {
+        playDirect('assets/sfx/mine_deplete.ogg', 0.72);
+    }
+    setTimeout(() => {
+        if (!play('ore_yield', 0.42)) playDirect('assets/sfx/ore_yield.ogg', 0.42);
+    }, 90);
 }
+
+export function playHarvestResource(resourceId, volume = 0.62) {
+    if (resourceId === 'wood') {
+        play('wood_chop', volume);
+        return;
+    }
+    if (resourceId === 'stone') {
+        play('stone_strike', volume);
+        return;
+    }
+    if (resourceId === 'crop') {
+        play('crop_harvest', volume);
+        return;
+    }
+    if (resourceId === 'herb') {
+        play('herb_pluck', volume);
+        return;
+    }
+    playPlacement(volume);
+}
+
+export function playCraftSuccess(volume = 0.58) { play('craft_success', volume); }
+export function playRecipeFail(volume = 0.55) { play('recipe_fail', volume); }
+export function playToolUpgrade(volume = 0.62) { play('tool_upgrade', volume); }
+export function playBuildingUnlock(volume = 0.58) { play('building_unlock', volume); }
+export function playPurchaseDone(volume = 0.58) { play('purchase_done', volume); }
+export function playLoanBorrow(volume = 0.58) { play('loan_borrow', volume); }
+export function playLoanRepay(volume = 0.58) { play('loan_repay', volume); }
+export function playTravelCue(kind, volume = 0.52) {
+    play('portal_whoosh', volume * 0.75);
+    const arrival = kind === 'property'
+        ? 'arrive_property'
+        : kind === 'township'
+            ? 'arrive_township'
+            : 'arrive_mine';
+    setTimeout(() => play(arrival, volume), 160);
+}
+export function playToast(kind = 'info', volume = 0.42) {
+    const id = kind === 'success'
+        ? 'toast_success'
+        : kind === 'error'
+            ? 'toast_error'
+            : 'toast_info';
+    play(id, volume);
+}
+export function playHighValueSting(volume = 0.65) { play('high_value_sting', volume); }
 
 /**
  * Asset ids whose placement / erase should trigger the brick-stone SFX.

@@ -19,11 +19,11 @@ describe('township zone', () => {
         expect(map.width).toBe(TOWNSHIP_SIZE);
         expect(map.height).toBe(TOWNSHIP_SIZE);
         expect(isWalkable(map, TOWNSHIP_SPAWN.gx, TOWNSHIP_SPAWN.gy)).toBe(true);
-        expect(map.objects.some(o => o.role === TOWNSHIP_BUILDING_ROLES.store)).toBe(true);
-        expect(map.objects.some(o => o.role === TOWNSHIP_BUILDING_ROLES.market)).toBe(true);
-        expect(map.objects.some(o => o.role === TOWNSHIP_BUILDING_ROLES.bank)).toBe(true);
-        expect(map.objects.some(o => o.role === TOWNSHIP_BUILDING_ROLES.gallery)).toBe(true);
-        expect(map.objects.some(o => o.role === TOWNSHIP_BUILDING_ROLES.communityHall)).toBe(true);
+        expect(map.objects.find(o => o.role === TOWNSHIP_BUILDING_ROLES.store).assetId).toBe('township_store');
+        expect(map.objects.find(o => o.role === TOWNSHIP_BUILDING_ROLES.market).assetId).toBe('township_market');
+        expect(map.objects.find(o => o.role === TOWNSHIP_BUILDING_ROLES.bank).assetId).toBe('township_bank');
+        expect(map.objects.find(o => o.role === TOWNSHIP_BUILDING_ROLES.gallery).assetId).toBe('township_gallery');
+        expect(map.objects.find(o => o.role === TOWNSHIP_BUILDING_ROLES.communityHall).assetId).toBe('township_community_hall');
         expect(map.objects.some(o => o.role === TOWNSHIP_MINE_PORTAL_ROLE)).toBe(true);
         expect(map.objects.some(o => o.role === TOWNSHIP_PROPERTY_PORTAL_ROLE)).toBe(true);
     });

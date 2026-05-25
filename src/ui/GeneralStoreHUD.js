@@ -4,6 +4,7 @@ import {
     formatStorePrice,
     generalStoreCatalog,
 } from '../store/generalStoreCatalog.js';
+import { hudMount } from './hudMount.js';
 
 function clear(el) {
     while (el.firstChild) el.removeChild(el.firstChild);
@@ -48,13 +49,24 @@ export function installGeneralStoreHUD(game) {
     const panel = document.createElement('div');
     panel.className = 'general-store__panel';
     root.appendChild(panel);
-    document.body.appendChild(root);
+    hudMount('actions').appendChild(root);
+    let balanceInventory = game.player?.inventory ?? null;
+
+    async function refreshBalances() {
+        if (!game.storeBalanceAdapter?.read) {
+            balanceInventory = game.player?.inventory ?? null;
+            return balanceInventory;
+        }
+        const snapshot = await game.storeBalanceAdapter.read();
+        balanceInventory = snapshot.currencies;
+        return balanceInventory;
+    }
 
     function render() {
         clear(panel);
         panel.appendChild(div('general-store__title', 'General Store'));
 
-        const balance = game.player?.inventory?.get?.('ckb') ?? 0;
+        const balance = balanceInventory?.get?.('ckb') ?? 0;
         panel.appendChild(div('general-store__balance', `Balance ${formatCurrencyAmount('ckb', balance)}`));
 
         const list = div('general-store__list');
@@ -78,8 +90,10 @@ export function installGeneralStoreHUD(game) {
             buy.className = 'general-store__buy';
             buy.textContent = game.propertyTier < item.unlockTier ? 'Locked' : 'Buy';
             buy.disabled = game.propertyTier < item.unlockTier || balance < item.price.amount;
-            buy.addEventListener('click', () => {
-                game.buyGeneralStoreItem(item.assetId);
+            buy.addEventListener('click', async () => {
+                buy.disabled = true;
+                await game.buyGeneralStoreItem(item.assetId);
+                await refreshBalances();
                 render();
             });
             row.appendChild(buy);
@@ -88,8 +102,9 @@ export function installGeneralStoreHUD(game) {
         panel.appendChild(list);
     }
 
-    function open() {
+    async function open() {
         root.dataset.open = '1';
+        await refreshBalances();
         render();
     }
 
@@ -99,7 +114,10 @@ export function installGeneralStoreHUD(game) {
 
     toggle.addEventListener('click', () => {
         if (root.dataset.open === '1') close();
-        else open();
+        else open().catch(err => {
+            console.warn('[cellshire] store balance refresh failed', err);
+            render();
+        });
     });
 
     const offCurrency = game.player?.inventory?.onChange?.(() => {
@@ -118,6 +136,7 @@ export function installGeneralStoreHUD(game) {
         render,
         open,
         close,
+        refreshBalances,
         dismiss() {
             offCurrency?.();
             offProps?.();

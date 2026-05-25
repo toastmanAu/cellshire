@@ -1,4 +1,5 @@
 import { buildEpochStatus } from '../chain/epochStatus.js';
+import { hudMount } from './hudMount.js';
 
 export function installEpochHUD(game, epochStats) {
     const root = document.createElement('section');
@@ -21,7 +22,7 @@ export function installEpochHUD(game, epochStats) {
     reload.addEventListener('click', () => window.location.reload());
     root.appendChild(reload);
 
-    document.body.appendChild(root);
+    hudMount('status').appendChild(root);
 
     let warned = false;
     let highValueAnnounced = false;

@@ -42,6 +42,22 @@ describe('playerMarketplace', () => {
         expect(marketplaceListings(state)[0].seller).toBe('ckt1seller');
     });
 
+    it('rejects raw materials before marketplace asset lookup', () => {
+        const state = loadMarketplaceState({ get: () => null });
+        const props = new PropInventory([['wood', 10]]);
+        const out = createMarketplaceListing({
+            assetId: 'wood',
+            price: { currency: 'ckb', amount: 1500 },
+            seller: wallet('ckt1seller').account,
+            propInventory: props,
+            state,
+        });
+        expect(out.ok).toBe(false);
+        expect(out.reason).toBe('raw-resource-not-listable');
+        expect(props.get('wood')).toBe(10);
+        expect(marketplaceListings(state).length).toBe(3);
+    });
+
     it('buys a seed prop listing once and adds it to prop inventory', () => {
         const state = loadMarketplaceState({ get: () => null });
         const props = new PropInventory();

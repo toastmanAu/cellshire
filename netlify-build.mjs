@@ -54,11 +54,14 @@ for (const entry of ENTRIES) {
     const dst = join(DIST, entry);
     cpSync(src, dst, {
         recursive: true,
-        // Filter out OS junk + the unused .webp duplicates living next
-        // to the .png assets in `assets/newAsset/`.
+        // Filter out OS junk, source/reference assets, local selection
+        // archives, and unused .webp duplicates living next to the .png
+        // assets in `assets/newAsset/`.
         filter: (s) => {
             const name = s.split('/').pop();
             if (name === '.DS_Store') return false;
+            if (name === 'raw' || name === 'raw_pending' || name === 'raw_mining_originals') return false;
+            if (name === 'assets_cellshire.zip') return false;
             if (name.endsWith('.webp')) return false;
             return true;
         },

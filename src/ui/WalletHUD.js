@@ -12,6 +12,7 @@ import {
     propertyOwnerFromBinding,
 } from '../property/propertyOwnerBinding.js';
 import { ownerIdForVisit } from '../visiting/visitLinks.js';
+import { hudMount } from './hudMount.js';
 
 export function installWalletHUD({ storage, shouldFail = false, connector = connectJoyIdStub, game = null }) {
     let state = loadWalletIdentity(storage);
@@ -39,7 +40,7 @@ export function installWalletHUD({ storage, shouldFail = false, connector = conn
     propertyAction.className = 'wallet-hud__property';
     root.appendChild(propertyAction);
 
-    document.body.appendChild(root);
+    hudMount('wallet').appendChild(root);
 
     function render() {
         root.dataset.state = state.status;

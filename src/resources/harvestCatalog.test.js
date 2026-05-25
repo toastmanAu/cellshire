@@ -10,8 +10,9 @@ describe('harvest resource catalog', () => {
     it('maps harvest roles to local resources and yields', () => {
         const wood = harvestResourceConfig(HARVEST_RESOURCE_ROLES.wood);
         expect(wood.resourceId).toBe('wood');
-        expect(wood.yieldAmount).toBe(3);
+        expect(wood.yieldAmount).toBe(4);
         expect(harvestResourceConfig(HARVEST_RESOURCE_ROLES.stone).resourceId).toBe('stone');
+        expect(harvestResourceConfig(HARVEST_RESOURCE_ROLES.stone).yieldAmount).toBe(3);
     });
 
     it('identifies harvestable objects by role', () => {

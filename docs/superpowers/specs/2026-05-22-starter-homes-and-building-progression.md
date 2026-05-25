@@ -29,6 +29,10 @@ base game dependent on market availability.
   and treasury-generating fee loops relevant to home-base progression.
 - Each building has a functional level independent of its visual skin.
 - Levels improve efficiency, capacity, recipe access, cooldowns, or automation.
+- Building levels follow a builder-game tier gate: a building can advance to
+  level `N` only after every standard building that supports level `N-1` has
+  reached level `N-1`. Practically, level 2 upgrades require all standard
+  buildings at level 1 first.
 - Asset-market purchases can later override visuals or add specializations,
   but should not remove the standard local unlock path.
 - Market assets should map onto building slots, e.g. a rare `workbench` skin

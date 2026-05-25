@@ -1,12 +1,14 @@
 import {
+    CURRENCY_CATALOG,
     formatCurrencyAmount,
     formatUsd,
     priceUsdForCurrency,
 } from '../mining/cryptoEconomy.js';
+import { RESOURCE_CATALOG } from '../resources/resourceInventory.js';
 
 export const BANK_LOANS_STORAGE_KEY = 'cellshire:bank-loans:v1:local';
 export const BANK_LOAN_CURRENCY = 'ckb';
-export const BANK_LOAN_FEE_BPS = 300;
+export const BANK_LOAN_FEE_BPS = 250;
 export const BANK_LOAN_TERM_DAYS = 7;
 export const BANK_LOAN_BASE_RESERVE_USD = 100;
 
@@ -14,21 +16,21 @@ export const BANK_LOAN_OFFERS = Object.freeze([
     Object.freeze({
         id: 'starter-float',
         name: 'Starter float',
-        amount: 5000,
+        amount: 7500,
         feeBps: BANK_LOAN_FEE_BPS,
         termDays: BANK_LOAN_TERM_DAYS,
     }),
     Object.freeze({
         id: 'builder-credit',
         name: 'Builder credit',
-        amount: 15000,
+        amount: 18000,
         feeBps: BANK_LOAN_FEE_BPS,
         termDays: BANK_LOAN_TERM_DAYS,
     }),
     Object.freeze({
         id: 'expansion-note',
         name: 'Expansion note',
-        amount: 50000,
+        amount: 42000,
         feeBps: BANK_LOAN_FEE_BPS,
         termDays: BANK_LOAN_TERM_DAYS,
     }),
@@ -73,6 +75,21 @@ export class BankLoanBook {
 
 export function bankLoanOffer(id) {
     return OFFER_INDEX.get(id) ?? null;
+}
+
+export function validateBankCollateral(collateral) {
+    const assetId = collateral?.assetId ?? collateral?.id;
+    const currency = collateral?.currency;
+    if (RESOURCE_CATALOG[assetId] || RESOURCE_CATALOG[currency]) {
+        return { ok: false, reason: 'raw-resource-collateral' };
+    }
+    if (currency) {
+        return CURRENCY_CATALOG[currency]
+            ? { ok: true, type: 'currency', currency }
+            : { ok: false, reason: 'unknown-currency' };
+    }
+    if (assetId) return { ok: true, type: 'asset', assetId };
+    return { ok: false, reason: 'missing-collateral' };
 }
 
 export function loanTotalOwed(offer) {
@@ -229,7 +246,7 @@ function normalizeLoan(loan) {
     const remainingOwed = Number(loan.remainingOwed);
     if (!Number.isFinite(principal) || principal <= 0) return null;
     if (!Number.isFinite(remainingOwed) || remainingOwed < 0) return null;
-    return {
+    const normalized = {
         id: typeof loan.id === 'string' && loan.id ? loan.id : `loan:${Date.now()}`,
         offerId: typeof loan.offerId === 'string' ? loan.offerId : 'unknown',
         name: typeof loan.name === 'string' && loan.name ? loan.name : 'Loan',
@@ -245,4 +262,13 @@ function normalizeLoan(loan) {
         paidAt: Number(loan.paidAt) || null,
         principalUsd: Number(loan.principalUsd) || 0,
     };
+    if (loan.mode === 'chain') normalized.mode = 'chain';
+    if (loan.collateralKind === 'ckb') normalized.collateralKind = 'ckb';
+    if (Number.isFinite(Number(loan.collateralAmount))) normalized.collateralAmount = Number(loan.collateralAmount);
+    if (Number.isFinite(Number(loan.dueEpoch))) normalized.dueEpoch = Math.floor(Number(loan.dueEpoch));
+    if (typeof loan.borrowTxHash === 'string') normalized.borrowTxHash = loan.borrowTxHash;
+    if (typeof loan.repaidTxHash === 'string') normalized.repaidTxHash = loan.repaidTxHash;
+    if (loan.debt && typeof loan.debt === 'object') normalized.debt = loan.debt;
+    if (loan.debtCell && typeof loan.debtCell === 'object') normalized.debtCell = loan.debtCell;
+    return normalized;
 }

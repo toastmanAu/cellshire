@@ -58,4 +58,40 @@ describe('EconomyHUD summary', () => {
         expect(hud.el.textContent.includes('$1.44')).toBe(true);
         hud.dismiss();
     });
+
+    it('switches between local and chain wallet balance sources', async () => {
+        const local = new Inventory();
+        local.add('ckb', 1000);
+        const chain = new Inventory();
+        chain.add('bch', 2);
+        const changes = [];
+        const hud = installEconomyHUD({
+            player: { inventory: local },
+            inventoryAdapters: {
+                local: {
+                    async read() {
+                        return { source: 'local', stale: false, currencies: local };
+                    },
+                },
+                chain: {
+                    async read() {
+                        return { source: 'chain', stale: false, currencies: chain };
+                    },
+                },
+            },
+            initialInventorySource: 'local',
+            onInventorySourceChange: source => changes.push(source),
+            priceSnapshot: fixedPriceSnapshot(),
+        });
+        await hud.refresh();
+        expect(hud.getInventorySource()).toBe('local');
+        expect(hud.el.textContent.includes('Local wallet')).toBe(true);
+        expect(hud.el.textContent.includes('CKB')).toBe(true);
+        await hud.setInventorySource('chain');
+        expect(hud.getInventorySource()).toBe('chain');
+        expect(changes).toEqual(['chain']);
+        expect(hud.el.textContent.includes('Chain wallet')).toBe(true);
+        expect(hud.el.textContent.includes('BCH')).toBe(true);
+        hud.dismiss();
+    });
 });

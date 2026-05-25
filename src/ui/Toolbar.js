@@ -5,7 +5,7 @@
  * inline (no external icon fonts), matching the rest of the asset style.
  */
 
-import { playUiClick } from './Audio.js';
+import { playUiClick } from './Audio.js?v=audio-wiring-3';
 
 const TOOL_ICONS = {
     place: drawPlaceIcon,

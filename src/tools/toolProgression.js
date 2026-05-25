@@ -17,8 +17,8 @@ export const TOOL_LINES = Object.freeze([
                 requiredToolRackLevel: 1,
                 resourceHarvestBonus: 1,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 10, stone: 12, crop: 4 }),
-                    ckb: 2500,
+                    resources: Object.freeze({ wood: 6, stone: 7, crop: 3 }),
+                    ckb: 1100,
                 }),
             }),
             Object.freeze({
@@ -76,8 +76,8 @@ export const TOOL_LINES = Object.freeze([
                 requiredToolRackLevel: 1,
                 resourceHarvestBonus: 1,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 12, stone: 8, crop: 4 }),
-                    ckb: 2300,
+                    resources: Object.freeze({ wood: 7, stone: 5, crop: 3 }),
+                    ckb: 1100,
                 }),
             }),
             Object.freeze({
@@ -135,8 +135,8 @@ export const TOOL_LINES = Object.freeze([
                 requiredToolRackLevel: 1,
                 resourceHarvestBonus: 1,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 8, stone: 6, crop: 12 }),
-                    ckb: 2200,
+                    resources: Object.freeze({ wood: 5, stone: 4, crop: 7 }),
+                    ckb: 1000,
                 }),
             }),
             Object.freeze({
@@ -212,6 +212,12 @@ export function toolTierConfig(toolId, tier) {
     const line = toolLineConfig(toolId);
     const normalized = normalizeToolTier(tier);
     return line.tiers.find(entry => entry.tier === normalized) ?? line.tiers[0];
+}
+
+export function toolIconSrc(toolId, tier) {
+    const line = toolLineConfig(toolId);
+    const normalized = normalizeToolTier(tier);
+    return `assets/tool_${line.id}_t${normalized}.png`;
 }
 
 export function nextToolTier(toolId, tier) {
@@ -305,6 +311,8 @@ function toolLineSummary({ line, toolProgression, toolRackLevel, resourceInvento
         next,
         toolRackLevel,
         label: `${current.name} · Tier ${current.tier}`,
+        iconSrc: toolIconSrc(line.id, current.tier),
+        nextIconSrc: next ? toolIconSrc(line.id, next.tier) : null,
         effectLabel: current.resourceHarvestBonus > 0
             ? `${line.resourceName} yield +${current.resourceHarvestBonus}`
             : `${line.resourceName} baseline yield`,

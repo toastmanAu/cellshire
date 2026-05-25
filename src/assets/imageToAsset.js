@@ -552,7 +552,7 @@ export function imageToAsset(image, footprint, kind, options = {}) {
  * can reuse the generated PNG pack. When replacing art during development,
  * append `?assetBust=<token>` to the page URL to force a one-off refresh.
  */
-const ASSET_PACK_VERSION = 'asset-pack-20260518-fastload';
+const ASSET_PACK_VERSION = 'asset-pack-20260525-boot-stability-2';
 
 function assetCacheToken() {
     if (typeof location === 'undefined') return ASSET_PACK_VERSION;

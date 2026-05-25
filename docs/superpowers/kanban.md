@@ -1,21 +1,104 @@
 # Cellshire Kanban
 
-Status captured 2026-05-22. This board tracks the next implementation
+Status captured 2026-05-25. This board tracks the next implementation
 cards needed to turn the current prototype into the game described in
 `docs/DESIGN.md`.
 
-## Session Wrap 2026-05-22
+## Session Wrap 2026-05-25
 
-- Completed chain visit fixture compatibility, the first communal township
-  plane, RPG-style building interior windows, and local house treasury fee
-  accounting, a local Bank loan prototype, expandable home farming, and the
-  cleaned HiDream starter-home asset integration, the first home building
-  unlock/effects pass, and Workbench recipe plus Tool Rack upgrade loops.
-- Latest completed card: `Workbench Recipes + Tool Rack Upgrades`.
-- Current Next card: `Resource Asset Generation Pass`.
-- Known local-only files: untracked `cs_logo.png` and `tmp/`.
-- Last verification: browser harness `285 passed, 0 failed` and
-  `node netlify-build.mjs`.
+**Latest completed card:** `Currency On-Chain — chain economy fixture
+settlement expansion`.
+
+**What landed since the last board save:**
+- Chain wallet source switching now supports pending deltas over indexed
+  balances and reconciliation once fixture indexer balances catch up.
+- Lazy mining cell slice is implemented behind
+  `?chainMining=1&chainMiningBirth=lazy`, including deterministic ore args,
+  local/HTTP indexer boundaries, and BIRTH/DECREMENT/DEPLETE tx shapes.
+- Chain Trader prototype is implemented behind `?chainTrader=1`:
+  `cellshire_trader_swap_tx`, fixture settlement, pending reconciliation, and
+  CCC/JoyID receipt submit via `?chainTraderSubmit=ccc`.
+- Chain General Store prototype is implemented behind `?chainStore=1`:
+  `cellshire_store_purchase_tx`, fixture CKB spend, local prop grant, pending
+  reconciliation, and CCC/JoyID receipt submit via `?chainStoreSubmit=ccc`.
+- Chain Marketplace buy prototype is implemented behind
+  `?chainMarketplace=1`: `cellshire_marketplace_purchase_tx`, fixture CKB
+  spend, local prop/skin grant, listing close, and pending reconciliation.
+- Bank chain fixture slice is implemented behind
+  `?chainBank=1&chainBankCollateral=ckb`, with CCC/JoyID receipt submit via
+  `?chainBankSubmit=ccc`; full collateral-lock settlement is still deferred.
+- Audio, music, township/interior/NPC visuals, boot screen, farm/tool assets,
+  economy tuning, and overlay/layout fixes remain in the current dirty
+  workspace and are reflected in the detailed Done/Backlog sections below.
+
+**Verification saved on board:**
+- Latest focused marketplace/store/trader/currency module run:
+  `30 passed, 0 failed`.
+- Latest focused CCC/store/trader run: `35 passed, 0 failed`.
+- `node netlify-build.mjs` passed after the latest chain marketplace slice.
+- `git diff --check` passed after the latest chain marketplace slice.
+
+**Current Next card:** `CCC Marketplace Receipt Submit` — mirror the
+Trader/Store receipt pattern for `cellshire.marketplace.purchase`, keeping it
+receipt-only until real marketplace settlement/Open Asset transfer is wired.
+
+**Known caveat:** full browser harness was not rerun in this sandbox because
+the installed Chromium snap cannot create its runtime directory here. Focused
+module tests and build checks are current.
+
+## Session Wrap 2026-05-23 (late)
+
+Two parallel tracks landed while Codex was rate-limited:
+
+**Chain & Data Model specs (5 specs)**
+- Resolved every open decision in the Chain & Data Model cluster of the
+  Needs Decision section: currency model, save-state storage, first
+  on-chain mining path, resource model, gold disambiguation, bank chain
+  design.
+- New specs (all dated 2026-05-23):
+  - [`2026-05-23-currency-on-chain-sudt.md`](specs/2026-05-23-currency-on-chain-sudt.md)
+    — sUDT issuance script, 11 deterministic per-currency type-args
+    (plus native CKB), admin-mint reserve for v1.
+  - [`2026-05-23-lazy-mint-mining-cells.md`](specs/2026-05-23-lazy-mint-mining-cells.md)
+    — lazy BIRTH/DECREMENT/DEPLETE lifecycle, deterministic 22-byte ore
+    args, first-mempool-wins race resolution with indexer canonicalisation.
+  - [`2026-05-23-resource-model-boundary.md`](specs/2026-05-23-resource-model-boundary.md)
+    — wood/stone/crop/herb/gold stay local; crafted outputs cross the
+    boundary via Open Asset Standard cells.
+  - [`2026-05-23-bank-chain-design.md`](specs/2026-05-23-bank-chain-design.md)
+    — three-phase plan, v2 CKB-collateralised debt cells with repay/seize
+    dual-branch lock script.
+
+**Asset generation pass (audio + visuals)**
+- Generated 92 SFX clips via Meta AudioGen medium (SA3 small-sfx produced
+  buzzsaw output; switched backends). 31 winners installed at
+  `assets/sfx/<id>.ogg`.
+- Generated 13 music tracks via Stable Audio 3 medium. 6 final winners
+  (4 originals + 2 from a follow-up alternatives batch) installed at
+  `assets/music/<id>.ogg`.
+- Generated 45 township-tier visuals (5 township buildings × 3 candidates,
+  5 RPG interior backdrops × 3, 5 NPCs × 3) plus 6 boot-screen iterations
+  and 4 harvest-tree redo iterations via Flux.1 Schnell GGUF on ComfyUI.
+- 17 visual winners installed: 5 township building sprites, 5 RPG interior
+  backdrops, 5 NPC sprites, 1 boot screen background, 1 replacement
+  harvest tree.
+- Boot screen already wired into `styles.css` (three-layer background:
+  gradient overlay + image + cream-gradient fallback).
+- Latest completed card: `Asset Generation — Township + Interiors + NPCs +
+  Audio Pass`.
+- Current Next card at that time: `Economy Pricing Pass`.
+- Known local-only files: untracked `cs_logo.png`,
+  `assets/assets_cellshire.zip`, `scripts/__pycache__/`, `tmp/`, and the
+  new `scripts/_sa3_stubs/` torchcodec workaround.
+- Pipeline scripts shipped under `scripts/`: `cellshire_sfx_catalog.py`,
+  `run_cellshire_sfx_audiogen_batch.py`, `cellshire_music_catalog.py`,
+  `run_cellshire_music_batch.py`, `cellshire_township_visual_catalog.py`,
+  `run_cellshire_township_visual_batch.py`, plus matching audition page
+  builders and install scripts.
+- Last verification: SFX, music, and visual batches all completed with
+  zero failures; install scripts emitted expected manifest/wiring
+  snippets; new boot screen renders correctly in browser smoke at
+  `http://localhost:8888`.
 
 ## Current Baseline
 
@@ -735,11 +818,12 @@ into player-facing crafting and tool progression.
 Verified with the browser test harness (`283 passed, 0 failed`),
 `node netlify-build.mjs`, and `git diff --check`.
 
-## Next
-
 ### Resource Asset Generation Pass
 
-**Status:** in progress; first gameplay-facing asset wiring shipped.
+**Completed:** 2026-05-23
+
+**Status:** shipped generated farm/resource/building/tool assets and gameplay
+visual wiring.
 
 **Goal:** generate and integrate farming/resource/crafting assets using
 ComfyUI/Wyltek Studio models.
@@ -762,8 +846,6 @@ ComfyUI/Wyltek Studio models.
   `stone_yard`, and `farm_storage`; these now use selected generated PNGs.
 - Unlocked standard buildings now appear in the property palette and can be
   placed without consuming or minting prop inventory.
-- Dedicated generated art remains outstanding for the resource/farm/building
-  asset set.
 - Added a Flux/Flux.2 comparison prompt sheet covering resource nodes, farm
   plot states, standard buildings, and pickaxe upgrade visuals.
 - Generated the first local Flux.1 Schnell vs Flux.2 Klein comparison batch
@@ -824,26 +906,65 @@ ComfyUI/Wyltek Studio models.
   `harvest_tree` and `stone_outcrop` for epoch-refreshing local Wood/Stone
   resources. Transparent preview sheet:
   `tmp/resource-asset-generation/resource-candidates/installed/contact-sheet.png`.
+- Installed `farm_plot_empty_v2` and `farm_plot_starter_crop_v2` as transparent
+  PNGs. Home farm cells now use generated empty plot terrain, planted starter
+  crops use generated starter crop art, and ready crops automatically swap to
+  `farm_plot_ready_crop`.
+- Installed six transparent UI icon tiers for `pickaxe`, `woodaxe`, and
+  `hoe_scythe` from the selected B-side bases and Flux.2 variant ladder.
+  Current tool icons now render in the Home Buildings panel. Transparent
+  preview sheet:
+  `tmp/resource-asset-generation/farm-tool-installed/contact-sheet.png`.
 
-Verified with the browser test harness (`285 passed, 0 failed`),
+Verified with the browser test harness (`288 passed, 0 failed`),
 `node netlify-build.mjs`, and `git diff --check`.
 
-## Backlog
+## Next
 
-### Pickaxe Upgrade Progression
+### Wire Township + Interior + NPC + Audio Assets
 
-**Status:** covered by `Workbench Recipes + Tool Rack Upgrades`; keep this
-only for a later ore-specific mining balance pass.
+**Status:** completed 2026-05-24.
 
-**Goal:** give players long-term mining/harvesting progression without
-over-inflating crypto rewards.
+**Goal:** plug the freshly generated assets into the running game.
+
+**Asset inventory (already on disk):**
+- `assets/boot/boot_screen.png` (wired in styles.css)
+- `assets/township_{store,market,bank,gallery,community_hall}.png`
+- `assets/interiors/interior_{store,market,bank,gallery,hall}.png`
+- `assets/npc_{storekeeper,trader,bank_teller,gallery_curator,hall_keeper}.png`
+- `assets/harvest_tree.png` (replaced with gnarled oak; previous version
+  preserved at `assets/raw/harvest_tree.previous.png`)
+- `assets/sfx/*.ogg` (31 clips covering harvest, mining, crafting,
+  economy, travel, property, UI, player, epoch layers)
+- `assets/music/*.ogg` (title_boot, mine_zone, property_zone,
+  township_zone, interior_bed, high_value_sting)
 
 **Acceptance:**
-- Add local tool tier state and upgrade recipes.
-- Apply conservative modifiers to resource harvesting and/or ore extraction.
-- Keep multiplier constants isolated for future economy tuning.
+- Township buildings: register the 5 new asset ids in
+  `src/assets/assetManifest.js`, swap `addObject(...)` calls in
+  `src/township/townshipZone.js:52-55` from generic house ids to the new
+  `township_*` ids, tune footprints per building.
+- Interior backdrops: new `INTERIOR_BACKDROPS` map consumed by the
+  building interior window component; drop the image as a CSS
+  background-image on each scene.
+- NPCs: pick a placement model (suggested: render NPC sprite inside the
+  interior window over the backdrop, near the relevant counter); add a
+  small NPC catalog and registry.
+- SFX: add `loadCellshireSfx()` Promise.all to `src/ui/Audio.js` using
+  the snippet emitted by `scripts/install_cellshire_sfx.py` and call it
+  from boot. Add `play*` wrappers for the new clip ids and fire them
+  from the harvest/crafting/economy/travel/UI hook sites.
+- Music: new `src/ui/MusicManager.js` module that listens for map
+  changes, loops the zone-appropriate track with 800ms crossfade, and
+  plays `high_value_sting` as a one-shot over the active bed when a
+  high-value epoch shift fires.
+- Browser smoke verifies all clips load and play without 404.
 
 ### Economy Pricing Pass
+
+**Status:** second tuning slice shipped.
+
+**Spec:** [`2026-05-23-economy-pricing-pass.md`](specs/2026-05-23-economy-pricing-pass.md)
 
 **Goal:** tune mined income, store prices, expansion costs, treasury fee flow,
 bank loan offers, farming outputs, crafting costs, and tool upgrade costs into
@@ -858,11 +979,246 @@ a coherent early-game economy.
 - Include local resource and farm/crafting progression targets.
 - Tests update only after pricing targets are recorded.
 
+**Notes:**
+- Trader fee increased to `2%`.
+- First utility building unlocks and first reinforced tool upgrades were
+  lowered so a normal first epoch can support roughly 2-3 visible upgrades when
+  paired with starter resource/farm harvesting.
+- Building upgrades now follow a builder-game tier gate: level `N` requires all
+  relevant standard buildings at level `N-1`.
+- First-session guardrail added: `10,000 CKB + 16 Wood + 9 Stone + 6 Crop`
+  funds first property expansion, one cheap store prop, Tool Rack level 1, and
+  one reinforced tool.
+- Wood/stone/crop intake and first expansion/store/loan prices were softened to
+  support that target without changing the `$20-$100` epoch mine clear budget.
+
+Verified with the browser test harness (`291 passed, 0 failed`),
+`node netlify-build.mjs`, and `git diff --check`.
+
+## Backlog
+
+### Asset Generation — Township + Interiors + NPCs + Audio Pass
+
+**Completed:** 2026-05-23 (late).
+
+**Goal:** populate the township map, interior windows, and full audio
+layer with custom-generated assets while the gameplay tracks were on
+hold.
+
+**Pipeline:** local-first, all generation on the RX 7900 XTX via ROCm.
+- SFX: Meta AudioGen medium (audiocraft 1.3.0) via
+  `scripts/run_cellshire_sfx_audiogen_batch.py`. SA3 small-sfx produced
+  buzzsaw artifacts; AudioGen medium was the working backend.
+- Music: Stable Audio 3 medium via
+  `scripts/run_cellshire_music_batch.py`. SA3 medium handled music well
+  (real-time-ish generation; 150-second zone bed in ~21s).
+- Visuals: Flux.1 Schnell GGUF on ComfyUI via
+  `scripts/run_cellshire_township_visual_batch.py`. Same pipeline as the
+  existing resource generation pass.
+
+**Outputs:** 122 audition candidates total (92 SFX, 13 music, 51 visuals
+across the three tiers + boot + harvest-tree redo). 39 winners
+installed.
+
+**Notes:**
+- Torchcodec ROCm collision required a stub-package shadow at
+  `scripts/_sa3_stubs/torchcodec/` plus a soundfile-backed
+  `AudioEncoder` shim. The stub is required for any future SA3 run on
+  this box and should not be removed.
+- The previous harvest_tree variant was preserved at
+  `assets/raw/harvest_tree.previous.png` in case the gnarled-oak swap
+  needs reverting.
+- Audition pages and install scripts live alongside the generation
+  scripts under `scripts/`. Re-running any tier reuses the same catalog,
+  so future regeneration passes are one command away.
+
+### Bank Chain Design — v2 CKB Collateral Slice
+
+**Status:** first fixture slice implemented 2026-05-25. CCC receipt submit is
+wired; full collateral-lock settlement remains the next follow-up.
+
+**Spec:** [`2026-05-23-bank-chain-design.md`](specs/2026-05-23-bank-chain-design.md)
+
+**Goal:** ship BORROW + REPAY for CKB-collateralised loans behind
+`?chainBank=1&chainBankSubmit=ccc&chainBankCollateral=ckb`. SEIZE specified
+but deferred to a backend worker. Preserves local prototype fallback.
+
+**Acceptance:**
+- `encodeDebt` round-trips deterministically.
+- Collateral lock derives from player owner lock hash.
+- BORROW/REPAY tx pure tests pass (principal, fee, due epoch, collateral
+  pointer).
+- CKB-collateralised loan borrows and repays through a prototype fixture path,
+  recording pending CKB deltas over the chain wallet view.
+- `?chainBankSubmit=ccc` signs/submits a bank-loan receipt through JoyID using
+  the existing CCC receipt pattern.
+- Local Bank unchanged when flags are off.
+
+**Notes:**
+- Added `src/chain/debtCell.js`, `src/chain/bankTx.js`, and
+  `src/bank/bankAdapter.js`.
+- `?chainBank=1&chainBankCollateral=ckb` routes the Bank interior through the
+  chain bank adapter. `?chainCurrencyCkb=<amount>` sets the fixture CKB wallet
+  balance.
+- `?chainBankSubmit=ccc` is receipt-only for now; it does not yet move real
+  collateral under the final collateral lock script.
+- Verification: browser test harness (`336 passed, 0 failed`),
+  `node netlify-build.mjs`, `git diff --check`, and a flagged boot smoke with
+  `?chainBank=1&chainBankCollateral=ckb&chainCurrencyCkb=30000`.
+
+### Resource Model Boundary — Catalog Disjointness + Collateral Validator
+
+**Status:** implemented 2026-05-24.
+
+**Spec:** [`2026-05-23-resource-model-boundary.md`](specs/2026-05-23-resource-model-boundary.md)
+
+**Goal:** lock in raw materials (Wood/Stone/Crop/Herb/Gold material) as
+local-only, with crafted props/skins/tools crossing the chain boundary
+through Open Asset Standard cells. Documentation-heavy card; small
+validator/test surface only.
+
+**Acceptance:**
+- Test asserts `RESOURCE_CATALOG` ids and `CURRENCY_CATALOG` ids do not
+  overlap.
+- Marketplace listing path rejects raw-material ids with a clear error.
+- Bank collateral validator rejects raw-material ids.
+
+Verified with the browser test harness (`294 passed, 0 failed`),
+`node netlify-build.mjs`, and `git diff --check`.
+
+### Lazy-Mint Mining Cells — First Slice
+
+**Status:** first fixture + HTTP indexer boundary implemented 2026-05-24.
+
+**Spec:** [`2026-05-23-lazy-mint-mining-cells.md`](specs/2026-05-23-lazy-mint-mining-cells.md)
+
+**Goal:** layer BIRTH/DECREMENT/DEPLETE ore cell lifecycle onto the existing
+mining adapter, with a local fixture indexer and deterministic ore type-script
+args, behind `?chainMining=1&chainMiningBirth=lazy`.
+
+**Acceptance:**
+- `encodeOreArgs` round-trips every entry in `oreCatalog.js` deterministically.
+- Local fixture indexer reports `untouched` → `live` → `depleted` → `orphaned`.
+- BIRTH/DEPLETE tx shapes pass pure tests.
+- Mining an untouched `coal_seam` submits a BIRTH-shaped tx through the
+  existing chain adapter path; local capacity reconciles on success.
+- Local mining path unchanged when flags are off.
+
+**Notes:**
+- Added deterministic 22-byte ore args and local ore indexer lifecycle state.
+- Added BIRTH, DECREMENT, and DEPLETE mining tx builders with receipt witnesses.
+- `?chainMining=1&chainMiningBirth=lazy` now routes supported ores through
+  lazy BIRTH for untouched fixture cells, then DECREMENT/DEPLETE for live cells.
+- `?chainMiningIndexer=http` or `?chainMiningIndexerUrl=<base url>` swaps the
+  fixture indexer for an HTTP ore indexer using `GET <base>/ore/<ore_id>`.
+- Stale HTTP indexer reads stop before submit so the local optimistic hit is
+  restored instead of sending an uncertain tx.
+- CCC mining receipt payloads now accept lazy BIRTH txs with no input ore cell.
+- Real ore script deps, treasury subsidy cells, and deployed on-chain
+  validation remain deferred.
+
+Verified with the browser test harness (`317 passed, 0 failed`),
+`node netlify-build.mjs`, `git diff --check`, and a flagged boot smoke with
+`?chainMining=1&chainMiningBirth=lazy&chainMiningIndexerUrl=...`.
+
+### Currency On-Chain — sUDT Read Slice
+
+**Status:** read-only fixture slice plus local/chain wallet source switch,
+pending overlay, chain Trader/Store/Marketplace prototypes, and CCC receipt
+submits implemented 2026-05-25.
+
+**Spec:** [`2026-05-23-currency-on-chain-sudt.md`](specs/2026-05-23-currency-on-chain-sudt.md)
+
+**Goal:** introduce a chain currency adapter that resolves Cellshire balances
+through deterministic sUDT type-args, starting with a read-only `bch` balance
+surface behind `?chainCurrency=1`.
+
+**Acceptance:**
+- `currencyTypeId(currencyId)` is deterministic and unique per currency.
+- Local mode behavior is unchanged; existing tests stay green.
+- With `?chainCurrency=1`, the Inventory HUD reads `bch` balance from an
+  indexer fixture; other currencies fall back to local.
+- Pending/stale state is visible when the indexer fixture is mocked offline.
+- No mint path is enabled yet — the slice is read-only.
+
+**Notes:**
+- Economy HUD now exposes a compact source switch when chain currency mode is
+  active, cycling between `Local wallet` and `Chain wallet`.
+- `?walletSource=local|chain` or `?inventorySource=local|chain` selects the
+  initial source; user selection persists locally.
+- Store, Marketplace, expansion, and crafting spends still use local balances
+  unless their explicit chain flags are enabled.
+- Chain mining rewards now record owner-keyed pending deltas. The Chain wallet
+  view applies pending deltas over indexed balances and clears them once the
+  indexer catches up.
+- Economy HUD labels pending chain state as `Chain wallet · pending`.
+- `?chainTrader=1` switches Trader to a chain-shaped prototype swap path.
+  The Trader panel reads chain wallet balances, builds a
+  `cellshire_trader_swap_tx`, and records pending `-source` / `+target`
+  deltas without mutating local inventory.
+- Default prototype chain Trader now applies fixture settlement against indexed
+  wallet balances: source balance decreases or is spent to zero, target balance
+  is created/updated, and pending deltas clear after the fixture indexer catches
+  up.
+- `?chainTraderSubmit=ccc` now signs/submits a compact
+  `cellshire.trader.swap` receipt through CCC/JoyID. Full real sUDT settlement
+  remains deferred to the Cellswap/settlement slice.
+- `?chainStore=1` switches General Store purchases to the chain wallet view,
+  builds `cellshire_store_purchase_tx`, spends fixture-indexed CKB, grants the
+  bought prop, and lets pending CKB clear once the fixture indexer catches up.
+  Store prop receipts are fixture/local for now; Open Asset minting remains a
+  later chain asset slice.
+- `?chainStoreSubmit=ccc` now signs/submits a compact
+  `cellshire.store.purchase` receipt through CCC/JoyID. Full real vendor
+  settlement and Open Asset prop minting remain deferred.
+- `?chainMarketplace=1` switches Marketplace buys to the chain wallet view,
+  builds `cellshire_marketplace_purchase_tx`, spends fixture-indexed CKB,
+  grants the bought prop/skin locally, closes the listing, and lets pending CKB
+  clear once the fixture indexer catches up. Listing and cancel remain local
+  wallet-gated actions for this slice.
+
+Verified with the browser test harness (`325 passed, 0 failed`),
+`node netlify-build.mjs`, `git diff --check`, and a boot smoke with
+`?chainCurrency=1&walletSource=chain&chainTrader=1`.
+CCC Trader receipt addendum verified with focused CCC/Trader module tests
+(`24 passed, 0 failed`), `node netlify-build.mjs`, and `git diff --check`.
+Trader fixture settlement addendum verified with focused
+CCC/Trader/currency-adapter module tests (`33 passed, 0 failed`),
+`node netlify-build.mjs`, and `git diff --check`.
+Chain Store fixture purchase addendum verified with focused
+store/currency module tests (`22 passed, 0 failed`), `node netlify-build.mjs`,
+and `git diff --check`.
+CCC Store receipt addendum verified with focused CCC/store module tests
+(`35 passed, 0 failed`), `node netlify-build.mjs`, and `git diff --check`.
+Chain Marketplace fixture buy addendum verified with focused
+marketplace/store/trader/currency module tests (`30 passed, 0 failed`),
+`node netlify-build.mjs`, and `git diff --check`.
+
+### Pickaxe Upgrade Progression
+
+**Status:** covered by `Workbench Recipes + Tool Rack Upgrades`; keep this
+only for a later ore-specific mining balance pass.
+
+**Goal:** give players long-term mining/harvesting progression without
+over-inflating crypto rewards.
+
+**Acceptance:**
+- Add local tool tier state and upgrade recipes.
+- Apply conservative modifiers to resource harvesting and/or ore extraction.
+- Keep multiplier constants isolated for future economy tuning.
+
 ## Needs Decision
 
 - Property topology: dedicated own-map vs subregion of a shared map.
-- First on-chain mining path: real testnet cells vs mock/indexed dev cells.
-- Currency model: sUDT per ore, custom typed cells, or hybrid.
+- ~~First on-chain mining path: real testnet cells vs mock/indexed dev cells.~~
+  Resolved 2026-05-23: lazy birth on first mine, deterministic ore_id args,
+  first-mempool-wins race resolution with indexer canonicalisation, optional
+  treasury subsidy. See
+  [`2026-05-23-lazy-mint-mining-cells.md`](specs/2026-05-23-lazy-mint-mining-cells.md).
+- ~~Currency model: sUDT per ore, custom typed cells, or hybrid.~~ Resolved
+  2026-05-23: sUDT with one Cellshire issuance script and twelve
+  deterministic per-currency type-args. CKB stays native capacity. See
+  [`2026-05-23-currency-on-chain-sudt.md`](specs/2026-05-23-currency-on-chain-sudt.md).
 - Epoch modifier algorithm and high-value epoch frequency.
 - Store integration order: Trader first, General Store first, or wallet inventory first.
 - Save-state storage: CKBFS V3 vs custom minimum-capacity state cell.
@@ -870,12 +1226,19 @@ a coherent early-game economy.
   township instances.
 - House treasury policy: which fees accrue, who controls treasury spending, and
   what can be automated safely.
-- Bank chain design: whether the local loan prototype becomes wallet-backed debt
-  cells, collateralized positions, or a hybrid.
-- Resource model: keep wood/stone/gold as local gameplay materials vs cell-backed
-  resources.
-- Gold material: separate local crafting material vs reuse the existing
-  `gold_ore`/BTC crypto mapping.
+- ~~Bank chain design: whether the local loan prototype becomes wallet-backed debt
+  cells, collateralized positions, or a hybrid.~~ Resolved 2026-05-23:
+  three-phase plan — local prototype (shipped) → collateralised debt cells
+  (v2, CKB collateral first) → peer-to-peer lending (v3). See
+  [`2026-05-23-bank-chain-design.md`](specs/2026-05-23-bank-chain-design.md).
+- ~~Resource model: keep wood/stone/gold as local gameplay materials vs cell-backed
+  resources.~~ Resolved 2026-05-23: raw materials stay local-only; crafted
+  outputs cross the boundary via Open Asset Standard. See
+  [`2026-05-23-resource-model-boundary.md`](specs/2026-05-23-resource-model-boundary.md).
+- ~~Gold material: separate local crafting material vs reuse the existing
+  `gold_ore`/BTC crypto mapping.~~ Resolved 2026-05-23: separate. `gold`
+  (resource) and `gold_ore` (mined → BTC sUDT) live in disjoint catalogs.
+  See [`2026-05-23-resource-model-boundary.md`](specs/2026-05-23-resource-model-boundary.md).
 - Farm timers: real elapsed time vs epoch-bucketed vs action-count based.
 - Crafting unlocks: capability from owned buildings, placed buildings, or both.
 - Tool upgrades: which pickaxe effects are safe before economy pricing is tuned.

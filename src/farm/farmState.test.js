@@ -9,7 +9,7 @@ describe('FarmState', () => {
         expect(farm.harvest(15, 13, { now: 2000 }).reason).toBe('not-ready');
         const harvested = farm.harvest(15, 13, { now: planted.plot.readyAt });
         expect(harvested.ok).toBe(true);
-        expect(harvested.output).toEqual({ resourceId: 'crop', amount: 2 });
+        expect(harvested.output).toEqual({ resourceId: 'crop', amount: 3 });
         expect(farm.entries().length).toBe(0);
     });
 

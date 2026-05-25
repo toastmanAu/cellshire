@@ -6,7 +6,7 @@ import {
     priceUsdForCurrency,
 } from '../mining/cryptoEconomy.js';
 
-export const TRADER_FEE_BPS = 75;
+export const TRADER_FEE_BPS = 200;
 
 export function traderCurrencyIds() {
     return Object.keys(CURRENCY_CATALOG);

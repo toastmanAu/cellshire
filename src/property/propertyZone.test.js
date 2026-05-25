@@ -21,7 +21,7 @@ describe('property zone starter map', () => {
         expect(map.height).toBe(PROPERTY_SIZE);
         expect(map.getTerrain(PROPERTY_EDIT_BOUNDS.minGx, PROPERTY_EDIT_BOUNDS.minGy)).toBe('grass');
         const farm = farmBoundsForTier(1);
-        expect(map.getTerrain(farm.minGx, farm.minGy)).toBe('dirt');
+        expect(map.getTerrain(farm.minGx, farm.minGy)).toBe('farm_plot_empty');
         expect(map.objectAt(12, PROPERTY_EDIT_BOUNDS.minGy).role).toBe(PROPERTY_MINE_PORTAL_ROLE);
         expect(map.objectAt(PROPERTY_EDIT_BOUNDS.minGx + 2, PROPERTY_EDIT_BOUNDS.minGy + 1).role)
             .toBe(TOWNSHIP_PORTAL_ROLE);

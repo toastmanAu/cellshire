@@ -4,7 +4,7 @@
  * Bottom-right HUD: clock + toggles for ambient occlusion / grid / borders.
  */
 
-import { playUiClick } from './Audio.js';
+import { playUiClick } from './Audio.js?v=audio-wiring-3';
 
 export class HUD {
     constructor(game) {

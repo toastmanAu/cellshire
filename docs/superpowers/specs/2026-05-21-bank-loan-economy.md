@@ -23,16 +23,16 @@ The first implementation is intentionally conservative:
 The tuning constants live in `src/bank/bankLoans.js`:
 
 ```js
-BANK_LOAN_FEE_BPS = 300
+BANK_LOAN_FEE_BPS = 250
 BANK_LOAN_TERM_DAYS = 7
 BANK_LOAN_BASE_RESERVE_USD = 100
 ```
 
 Current offers:
 
-- `Starter float`: `5,000 CKB`, repay `5,150 CKB`.
-- `Builder credit`: `15,000 CKB`, repay `15,450 CKB`.
-- `Expansion note`: `50,000 CKB`, repay `51,500 CKB`.
+- `Starter float`: `7,500 CKB`, repay `7,687.5 CKB`.
+- `Builder credit`: `18,000 CKB`, repay `18,450 CKB`.
+- `Expansion note`: `42,000 CKB`, repay `43,050 CKB`.
 
 These are placeholders. They should move as store prices, expansion costs,
 mining yield, and treasury fee volume settle.

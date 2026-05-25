@@ -44,20 +44,32 @@
             <div id="palette-grid"></div>
         </section>
 
-        <section id="hud">
-            <div class="hud-row">
-                <div class="hud-clock">
-                    <span class="sun-icon"></span>
-                    <span id="hud-time">10:42</span>
-                </div>
+        <aside id="side-menu" data-open="1">
+            <button type="button" id="side-menu-toggle" aria-controls="side-menu-body" aria-expanded="true">
+                Menu
+            </button>
+            <div id="side-menu-body">
+                <section id="hud">
+                    <div class="hud-row">
+                        <div class="hud-clock">
+                            <span class="sun-icon"></span>
+                            <span id="hud-time">10:42</span>
+                        </div>
+                    </div>
+                    <div class="hud-toggles">
+                        <label class="toggle"><span>Shadows</span><input type="checkbox" id="toggle-ao" checked /><span class="switch"></span></label>
+                        <label class="toggle"><span>Grid</span><input type="checkbox" id="toggle-grid" /><span class="switch"></span></label>
+                        <label class="toggle"><span>Borders</span><input type="checkbox" id="toggle-borders" checked /><span class="switch"></span></label>
+                    </div>
+                    <div class="hud-layers">Layers</div>
+                </section>
+                <div class="side-menu__section" data-hud-slot="status"></div>
+                <div class="side-menu__section" data-hud-slot="wallet"></div>
+                <div class="side-menu__section" data-hud-slot="economy"></div>
+                <div class="side-menu__section" data-hud-slot="resources"></div>
+                <div class="side-menu__section side-menu__section--actions" data-hud-slot="actions"></div>
             </div>
-            <div class="hud-toggles">
-                <label class="toggle"><span>Shadows</span><input type="checkbox" id="toggle-ao" checked /><span class="switch"></span></label>
-                <label class="toggle"><span>Grid</span><input type="checkbox" id="toggle-grid" /><span class="switch"></span></label>
-                <label class="toggle"><span>Borders</span><input type="checkbox" id="toggle-borders" checked /><span class="switch"></span></label>
-            </div>
-            <div class="hud-layers">Layers</div>
-        </section>
+        </aside>
 
         <details id="instructions" aria-label="Controls help">
             <summary class="ins-summary">
@@ -91,6 +103,6 @@
         <div id="toast"></div>
     </div>
 
-    <script type="module" src="src/main.js?v=asset-load-4"></script>
+    <script type="module" src="src/main.js?v=boot-stability-1"></script>
 </body>
 </html>

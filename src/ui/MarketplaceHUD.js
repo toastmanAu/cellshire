@@ -9,6 +9,7 @@ import {
     loadWalletIdentity,
     walletDisplayLabel,
 } from '../wallet/walletIdentity.js';
+import { hudMount } from './hudMount.js';
 
 function clear(el) {
     while (el.firstChild) el.removeChild(el.firstChild);
@@ -52,10 +53,21 @@ export function installMarketplaceHUD(game, { storage = safeStorage } = {}) {
 
     const panel = div('marketplace__panel');
     root.appendChild(panel);
-    document.body.appendChild(root);
+    hudMount('actions').appendChild(root);
+    let balanceInventory = game.player?.inventory ?? null;
 
     function currentWallet() {
         return loadWalletIdentity(storage);
+    }
+
+    async function refreshBalances() {
+        if (!game.marketplaceBalanceAdapter?.read) {
+            balanceInventory = game.player?.inventory ?? null;
+            return balanceInventory;
+        }
+        const snapshot = await game.marketplaceBalanceAdapter.read();
+        balanceInventory = snapshot.currencies;
+        return balanceInventory;
     }
 
     function renderListingForm(walletState) {
@@ -136,15 +148,17 @@ export function installMarketplaceHUD(game, { storage = safeStorage } = {}) {
             action.type = 'button';
             action.className = 'marketplace__action';
             const isOwn = canMutate && listing.seller === walletState.account.address;
-            const balance = game.player?.inventory?.get?.(listing.price.currency) ?? 0;
+            const balance = balanceInventory?.get?.(listing.price.currency) ?? 0;
             action.textContent = !canMutate ? 'View' : isOwn ? 'Cancel' : 'Buy';
             action.disabled = !canMutate || (!isOwn && balance < listing.price.amount);
-            action.addEventListener('click', () => {
+            action.addEventListener('click', async () => {
+                action.disabled = true;
                 if (isOwn) {
                     game.cancelMarketplaceListing(listing.id, walletState.account);
                 } else {
-                    game.buyMarketplaceListing(listing.id, walletState.account);
+                    await game.buyMarketplaceListing(listing.id, walletState.account);
                 }
+                await refreshBalances();
                 render();
             });
             row.appendChild(action);
@@ -153,8 +167,9 @@ export function installMarketplaceHUD(game, { storage = safeStorage } = {}) {
         panel.appendChild(list);
     }
 
-    function open() {
+    async function open() {
         root.dataset.open = '1';
+        await refreshBalances();
         render();
     }
 
@@ -164,7 +179,10 @@ export function installMarketplaceHUD(game, { storage = safeStorage } = {}) {
 
     toggle.addEventListener('click', () => {
         if (root.dataset.open === '1') close();
-        else open();
+        else open().catch(err => {
+            console.warn('[cellshire] marketplace balance refresh failed', err);
+            render();
+        });
     });
 
     const rerenderOpen = () => {
@@ -182,6 +200,7 @@ export function installMarketplaceHUD(game, { storage = safeStorage } = {}) {
         render,
         open,
         close,
+        refreshBalances,
         dismiss() {
             offCurrency?.();
             offProps?.();

@@ -18,7 +18,7 @@
 
 import { CONFIG } from '../config.js';
 import { screenToCell } from '../grid/IsoGrid.js';
-import { playUiClick } from '../ui/Audio.js';
+import { playUiClick } from '../ui/Audio.js?v=audio-wiring-3';
 
 // How long a stationary single-finger touch must be held before we
 // treat it as the "erase" gesture. Tuned to feel responsive but not

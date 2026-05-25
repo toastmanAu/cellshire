@@ -8,7 +8,7 @@
 import { loadAssets } from './assets/assetLoader.js';
 import { Game } from './core/Game.js';
 import { UIManager } from './ui/UIManager.js';
-import { loadUiAudio } from './ui/Audio.js';
+import { loadUiAudio } from './ui/Audio.js?v=audio-wiring-3';
 import { generateWorld } from './worldgen/procgen.js';
 import { installPerfHUD } from './ui/PerfHUD.js';
 import { installEpochHUD } from './ui/EpochHUD.js';
@@ -20,7 +20,14 @@ import { installOreDebugHUD } from './ui/OreDebugHUD.js';
 import { installTraderHUD } from './ui/TraderHUD.js';
 import { installGeneralStoreHUD } from './ui/GeneralStoreHUD.js';
 import { installMarketplaceHUD } from './ui/MarketplaceHUD.js';
-import { installBuildingInteriorHUD } from './ui/BuildingInteriorHUD.js';
+import { installBuildingInteriorHUD } from './ui/BuildingInteriorHUD.js?v=township-visuals-1';
+import { installMusicManager } from './ui/MusicManager.js';
+import {
+    FixtureCurrencyIndexer,
+    LocalCurrencyAdapter,
+    ReadOnlyChainCurrencyAdapter,
+} from './economy/currencyAdapter.js';
+import { PendingCurrencyDeltaStore } from './economy/pendingCurrencyDeltas.js';
 import { isWalkable } from './grid/walkability.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
 import { safeStorage } from './lib/safeStorage.js';
@@ -37,6 +44,11 @@ import { loadMinedState, pruneStaleMinedState } from './mining/minedStore.js';
 import { isHarvestResourceObject } from './resources/harvestCatalog.js';
 import { chainMiningEnabled, makeMiningAdapterFromParams } from './mining/miningAdapter.js';
 import { getEpochPriceSnapshot } from './mining/priceSnapshot.js';
+import { makeBankAdapterFromParams } from './bank/bankAdapter.js';
+import { makeTraderAdapterFromParams } from './trader/traderAdapter.js';
+import { traderCurrencyIds } from './trader/traderRates.js';
+import { makeGeneralStoreAdapterFromParams } from './store/generalStoreAdapter.js';
+import { makeMarketplaceAdapterFromParams } from './marketplace/marketplaceAdapter.js';
 import { loadWalletIdentity, walletFeatureEnabled } from './wallet/walletIdentity.js';
 import { propertyVisitOwnerFromParams } from './visiting/propertyVisit.js';
 import { makePropertySnapshotAdapterFromParams } from './property/propertySnapshotAdapter.js';
@@ -50,8 +62,11 @@ async function main() {
     const loadingScreen = document.getElementById('loading-screen');
     const app = document.getElementById('app');
 
+    fill.style.width = '2%';
+    status.textContent = 'lighting the kiln...';
+
     await loadAssets((p, label) => {
-        fill.style.width = `${Math.round(p * 100)}%`;
+        fill.style.width = `${Math.max(2, Math.round(p * 100))}%`;
         status.textContent = `packing ${label}...`;
     });
 
@@ -74,7 +89,12 @@ async function main() {
     const params = new URLSearchParams(location.search);
     const devMode = params.get('dev') === '1';
     const visitOwner = propertyVisitOwnerFromParams(params);
-    const walletSurfaceEnabled = walletFeatureEnabled(params) || chainMiningEnabled(params) || cccJoyIdEnabled(params);
+    const chainCurrencyEnabled = params.get('chainCurrency') === '1'
+        || params.get('chainTrader') === '1'
+        || params.get('chainBank') === '1'
+        || params.get('chainStore') === '1'
+        || params.get('chainMarketplace') === '1';
+    const walletSurfaceEnabled = walletFeatureEnabled(params) || chainMiningEnabled(params) || cccJoyIdEnabled(params) || chainCurrencyEnabled;
     const walletState = walletSurfaceEnabled ? loadWalletIdentity(safeStorage) : null;
     const homeOwner = visitOwner
         ?? propertyOwnerFromBinding(walletState, loadPropertyOwnerBinding(safeStorage));
@@ -215,22 +235,102 @@ async function main() {
             });
             game.ensureMinePropertyPortal(spawn);
             game.ensureMineTownshipPortal(spawn);
+            let economyInventoryAdapters = null;
+            let economyInitialSource = null;
+            let chainCurrencyAdapter = null;
+            if (chainCurrencyEnabled) {
+                const bchAmount = Number(params.get('chainCurrencyBch') ?? 4.5);
+                const pendingDeltas = new PendingCurrencyDeltaStore({
+                    storage: safeStorage,
+                    owner: homeOwner,
+                });
+                chainCurrencyAdapter = new ReadOnlyChainCurrencyAdapter({
+                    localInventory: game.player.inventory,
+                    props: game.propInventory,
+                    owner: homeOwner,
+                    pendingDeltas,
+                    chainCurrencyIds: params.get('chainTrader') === '1'
+                        ? traderCurrencyIds()
+                        : (params.get('chainBank') === '1' || params.get('chainStore') === '1' || params.get('chainMarketplace') === '1') ? ['bch', 'ckb'] : ['bch'],
+                    indexer: new FixtureCurrencyIndexer({
+                        offline: params.get('chainCurrencyOffline') === '1',
+                        balances: {
+                            bch: {
+                                amount: Number.isFinite(bchAmount) ? bchAmount : 4.5,
+                                stale: false,
+                            },
+                            ckb: {
+                                amount: Number.isFinite(Number(params.get('chainCurrencyCkb')))
+                                    ? Number(params.get('chainCurrencyCkb'))
+                                    : 20000,
+                                stale: false,
+                            },
+                        },
+                    }),
+                });
+                game.inventoryAdapter = chainCurrencyAdapter;
+                economyInventoryAdapters = {
+                    local: new LocalCurrencyAdapter({ inventory: game.player.inventory }),
+                    chain: chainCurrencyAdapter,
+                };
+                economyInitialSource = resolveWalletInventorySource({
+                    urlSource: params.get('walletSource') || params.get('inventorySource'),
+                    storage: safeStorage,
+                });
+            }
             if (visitOwner) await game.visitProperty(visitOwner);
-            installEconomyHUD({
+            game.hudPanels = game.hudPanels || {};
+            game.hudPanels.economy = installEconomyHUD({
                 player: game.player,
                 game,
                 inventoryAdapter: game.inventoryAdapter,
+                inventoryAdapters: economyInventoryAdapters,
+                initialInventorySource: economyInitialSource,
+                onInventorySourceChange: source => saveWalletInventorySource(safeStorage, source),
                 priceSnapshot,
             });
             installResourceHUD(game);
-            game.hudPanels = game.hudPanels || {};
             game.hudPanels.trader = installTraderHUD({
                 player: game.player,
                 game,
                 priceSnapshot,
+                adapter: makeTraderAdapterFromParams({
+                    params,
+                    storage: safeStorage,
+                    owner: homeOwner,
+                    inventoryAdapter: chainCurrencyAdapter,
+                    location: window.location,
+                }),
+                balanceAdapter: params.get('chainTrader') === '1' ? chainCurrencyAdapter : null,
             });
+            game.storeAdapter = makeGeneralStoreAdapterFromParams({
+                params,
+                storage: safeStorage,
+                owner: homeOwner,
+                inventoryAdapter: chainCurrencyAdapter,
+                location: window.location,
+            });
+            game.storeBalanceAdapter = params.get('chainStore') === '1' ? chainCurrencyAdapter : null;
             game.hudPanels.store = installGeneralStoreHUD(game);
+            game.marketplaceAdapter = makeMarketplaceAdapterFromParams({
+                params,
+                owner: homeOwner,
+                inventoryAdapter: chainCurrencyAdapter,
+            });
+            game.marketplaceBalanceAdapter = params.get('chainMarketplace') === '1' ? chainCurrencyAdapter : null;
             game.hudPanels.market = installMarketplaceHUD(game);
+            game.bankAdapter = makeBankAdapterFromParams({
+                params,
+                storage: safeStorage,
+                owner: homeOwner,
+                loanBook: game.bankLoanBook,
+                treasury: game.houseTreasury,
+                priceSnapshot,
+                inventory: game.player.inventory,
+                inventoryAdapter: chainCurrencyAdapter,
+                currentEpoch: () => Number(game.currentEpoch) || 0,
+                location: window.location,
+            });
             installBuildingInteriorHUD(game);
 
             // No stored / URL choice — show the first-load gate. World
@@ -280,10 +380,24 @@ async function main() {
                 : undefined,
         });
     }
+    installMusicManager(game);
 
     loadingScreen.classList.add('hidden');
     app.classList.remove('hidden');
     document.body.dataset.cellshireBoot = 'ready';
+}
+
+const WALLET_INVENTORY_SOURCE_KEY = 'cellshire:wallet-inventory-source:v1';
+
+function resolveWalletInventorySource({ urlSource, storage }) {
+    if (urlSource === 'local' || urlSource === 'chain') return urlSource;
+    const stored = storage.get(WALLET_INVENTORY_SOURCE_KEY);
+    if (stored === 'local' || stored === 'chain') return stored;
+    return 'chain';
+}
+
+function saveWalletInventorySource(storage, source) {
+    if (source === 'local' || source === 'chain') storage.set(WALLET_INVENTORY_SOURCE_KEY, source);
 }
 
 /**

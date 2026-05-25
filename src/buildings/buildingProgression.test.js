@@ -5,6 +5,7 @@ import {
     STANDARD_BUILDINGS,
     STANDARD_BUILDING_ASSET_IDS,
     buildingCapabilityEffects,
+    buildingTierGate,
     buildingProgressStorageKey,
     buildingProgressSummary,
     formatBuildingCost,
@@ -70,10 +71,10 @@ describe('building progression', () => {
 
         expect(result.ok).toBe(true);
         expect(progression.getLevel('workbench')).toBe(1);
-        expect(resources.get('wood')).toBe(12);
-        expect(resources.get('stone')).toBe(16);
-        expect(resources.get('crop')).toBe(17);
-        expect(currencies.get('ckb')).toBe(500);
+        expect(resources.get('wood')).toBe(14);
+        expect(resources.get('stone')).toBe(17);
+        expect(resources.get('crop')).toBe(18);
+        expect(currencies.get('ckb')).toBe(1100);
     });
 
     it('rejects building unlocks when either materials or CKB are short', () => {
@@ -83,7 +84,7 @@ describe('building progression', () => {
         resources.add('wood', 20);
         resources.add('stone', 20);
         resources.add('crop', 20);
-        currencies.add('ckb', 1499);
+        currencies.add('ckb', 899);
 
         const result = unlockOrUpgradeBuilding({
             progression,
@@ -96,18 +97,18 @@ describe('building progression', () => {
         expect(result.reason).toBe('insufficient-funds');
         expect(progression.getLevel('workbench')).toBe(0);
         expect(resources.get('wood')).toBe(20);
-        expect(currencies.get('ckb')).toBe(1499);
+        expect(currencies.get('ckb')).toBe(899);
     });
 
     it('summarizes affordability from resource and currency inventories', () => {
         const progression = new BuildingProgression();
         const resources = new ResourceInventory([
-            ['wood', 8],
-            ['stone', 4],
-            ['crop', 3],
+            ['wood', 6],
+            ['stone', 3],
+            ['crop', 2],
         ]);
         const currencies = new Inventory();
-        currencies.add('ckb', 1500);
+        currencies.add('ckb', 900);
 
         const workbench = buildingProgressSummary(progression, {
             resourceInventory: resources,
@@ -116,6 +117,33 @@ describe('building progression', () => {
 
         expect(workbench.canAffordNext).toBe(true);
         expect(workbench.actionLabel).toBe('Unlock');
+    });
+
+    it('gates higher building tiers until the previous tier is complete across the set', () => {
+        const early = new BuildingProgression({ workbench: 1 });
+        const locked = buildingProgressSummary(early, {
+            resourceInventory: new ResourceInventory([['wood', 999], ['stone', 999], ['crop', 999]]),
+            currencyInventory: (() => {
+                const inv = new Inventory();
+                inv.add('ckb', 999999);
+                return inv;
+            })(),
+        }).find(entry => entry.id === 'workbench');
+
+        expect(locked.canAffordNext).toBe(false);
+        expect(locked.tierGate.ok).toBe(false);
+        expect(locked.tierGate.requiredLevel).toBe(1);
+        expect(locked.tierGateLabel.includes('Need all buildings Level 1')).toBe(true);
+
+        const ready = new BuildingProgression({
+            home: 1,
+            workbench: 1,
+            tool_rack: 1,
+            sawmill: 1,
+            stone_yard: 1,
+            farm_storage: 1,
+        });
+        expect(buildingTierGate(ready, 'workbench', 2).ok).toBe(true);
     });
 
     it('derives conservative resource-yield bonuses from utility building levels', () => {

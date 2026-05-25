@@ -2,6 +2,7 @@ import { describe, it, expect } from '../test/harness.js';
 import { ResourceInventory } from '../resources/resourceInventory.js';
 import {
     canAffordFarmExpansion,
+    farmCropAssetId,
     farmBoundsForTier,
     farmTierSummary,
     formatFarmExpansionCost,
@@ -19,8 +20,8 @@ describe('farm zone tiers', () => {
 
     it('spends local wood and stone to unlock the next farm tier', () => {
         const inventory = new ResourceInventory();
-        inventory.add('wood', 12);
-        inventory.add('stone', 8);
+        inventory.add('wood', 10);
+        inventory.add('stone', 7);
         expect(canAffordFarmExpansion(inventory, 1)).toBe(true);
         const result = spendFarmExpansionCost(inventory, 1);
         expect(result.ok).toBe(true);
@@ -30,6 +31,12 @@ describe('farm zone tiers', () => {
     });
 
     it('formats resource costs for UI labels', () => {
-        expect(formatFarmExpansionCost({ wood: 12, stone: 8 })).toBe('12 Wood + 8 Stone');
+        expect(formatFarmExpansionCost({ wood: 10, stone: 7 })).toBe('10 Wood + 7 Stone');
+    });
+
+    it('maps planted crop plots to planted and ready visuals', () => {
+        const plot = { cropId: 'starter_crop', plantedAt: 1000, readyAt: 16000 };
+        expect(farmCropAssetId(plot, 15000)).toBe('farm_plot_starter_crop');
+        expect(farmCropAssetId(plot, 16000)).toBe('farm_plot_ready_crop');
     });
 });

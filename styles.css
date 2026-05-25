@@ -122,6 +122,28 @@ html, body {
     font-weight: 700;
     letter-spacing: 0;
 }
+.economy-hud__title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.economy-hud__source {
+    border: 1px solid rgba(31, 42, 55, 0.14);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.62);
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.economy-hud__source:hover {
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--ink);
+}
 
 .economy-hud__total {
     color: var(--coal);
@@ -796,145 +818,44 @@ html, body {
 .building-window__scene {
     position: relative;
     min-height: 250px;
+    aspect-ratio: 16 / 9;
     overflow: hidden;
     border: 1px solid rgba(47, 43, 39, 0.12);
     border-radius: 7px;
+    background-color: #eadbc0;
+    background-position: center;
+    background-size: cover;
+}
+
+.building-window__shade {
+    position: absolute;
+    inset: 0;
     background:
-        linear-gradient(180deg, rgba(255, 252, 244, 0.92), rgba(236, 223, 199, 0.98) 62%, rgba(200, 176, 132, 0.95) 63%);
+        linear-gradient(180deg, rgba(13, 20, 24, 0.02) 0%, rgba(13, 20, 24, 0.18) 100%),
+        radial-gradient(circle at 50% 82%, rgba(255, 246, 220, 0.18), rgba(35, 28, 23, 0.08) 58%, rgba(35, 28, 23, 0.22));
+    pointer-events: none;
 }
 
-.building-window__back-wall {
+.building-window__npc {
     position: absolute;
-    left: 10%;
-    right: 10%;
-    top: 14%;
-    height: 42%;
-    border: 1px solid rgba(47, 43, 39, 0.14);
-    border-radius: 7px 7px 2px 2px;
-    background: rgba(255, 250, 237, 0.76);
+    right: clamp(18px, 8%, 54px);
+    bottom: 6%;
+    width: clamp(70px, 17%, 116px);
+    max-height: 74%;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 12px rgba(18, 20, 22, 0.32));
+    transform-origin: 50% 100%;
 }
 
-.building-window__counter {
-    position: absolute;
-    left: 23%;
-    right: 23%;
-    bottom: 22%;
-    height: 24%;
-    border: 1px solid rgba(86, 58, 31, 0.28);
-    border-radius: 6px;
-    background: #8c6541;
-    box-shadow: inset 0 8px 0 rgba(255, 255, 255, 0.12);
+.building-window[data-scene="bank"] .building-window__npc,
+.building-window[data-scene="gallery"] .building-window__npc {
+    right: auto;
+    left: clamp(18px, 8%, 54px);
 }
 
-.building-window__shelf {
-    position: absolute;
-    top: 26%;
-    width: 17%;
-    height: 9%;
-    border-radius: 3px;
-    background: #6e4b31;
-    box-shadow:
-        0 12px 0 #6e4b31,
-        0 24px 0 #6e4b31;
-}
-
-.building-window__shelf::before,
-.building-window__shelf::after {
-    content: "";
-    position: absolute;
-    top: -10px;
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-    background: var(--leaf);
-    box-shadow: 22px 0 0 var(--cobalt), 44px 0 0 #b88332;
-}
-
-.building-window__shelf--left { left: 14%; }
-.building-window__shelf--right { right: 14%; }
-
-.building-window__accent {
-    position: absolute;
-    border-radius: 50%;
-    background: var(--cobalt);
-}
-
-.building-window__accent--one {
-    left: 47%;
-    top: 23%;
-    width: 34px;
-    height: 34px;
-}
-
-.building-window__accent--two {
-    right: 28%;
-    bottom: 33%;
-    width: 18px;
-    height: 18px;
-    background: #b88332;
-}
-
-.building-window__floor {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 38%;
-    background:
-        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 28px, rgba(47, 43, 39, 0.06) 28px 30px),
-        rgba(183, 151, 104, 0.62);
-}
-
-.building-window[data-scene="market"] .building-window__counter {
-    background: #704a7f;
-}
-
-.building-window[data-scene="market"] .building-window__accent--one {
-    background: #704a7f;
-    border-radius: 4px;
-}
-
-.building-window[data-scene="bank"] .building-window__counter {
-    background: #41566d;
-}
-
-.building-window[data-scene="bank"] .building-window__back-wall {
-    background:
-        linear-gradient(90deg, transparent 0 45%, rgba(47, 43, 39, 0.12) 45% 55%, transparent 55%),
-        rgba(235, 240, 238, 0.82);
-}
-
-.building-window[data-scene="gallery"] .building-window__back-wall {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    padding: 18px;
-    background: #fbfaf5;
-}
-
-.building-window[data-scene="gallery"] .building-window__back-wall::before {
-    content: "";
-    grid-column: 1 / -1;
-    height: 54px;
-    background:
-        linear-gradient(90deg, #1b5ba8 0 20%, transparent 20% 27%, #3d7355 27% 47%, transparent 47% 54%, #b88332 54% 74%, transparent 74% 81%, #704a7f 81%);
-}
-
-.building-window[data-scene="hall"] .building-window__counter {
-    left: 34%;
-    right: 34%;
-    bottom: 28%;
-    height: 18%;
-    background: #7b3f33;
-}
-
-.building-window[data-scene="hall"] .building-window__accent--one {
-    left: 42%;
-    top: 30%;
-    width: 70px;
-    height: 42px;
-    border-radius: 4px;
-    background: #b88332;
+.building-window[data-scene="market"] .building-window__npc {
+    right: clamp(12px, 5%, 38px);
+    width: clamp(78px, 18%, 126px);
 }
 
 .building-window__actions {
@@ -1034,7 +955,10 @@ html, body {
     inset: 0;
     display: grid;
     place-items: center;
-    background: linear-gradient(180deg, #f6efe1, #e8dcc1);
+    background:
+        linear-gradient(180deg, rgba(43, 42, 38, 0) 40%, rgba(43, 42, 38, 0.32) 100%),
+        url('assets/boot/boot_screen.png?v=boot-1') center / cover no-repeat,
+        linear-gradient(180deg, #f6efe1, #e8dcc1);
     z-index: 999;
 }
 #loading-screen.hidden { display: none; }
@@ -1620,6 +1544,18 @@ html, body {
     padding-left: 10px;
     border-left: 2px solid rgba(155, 113, 62, 0.24);
 }
+.property-hud__tool-row {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+}
+.property-hud__tool-icon {
+    display: block;
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: rgba(255, 252, 244, 0.72);
+    border: 1px solid rgba(155, 113, 62, 0.18);
+}
 .property-hud__building-name {
     font-size: 11px;
     font-weight: 850;
@@ -2174,6 +2110,260 @@ body.mode-visit #property-hud {
     #instructions {
         bottom: calc(8px + env(safe-area-inset-bottom));
         left: calc(8px + env(safe-area-inset-left));
+    }
+}
+
+/* ── Unified HUD Menu ─────────────────────────────────────────────
+   Later gameplay slices added enough panels that the old scattered HUD
+   started competing with the canvas. These overrides keep the existing HUD
+   modules intact but mount them inside one collapsible right rail. */
+
+#side-menu {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 35;
+    width: min(330px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px;
+    pointer-events: none;
+    transition: transform 0.18s ease;
+}
+
+#side-menu[data-open="0"] {
+    bottom: auto;
+    width: 46px;
+    transform: none;
+}
+
+#side-menu[data-open="0"] #side-menu-toggle {
+    justify-self: start;
+}
+
+#side-menu-toggle {
+    justify-self: end;
+    min-width: 46px;
+    min-height: 36px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(31, 42, 55, 0.92);
+    color: #fff;
+    box-shadow: var(--shadow);
+    font: 800 12px/1 system-ui, -apple-system, 'Segoe UI', sans-serif;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+#side-menu-body {
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid rgba(47, 43, 39, 0.12);
+    border-radius: var(--radius-sm);
+    background: rgba(251, 246, 236, 0.94);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+    scrollbar-width: thin;
+}
+
+#side-menu[data-open="0"] #side-menu-body {
+    display: none;
+    visibility: hidden;
+}
+
+.side-menu__section {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+
+#side-menu #hud,
+#side-menu #epoch-hud,
+#side-menu #property-hud,
+#side-menu #wallet-hud,
+#side-menu #economy-hud,
+#side-menu #resource-hud,
+#side-menu #trader-hud,
+#side-menu #general-store-hud,
+#side-menu #marketplace-hud {
+    position: static;
+    inset: auto;
+    transform: none;
+    width: 100%;
+    max-width: none;
+    z-index: auto;
+    margin: 0;
+    pointer-events: auto;
+}
+
+#side-menu #hud,
+#side-menu #epoch-hud,
+#side-menu #property-hud,
+#side-menu #wallet-hud,
+#side-menu #economy-hud,
+#side-menu #resource-hud {
+    box-shadow: none;
+    border-radius: 8px;
+}
+
+#side-menu #hud {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px 8px;
+    padding: 8px;
+    background: rgba(255, 252, 244, 0.72);
+}
+
+#side-menu .hud-toggles {
+    justify-content: end;
+}
+
+#side-menu #epoch-hud {
+    max-width: none;
+    padding: 8px;
+}
+
+#side-menu #property-hud {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    padding: 8px;
+}
+
+#side-menu .property-hud__detail,
+#side-menu .property-hud__building-panel {
+    grid-column: 1 / -1;
+}
+
+#side-menu .property-hud__action,
+#side-menu .property-hud__unlock,
+#side-menu .property-hud__farm,
+#side-menu .property-hud__buildings,
+#side-menu .property-hud__share {
+    grid-row: auto;
+    grid-column: auto;
+    min-width: 0;
+}
+
+#side-menu .property-hud__unlock,
+#side-menu .property-hud__farm,
+#side-menu .property-hud__buildings,
+#side-menu .property-hud__share {
+    grid-column: span 1;
+}
+
+#side-menu .property-hud__building-row,
+#side-menu .property-hud__craft-row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+#side-menu .property-hud__building-action,
+#side-menu .property-hud__craft-action {
+    width: 100%;
+}
+
+#side-menu #wallet-hud {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 5px 8px;
+    padding: 8px;
+}
+
+#side-menu .wallet-hud__label,
+#side-menu .wallet-hud__detail {
+    grid-column: 2;
+}
+
+#side-menu .wallet-hud__property,
+#side-menu .wallet-hud__action {
+    grid-row: auto;
+    grid-column: auto;
+}
+
+#side-menu .wallet-hud__property {
+    grid-column: 1 / span 2;
+}
+
+#side-menu .wallet-hud__action {
+    grid-column: 1 / span 2;
+}
+
+#side-menu #economy-hud,
+#side-menu #resource-hud {
+    padding: 9px 10px;
+}
+
+#side-menu #resource-hud {
+    pointer-events: auto;
+}
+
+#side-menu .side-menu__section--actions {
+    grid-template-columns: 1fr;
+}
+
+#side-menu .trader-hud__toggle,
+#side-menu .general-store__toggle,
+#side-menu .marketplace__toggle {
+    width: 100%;
+    margin: 0;
+    text-align: left;
+}
+
+#side-menu .trader-hud__panel,
+#side-menu .general-store__panel,
+#side-menu .marketplace__panel {
+    margin-top: 6px;
+    box-shadow: none;
+}
+
+#side-menu .general-store__list,
+#side-menu .marketplace__list {
+    max-height: 320px;
+}
+
+@media (min-width: 901px) {
+    body.mode-build #toolbar,
+    body.mode-property #toolbar {
+        top: auto;
+        left: var(--edge-gap);
+        right: calc(360px + env(safe-area-inset-right));
+        bottom: calc(202px + env(safe-area-inset-bottom));
+        flex-direction: row;
+        align-items: center;
+        overflow-x: auto;
+    }
+
+    body.mode-build #palette,
+    body.mode-property #palette {
+        top: auto;
+        left: var(--edge-gap);
+        right: calc(360px + env(safe-area-inset-right));
+        bottom: var(--edge-gap);
+        width: auto;
+        height: 176px;
+        min-height: 0;
+    }
+
+    body.mode-build #palette-grid,
+    body.mode-property #palette-grid {
+        grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    #side-menu {
+        width: min(310px, calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+        top: calc(8px + env(safe-area-inset-top));
+        right: calc(8px + env(safe-area-inset-right));
+        bottom: calc(8px + env(safe-area-inset-bottom));
+    }
+
+    #side-menu #hud {
+        display: grid;
     }
 }
 

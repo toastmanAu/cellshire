@@ -51,6 +51,7 @@ export const ASSET_MANIFEST = [
     // Mining theme — generated via HiDream-O1 from Mykonos refs
     { ...T('dark_stone', 'Dark Stone'), tileLike: true, builder: A.tileWhiteStone },
     { ...T('dirt',       'Dirt'),       tileLike: true, builder: A.tileSand },
+    { ...T('farm_plot_empty', 'Prepared Farm Plot'), fitCell: true, flatBase: true, noShadow: true, builder: A.tileSand },
     { ...TO('stairs',   'Stairs'),   noShadow: true, builder: A.tileStairs },
     { ...TO('sea_wall', 'Sea Wall', { w: 1, d: 1 }, 0.70), fitCell: true, flatBase: true, noShadow: true, builder: A.tileSeaWall },
 
@@ -127,6 +128,7 @@ export const ASSET_MANIFEST = [
     { ...W('garden_bed',   'Garden Bed', { w: 1, d: 1 }, 0.95), filename: 'newAsset/Garden Bed.png', fitCell: true, flatBase: true, noShadow: true, builder: A.plantedGardenBed },
     { ...W('crop_patch',   'Crop Patch', { w: 1, d: 1 }, 0.95), filename: 'newAsset/Crop Patch.png', fitCell: true, flatBase: true, noShadow: true, builder: A.cropPatch },
     { ...W('veg_garden',   'Veg Garden', { w: 1, d: 1 }, 0.95), filename: 'newAsset/Veg Garden.png', fitCell: true, flatBase: true, noShadow: true, builder: A.vegetableGarden },
+    { ...W('farm_plot_starter_crop', 'Starter Crop Plot', { w: 1, d: 1 }, 0.95), fitCell: true, flatBase: true, noShadow: true, builder: A.cropPatch },
     { ...W('farm_plot_ready_crop', 'Ready Crop Plot', { w: 1, d: 1 }, 0.95), fitCell: true, flatBase: true, noShadow: true, builder: A.vegetableGarden },
 
     // ── BUILDINGS ─────────────────────────────────────────────────
@@ -138,6 +140,11 @@ export const ASSET_MANIFEST = [
     { ...B('sawmill',       'Sawmill',       { w: 1, d: 1 }, 0.90), noShadow: true, builder: A.woodPile },
     { ...B('stone_yard',    'Stone Yard',    { w: 1, d: 1 }, 0.90), noShadow: true, builder: A.stonePile },
     { ...B('farm_storage',  'Farm Storage',  { w: 1, d: 1 }, 0.90), noShadow: true, builder: A.storageBox },
+    { ...B('township_store',          'General Store',  { w: 2, d: 2 }, 1.00), noShadow: true, builder: A.whiteCubeHouse },
+    { ...B('township_market',         'Market',         { w: 2, d: 2 }, 1.05), noShadow: true, builder: A.pergolaHouse },
+    { ...B('township_bank',           'Bank',           { w: 2, d: 2 }, 1.00), noShadow: true, builder: A.twoStoryHouse },
+    { ...B('township_gallery',        'Gallery',        { w: 2, d: 2 }, 0.92), noShadow: true, builder: A.terraceHouse },
+    { ...B('township_community_hall', 'Community Hall', { w: 3, d: 2 }, 1.05), noShadow: true, builder: A.mainChapel },
     { ...B('two_story',     'Two-Story',     { w: 3, d: 3 }), builder: A.twoStoryHouse },
     { ...B('cube_house',    'Cube House',    { w: 2, d: 2 }), builder: A.whiteCubeHouse },
     { ...B('terrace_house', 'Terrace House', { w: 3, d: 2 }), builder: A.terraceHouse },

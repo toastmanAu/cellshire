@@ -1,3 +1,5 @@
+import { hudMount } from './hudMount.js';
+
 export function installPropertyHUD(game) {
     const root = document.createElement('section');
     root.id = 'property-hud';
@@ -64,7 +66,7 @@ export function installPropertyHUD(game) {
     });
     root.appendChild(share);
 
-    document.body.appendChild(root);
+    hudMount('status').appendChild(root);
 
     function render() {
         const home = game.mapKind === 'property';
@@ -124,7 +126,7 @@ export function installPropertyHUD(game) {
             detail.className = 'property-hud__building-cost';
             const effect = entry.effectLabel ? `${entry.effectLabel} · ` : '';
             detail.textContent = entry.nextLevel
-                ? `${effect}${entry.nextCostLabel}`
+                ? `${effect}${entry.tierGateLabel || entry.nextCostLabel}`
                 : `${effect}Max level`;
             meta.appendChild(name);
             meta.appendChild(detail);
@@ -188,7 +190,15 @@ export function installPropertyHUD(game) {
 
     function renderToolLine(tool) {
         const row = document.createElement('div');
-        row.className = 'property-hud__craft-row';
+        row.className = 'property-hud__craft-row property-hud__tool-row';
+        if (tool.iconSrc) {
+            const icon = document.createElement('img');
+            icon.className = 'property-hud__tool-icon';
+            icon.src = tool.iconSrc;
+            icon.alt = '';
+            icon.loading = 'lazy';
+            row.appendChild(icon);
+        }
         const meta = document.createElement('div');
         meta.className = 'property-hud__building-meta';
         const name = document.createElement('div');

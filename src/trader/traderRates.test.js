@@ -5,10 +5,18 @@ import {
     formatPairRate,
     formatTradeQuote,
     quoteTrade,
+    TRADER_FEE_BPS,
     traderCurrencyIds,
 } from './traderRates.js';
 
 describe('traderRates', () => {
+    it('defaults to a 2% house trader fee', () => {
+        const table = buildTraderRateTable(fixedPriceSnapshot());
+        expect(TRADER_FEE_BPS).toBe(200);
+        expect(table.feeBps).toBe(200);
+        expect(table.feeMultiplier).toBe(0.98);
+    });
+
     it('builds a deterministic price-backed rate table', () => {
         const table = buildTraderRateTable(fixedPriceSnapshot(), { feeBps: 100 });
         expect(table.prices.btc).toBe(76847);

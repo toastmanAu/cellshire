@@ -26,7 +26,20 @@ import { isWalkable, isInteractable, findAdjacentWalkable } from '../grid/walkab
 import { OreState } from '../mining/OreState.js';
 import { formatCurrencyAmount, splitUsdBudget } from '../mining/cryptoEconomy.js';
 import { isOre, oreConfig } from '../mining/oreCatalog.js';
-import { playPlacementFor, playMineHit, playMineDeplete } from '../ui/Audio.js';
+import {
+    playPlacementFor,
+    playMineHit,
+    playMineDeplete,
+    playHarvestResource,
+    playCraftSuccess,
+    playRecipeFail,
+    playToolUpgrade,
+    playBuildingUnlock,
+    playPurchaseDone,
+    playLoanBorrow,
+    playLoanRepay,
+    playTravelCue,
+} from '../ui/Audio.js?v=audio-wiring-3';
 import { CELL_CURSORS } from '../ui/cursors.js';
 import { recordMine } from '../mining/minedStore.js';
 import { LocalMiningAdapter } from '../mining/miningAdapter.js';
@@ -42,8 +55,10 @@ import {
 import {
     FARM_CROP_ROLE,
     FARM_CROPS,
+    FARM_EMPTY_PLOT_ASSET_ID,
     FARM_STARTER_CROP_ID,
     canAffordFarmExpansion,
+    farmCropAssetId,
     farmBoundsForTier,
     farmExpansionPreview,
     farmTierSummary,
@@ -96,10 +111,10 @@ import { propertyVisitLabel } from '../visiting/propertyVisit.js';
 import { buildVisitUrl, visitLinkSourceFromSnapshot } from '../visiting/visitLinks.js';
 import { loadWalletIdentity } from '../wallet/walletIdentity.js';
 import {
-    buyStoreItem,
     formatStorePrice,
     generalStoreItem,
 } from '../store/generalStoreCatalog.js';
+import { LocalGeneralStoreAdapter } from '../store/generalStoreAdapter.js';
 import {
     bankLoanSummary,
     borrowBankLoan,
@@ -108,13 +123,13 @@ import {
     saveBankLoanBook,
 } from '../bank/bankLoans.js';
 import {
-    buyMarketplaceListing,
     cancelMarketplaceListing,
     createMarketplaceListing,
     loadMarketplaceState,
     marketplaceListings,
     saveMarketplaceState,
 } from '../marketplace/playerMarketplace.js';
+import { LocalMarketplaceAdapter } from '../marketplace/marketplaceAdapter.js';
 import {
     houseTreasurySummary,
     loadHouseTreasury,
@@ -205,7 +220,11 @@ export class Game {
         this.inventoryAdapter = new LocalInventoryAdapter({
             props: this.propInventory,
         });
+        this.storeAdapter = new LocalGeneralStoreAdapter();
+        this.storeBalanceAdapter = null;
         this.marketplaceState = loadMarketplaceState(safeStorage);
+        this.marketplaceAdapter = new LocalMarketplaceAdapter();
+        this.marketplaceBalanceAdapter = null;
         this.houseTreasury = loadHouseTreasury(safeStorage);
         this.houseTreasury.onChange(() => {
             saveHouseTreasury(safeStorage, this.houseTreasury);
@@ -700,7 +719,7 @@ export class Game {
         const planted = this.farmState.plant(gx, gy, { cropId: FARM_STARTER_CROP_ID });
         if (!planted.ok) return false;
         const crop = FARM_CROPS[planted.plot.cropId];
-        this.tileMap.setTerrain(gx, gy, 'dirt');
+        this.tileMap.setTerrain(gx, gy, FARM_EMPTY_PLOT_ASSET_ID);
         const result = this.placement.place(crop.assetId, gx, gy, { role: FARM_CROP_ROLE });
         if (!result?.object) {
             this.farmState.harvest(gx, gy, { now: Number.MAX_SAFE_INTEGER });
@@ -936,7 +955,16 @@ export class Game {
                 out.txHash ? `Mining tx ${out.txHash.slice(0, 12)}...` : 'Mining transaction submitted',
                 2200,
             );
+            this.inventoryAdapter?.addPendingDelta?.({
+                currency: result.currency,
+                amount: result.amount,
+                txHash: out.txHash,
+                source: 'mining',
+            });
             this._commitMinedOre(obj, state, result);
+            this.hudPanels?.economy?.refresh?.().catch?.(err => {
+                console.warn('[cellshire] economy refresh failed after chain mine', err);
+            });
         } finally {
             this._pendingChainMines.delete(obj.id);
         }
@@ -1013,7 +1041,7 @@ export class Game {
             durationMs: 650,
             sizeRange: [2, 4],
         });
-        playMineDeplete();
+        playHarvestResource(cfg.resourceId);
         this._startDepletion(obj);
         this.ui?.showToast?.(`Harvested ${formatResourceAmount(cfg.resourceId, yieldAmount)}`, 1600);
     }
@@ -1046,8 +1074,9 @@ export class Game {
             durationMs: 600,
             sizeRange: [2, 4],
         });
-        playPlacementFor(obj.assetId);
+        playHarvestResource(result.output.resourceId);
         this.tileMap.removeObjectAt(obj.gx, obj.gy);
+        this.tileMap.setTerrain(obj.gx, obj.gy, FARM_EMPTY_PLOT_ASSET_ID);
         this.renderer.markDirty();
         this._autosaveProperty();
         this._syncFarmZonePreview();
@@ -1241,6 +1270,7 @@ export class Game {
         this._syncBodyModeClass();
         this._emitMapChange();
         this.ui?.showToast?.('Township square', 1600);
+        playTravelCue('township');
         return true;
     }
 
@@ -1264,6 +1294,7 @@ export class Game {
             ? `Visiting ${propertyVisitLabel(ownerId)}`
             : `Visiting ${propertyVisitLabel(ownerId)} · ${read.status === 'stale' ? 'snapshot pending' : 'starter view'}`;
         this.ui?.showToast?.(readOnly ? visitStatus : 'Welcome home', 1800);
+        playTravelCue('property');
     }
 
     async visitProperty(ownerId) {
@@ -1339,6 +1370,7 @@ export class Game {
         this._syncBodyModeClass();
         this._emitMapChange();
         this.ui?.showToast?.('Back to the mine', 1600);
+        playTravelCue('mine');
     }
 
     isAssetVisibleInPalette(assetId) {
@@ -1491,6 +1523,8 @@ export class Game {
             const state = result.state;
             const message = result.reason === 'max-level'
                 ? `${state?.name ?? 'Building'} is max level`
+                : result.reason === 'tier-gate'
+                    ? state?.tierGateLabel ?? 'Upgrade other buildings first'
                 : state?.nextCost
                     ? `Need ${formatBuildingCost(state.nextCost)}`
                     : 'Building unavailable';
@@ -1500,6 +1534,7 @@ export class Game {
         saveBuildingProgression(safeStorage, this.propertyOwner, this.buildingProgression);
         this._emitMapChange();
         this.ui?.showToast?.(`${result.state.name} ${result.state.label}`, 2200);
+        playBuildingUnlock();
         return result;
     }
 
@@ -1523,10 +1558,12 @@ export class Game {
                     ? `Need ${formatRecipeCost(result.recipe.cost)}`
                     : 'Recipe unavailable';
             this.ui?.showToast?.(message, 2200);
+            playRecipeFail();
             return result;
         }
         this._emitMapChange();
         this.ui?.showToast?.(`Crafted ${result.recipe.name}`, 1800);
+        playCraftSuccess();
         return result;
     }
 
@@ -1557,12 +1594,14 @@ export class Game {
         saveToolProgression(safeStorage, this.propertyOwner, this.toolProgression);
         this._emitMapChange();
         this.ui?.showToast?.(`Upgraded ${result.current.name}`, 1800);
+        playToolUpgrade();
         return result;
     }
 
-    buyGeneralStoreItem(assetId) {
+    async buyGeneralStoreItem(assetId) {
         const item = generalStoreItem(assetId);
-        const result = buyStoreItem({
+        const adapter = this.storeAdapter ?? new LocalGeneralStoreAdapter();
+        const result = await adapter.buy({
             assetId,
             inventory: this.player?.inventory,
             propInventory: this.propInventory,
@@ -1579,7 +1618,11 @@ export class Game {
             return result;
         }
         this.ui?.showToast?.(`Bought ${result.item.name}`, 1800);
+        playPurchaseDone();
         this.ui?.update();
+        this.hudPanels?.economy?.refresh?.().catch?.(err => {
+            console.warn('[cellshire] economy refresh failed after store purchase', err);
+        });
         return result;
     }
 
@@ -1600,6 +1643,7 @@ export class Game {
     }
 
     bankLoanSummary() {
+        if (this.bankAdapter) return this.bankAdapter.summary();
         return bankLoanSummary({
             loanBook: this.bankLoanBook,
             treasury: this.houseTreasury,
@@ -1607,30 +1651,35 @@ export class Game {
         });
     }
 
-    borrowBankLoan(offerId) {
-        const result = borrowBankLoan({
-            offerId,
-            loanBook: this.bankLoanBook,
-            inventory: this.player?.inventory,
-            treasury: this.houseTreasury,
-            priceSnapshot: this.priceSnapshot,
-        });
+    async borrowBankLoan(offerId) {
+        const result = this.bankAdapter
+            ? await this.bankAdapter.borrow(offerId)
+            : borrowBankLoan({
+                offerId,
+                loanBook: this.bankLoanBook,
+                inventory: this.player?.inventory,
+                treasury: this.houseTreasury,
+                priceSnapshot: this.priceSnapshot,
+            });
         if (!result.ok) {
             this.ui?.showToast?.(bankLoanFailureMessage(result.reason), 2200);
             return result;
         }
         saveBankLoanBook(safeStorage, this.bankLoanBook);
         this.ui?.showToast?.(`Borrowed ${formatCurrencyAmount(result.loan.currency, result.loan.principal)}`, 2200);
+        playLoanBorrow();
         this.ui?.update();
         return result;
     }
 
-    repayBankLoan(amount = 'max') {
-        const result = repayBankLoan({
-            loanBook: this.bankLoanBook,
-            inventory: this.player?.inventory,
-            amount,
-        });
+    async repayBankLoan(amount = 'max') {
+        const result = this.bankAdapter
+            ? await this.bankAdapter.repay(amount)
+            : repayBankLoan({
+                loanBook: this.bankLoanBook,
+                inventory: this.player?.inventory,
+                amount,
+            });
         if (!result.ok) {
             this.ui?.showToast?.(bankLoanFailureMessage(result.reason), 2200);
             return result;
@@ -1640,6 +1689,7 @@ export class Game {
             result.paid ? 'Loan repaid' : `Paid ${formatCurrencyAmount(result.loan.currency, result.payment)}`,
             2200,
         );
+        playLoanRepay();
         this.ui?.update();
         return result;
     }
@@ -1661,8 +1711,9 @@ export class Game {
         return result;
     }
 
-    buyMarketplaceListing(listingId, account) {
-        const result = buyMarketplaceListing({
+    async buyMarketplaceListing(listingId, account) {
+        const adapter = this.marketplaceAdapter ?? new LocalMarketplaceAdapter();
+        const result = await adapter.buy({
             listingId,
             buyer: account,
             inventory: this.player?.inventory,
@@ -1675,6 +1726,9 @@ export class Game {
         }
         this._saveMarketplace();
         this.ui?.showToast?.(`Bought ${result.listing.name}`, 1800);
+        this.hudPanels?.economy?.refresh?.().catch?.(err => {
+            console.warn('[cellshire] economy refresh failed after marketplace buy', err);
+        });
         return result;
     }
 
@@ -1925,7 +1979,7 @@ export class Game {
         const bounds = farmBoundsForTier(this.farmState.tier);
         for (let gy = bounds.minGy; gy <= bounds.maxGy; gy++)
         for (let gx = bounds.minGx; gx <= bounds.maxGx; gx++) {
-            if (this.tileMap.inBounds(gx, gy)) this.tileMap.setTerrain(gx, gy, 'dirt');
+            if (this.tileMap.inBounds(gx, gy)) this.tileMap.setTerrain(gx, gy, FARM_EMPTY_PLOT_ASSET_ID);
         }
 
         const activeKeys = new Set(this.farmState.entries().map(plot => `${plot.gx},${plot.gy}`));
@@ -1940,9 +1994,24 @@ export class Game {
         for (const plot of this.farmState.entries()) {
             if (!isFarmCell(plot.gx, plot.gy, this.farmState.tier)) continue;
             if (this.tileMap.objectAt(plot.gx, plot.gy)) continue;
-            const crop = FARM_CROPS[plot.cropId] ?? FARM_CROPS[FARM_STARTER_CROP_ID];
-            this.placement.place(crop.assetId, plot.gx, plot.gy, { role: FARM_CROP_ROLE });
+            this.placement.place(farmCropAssetId(plot), plot.gx, plot.gy, { role: FARM_CROP_ROLE });
         }
+    }
+
+    _refreshFarmCropVisuals(now = Date.now()) {
+        if (this.mapKind !== 'property') return false;
+        let changed = false;
+        for (const plot of this.farmState.entries()) {
+            const obj = this.tileMap.objectAt(plot.gx, plot.gy);
+            if (obj?.role !== FARM_CROP_ROLE) continue;
+            const assetId = farmCropAssetId(plot, now);
+            changed = this.tileMap.setObjectAsset(obj, assetId) || changed;
+        }
+        if (changed) {
+            this.renderer.markDirty();
+            this._emitMapChange();
+        }
+        return changed;
     }
 
     _emitMapChange() {
@@ -2012,6 +2081,7 @@ export class Game {
             }
         }
 
+        this._refreshFarmCropVisuals();
         this.renderer.draw();
         requestAnimationFrame(this._loop);
     }
@@ -2022,6 +2092,7 @@ function marketplaceFailureMessage(reason) {
     if (reason === 'insufficient-funds') return 'Not enough CKB';
     if (reason === 'missing-owned-item') return 'No owned prop to list';
     if (reason === 'invalid-price') return 'Enter a valid price';
+    if (reason === 'raw-resource-not-listable') return 'Craft materials into props before listing';
     if (reason === 'own-listing') return 'Cannot buy your own listing';
     if (reason === 'not-owner') return 'Only the seller can cancel';
     return 'Marketplace action failed';
@@ -2031,6 +2102,9 @@ function bankLoanFailureMessage(reason) {
     if (reason === 'active-loan') return 'Repay the current loan first';
     if (reason === 'insufficient-reserve') return 'House reserve is too low';
     if (reason === 'insufficient-funds') return 'Not enough CKB to repay';
+    if (reason === 'insufficient-collateral') return 'Not enough CKB collateral';
+    if (reason === 'not-implemented') return 'Bank chain submit is not wired yet';
+    if (reason === 'unsupported-collateral') return 'Bank collateral type is not supported yet';
     if (reason === 'no-active-loan') return 'No active loan';
     if (reason === 'invalid-amount') return 'Enter a valid repayment';
     return 'Bank action failed';

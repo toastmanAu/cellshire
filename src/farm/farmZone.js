@@ -1,18 +1,27 @@
 import { formatResourceAmount } from '../resources/resourceInventory.js';
 
 export const FARM_CROP_ROLE = 'farm_crop';
+export const FARM_EMPTY_PLOT_ASSET_ID = 'farm_plot_empty';
 export const FARM_STARTER_CROP_ID = 'starter_crop';
-export const FARM_STARTER_CROP_GROW_MS = 15_000;
+export const FARM_STARTER_CROP_GROW_MS = 12_000;
 
 export const FARM_CROPS = Object.freeze({
     [FARM_STARTER_CROP_ID]: Object.freeze({
         id: FARM_STARTER_CROP_ID,
         name: 'Starter crop',
-        assetId: 'crop_patch',
+        assetId: 'farm_plot_starter_crop',
+        readyAssetId: 'farm_plot_ready_crop',
         growMs: FARM_STARTER_CROP_GROW_MS,
-        output: Object.freeze({ resourceId: 'crop', amount: 2 }),
+        output: Object.freeze({ resourceId: 'crop', amount: 3 }),
     }),
 });
+
+export function farmCropAssetId(plot, now = Date.now()) {
+    const crop = FARM_CROPS[plot?.cropId] ?? FARM_CROPS[FARM_STARTER_CROP_ID];
+    return Number(now) >= Number(plot?.readyAt)
+        ? crop.readyAssetId ?? crop.assetId
+        : crop.assetId;
+}
 
 export const FARM_TIERS = Object.freeze([
     Object.freeze({
@@ -25,13 +34,13 @@ export const FARM_TIERS = Object.freeze([
         tier: 2,
         name: 'Kitchen garden',
         bounds: Object.freeze({ minGx: 14, minGy: 12, maxGx: 17, maxGy: 15 }),
-        cost: Object.freeze({ wood: 12, stone: 8 }),
+        cost: Object.freeze({ wood: 10, stone: 7 }),
     }),
     Object.freeze({
         tier: 3,
         name: 'Field patch',
         bounds: Object.freeze({ minGx: 13, minGy: 11, maxGx: 18, maxGy: 16 }),
-        cost: Object.freeze({ wood: 30, stone: 18 }),
+        cost: Object.freeze({ wood: 28, stone: 18 }),
     }),
 ]);
 

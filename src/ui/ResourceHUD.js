@@ -1,4 +1,5 @@
 import { RESOURCE_CATALOG, formatResourceAmount } from '../resources/resourceInventory.js';
+import { hudMount } from './hudMount.js';
 
 const MAX_ROWS = 5;
 
@@ -26,7 +27,7 @@ export function installResourceHUD(game) {
     const root = document.createElement('section');
     root.id = 'resource-hud';
     root.setAttribute('aria-live', 'polite');
-    document.body.appendChild(root);
+    hudMount('resources').appendChild(root);
 
     const inventory = game?.resourceInventory ?? null;
     let lastChange = null;

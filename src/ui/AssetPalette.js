@@ -9,7 +9,7 @@
 import { CATEGORIES } from '../assets/assetManifest.js';
 import { allAssetDefinitions } from '../assets/assetRegistry.js';
 import { allAssets } from '../assets/assetLoader.js';
-import { playUiClick } from './Audio.js';
+import { playUiClick } from './Audio.js?v=audio-wiring-3';
 
 export class AssetPalette {
     constructor(tabsEl, gridEl, game) {

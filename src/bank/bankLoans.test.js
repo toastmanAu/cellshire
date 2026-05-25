@@ -11,6 +11,7 @@ import {
     loadBankLoanBook,
     repayBankLoan,
     saveBankLoanBook,
+    validateBankCollateral,
 } from './bankLoans.js';
 
 function fakeStorage(initial = {}) {
@@ -30,9 +31,16 @@ describe('bank loans', () => {
         });
         expect(offers.length).toBe(3);
         expect(offers[0].currency).toBe('ckb');
-        expect(offers[0].amount).toBe(5000);
-        expect(offers[0].totalOwed).toBe(5150);
+        expect(offers[0].amount).toBe(7500);
+        expect(offers[0].totalOwed).toBe(7687.5);
         expect(offers[0].enabled).toBe(true);
+    });
+
+    it('rejects raw materials as loan collateral', () => {
+        expect(validateBankCollateral({ assetId: 'stone' }).reason).toBe('raw-resource-collateral');
+        expect(validateBankCollateral({ currency: 'crop' }).reason).toBe('raw-resource-collateral');
+        expect(validateBankCollateral({ currency: 'ckb' }).ok).toBe(true);
+        expect(validateBankCollateral({ assetId: 'blue_railing' }).ok).toBe(true);
     });
 
     it('borrows one active loan at a time and credits local CKB', () => {
@@ -47,8 +55,8 @@ describe('bank loans', () => {
             now: () => 1000,
         });
         expect(result.ok).toBe(true);
-        expect(inventory.get('ckb')).toBe(5000);
-        expect(loanBook.activeLoan().remainingOwed).toBe(5150);
+        expect(inventory.get('ckb')).toBe(7500);
+        expect(loanBook.activeLoan().remainingOwed).toBe(7687.5);
         expect(borrowBankLoan({
             offerId: 'builder-credit',
             loanBook,
@@ -70,9 +78,9 @@ describe('bank loans', () => {
             now: () => 1000,
         });
         inventory.add('ckb', 1000);
-        const part = repayBankLoan({ loanBook, inventory, amount: 150 });
+        const part = repayBankLoan({ loanBook, inventory, amount: 187.5 });
         expect(part.ok).toBe(true);
-        expect(part.loan.remainingOwed).toBe(5000);
+        expect(part.loan.remainingOwed).toBe(7500);
         expect(part.loan.status).toBe('active');
         const paid = repayBankLoan({ loanBook, inventory, amount: 'max' });
         expect(paid.ok).toBe(true);
@@ -93,7 +101,7 @@ describe('bank loans', () => {
         const result = repayBankLoan({ loanBook, inventory, amount: 'max' });
         expect(result.ok).toBe(false);
         expect(result.reason).toBe('insufficient-funds');
-        expect(result.loan.remainingOwed).toBe(5150);
+        expect(result.loan.remainingOwed).toBe(7687.5);
     });
 
     it('persists and summarizes loan state', () => {
@@ -111,11 +119,11 @@ describe('bank loans', () => {
         expect(saveBankLoanBook(storage, loanBook)).toBe(true);
         const loaded = loadBankLoanBook(storage);
         expect(storage.get(BANK_LOANS_STORAGE_KEY) !== null).toBe(true);
-        expect(loaded.activeLoan().principal).toBe(15000);
+        expect(loaded.activeLoan().principal).toBe(18000);
         expect(bankLoanSummary({
             loanBook: loaded,
             treasury: new HouseTreasury(),
             priceSnapshot: fixedPriceSnapshot(),
-        }).detail).toBe('15450.00 CKB due');
+        }).detail).toBe('18450.00 CKB due');
     });
 });

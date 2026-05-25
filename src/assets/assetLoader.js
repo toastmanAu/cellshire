@@ -216,6 +216,7 @@ export async function loadAssets(onProgress = () => {}) {
     for (let i = 0; i < total; i++) {
         const entry = ASSET_MANIFEST[i];
         queueImageLoad(ASSET_MANIFEST[i + IMAGE_LOAD_AHEAD]);
+        onProgress(i / total, entry.name);
         const meta = {
             id: entry.id,
             name: entry.name,

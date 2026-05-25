@@ -12,19 +12,19 @@ export const PROPERTY_EXPANSION_TIERS = Object.freeze([
         tier: 2,
         name: 'Garden claim',
         bounds: Object.freeze({ minGx: 3, minGy: 3, maxGx: 20, maxGy: 20 }),
-        cost: Object.freeze({ currency: 'ckb', amount: 10000 }),
+        cost: Object.freeze({ currency: 'ckb', amount: 7500 }),
     }),
     Object.freeze({
         tier: 3,
         name: 'Homestead claim',
         bounds: Object.freeze({ minGx: 2, minGy: 2, maxGx: 21, maxGy: 21 }),
-        cost: Object.freeze({ currency: 'ckb', amount: 25000 }),
+        cost: Object.freeze({ currency: 'ckb', amount: 22000 }),
     }),
     Object.freeze({
         tier: 4,
         name: 'Estate claim',
         bounds: Object.freeze({ minGx: 1, minGy: 1, maxGx: 22, maxGy: 22 }),
-        cost: Object.freeze({ currency: 'ckb', amount: 50000 }),
+        cost: Object.freeze({ currency: 'ckb', amount: 48000 }),
     }),
 ]);
 

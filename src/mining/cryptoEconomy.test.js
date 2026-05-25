@@ -12,6 +12,7 @@ import {
     splitUsdBudget,
 } from './cryptoEconomy.js';
 import { ORE_CATALOG } from './oreCatalog.js';
+import { RESOURCE_CATALOG } from '../resources/resourceInventory.js';
 
 describe('crypto economy mapping', () => {
     it('maps every current mineable deposit to a proof-of-work currency', () => {
@@ -19,6 +20,12 @@ describe('crypto economy mapping', () => {
         for (const currencyId of Object.values(ORE_CURRENCY_MAP)) {
             expect(CURRENCY_CATALOG[currencyId].pow).toBe(true);
         }
+    });
+
+    it('keeps local resource ids disjoint from chain currency ids', () => {
+        const overlap = Object.keys(RESOURCE_CATALOG)
+            .filter(resourceId => Object.prototype.hasOwnProperty.call(CURRENCY_CATALOG, resourceId));
+        expect(overlap).toEqual([]);
     });
 
     it('uses the requested deposit-to-crypto associations', () => {

@@ -23,6 +23,7 @@ const WALKABLE_TERRAIN = new Set([
     'grass',
     'path',
     'stone',
+    'farm_plot_empty',
 ]);
 
 const INTERACTABLE_OBJECTS = new Set([

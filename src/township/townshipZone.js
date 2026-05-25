@@ -49,11 +49,11 @@ export function createTownshipMap() {
         tileMap.setTerrain(gx, gy, 'stone');
     }
 
-    addObject(tileMap, 'cube_house', 6, 9, { role: TOWNSHIP_BUILDING_ROLES.store });
-    addObject(tileMap, 'terrace_house', 12, 7, { role: TOWNSHIP_BUILDING_ROLES.market });
-    addObject(tileMap, 'two_story', 20, 8, { role: TOWNSHIP_BUILDING_ROLES.bank });
-    addObject(tileMap, 'villa', 5, 16, { role: TOWNSHIP_BUILDING_ROLES.gallery });
-    addObject(tileMap, 'main_chapel', 19, 16, { role: TOWNSHIP_BUILDING_ROLES.communityHall });
+    addObject(tileMap, 'township_store', 6, 9, { role: TOWNSHIP_BUILDING_ROLES.store });
+    addObject(tileMap, 'township_market', 12, 7, { role: TOWNSHIP_BUILDING_ROLES.market });
+    addObject(tileMap, 'township_bank', 20, 8, { role: TOWNSHIP_BUILDING_ROLES.bank });
+    addObject(tileMap, 'township_gallery', 5, 16, { role: TOWNSHIP_BUILDING_ROLES.gallery });
+    addObject(tileMap, 'township_community_hall', 19, 16, { role: TOWNSHIP_BUILDING_ROLES.communityHall });
 
     addObject(tileMap, 'signpost', 13, 24, { role: TOWNSHIP_MINE_PORTAL_ROLE });
     addObject(tileMap, 'signpost', 17, 24, { role: TOWNSHIP_PROPERTY_PORTAL_ROLE });

@@ -4,6 +4,37 @@ import {
 } from '../township/townshipZone.js';
 import { formatCurrencyAmount } from '../mining/cryptoEconomy.js';
 
+export const INTERIOR_BACKDROPS = Object.freeze({
+    store: 'assets/interiors/interior_store.png',
+    market: 'assets/interiors/interior_market.png',
+    bank: 'assets/interiors/interior_bank.png',
+    gallery: 'assets/interiors/interior_gallery.png',
+    hall: 'assets/interiors/interior_hall.png',
+});
+
+export const INTERIOR_NPCS = Object.freeze({
+    store: Object.freeze({
+        name: 'Storekeeper',
+        src: 'assets/npc_storekeeper.png',
+    }),
+    market: Object.freeze({
+        name: 'Trader',
+        src: 'assets/npc_trader.png',
+    }),
+    bank: Object.freeze({
+        name: 'Bank Teller',
+        src: 'assets/npc_bank_teller.png',
+    }),
+    gallery: Object.freeze({
+        name: 'Gallery Curator',
+        src: 'assets/npc_gallery_curator.png',
+    }),
+    hall: Object.freeze({
+        name: 'Hall Keeper',
+        src: 'assets/npc_hall_keeper.png',
+    }),
+});
+
 function clear(el) {
     while (el.firstChild) el.removeChild(el.firstChild);
 }
@@ -22,6 +53,8 @@ export function buildingInteriorDefinition(role) {
             role,
             title: label,
             scene: 'store',
+            backdrop: INTERIOR_BACKDROPS.store,
+            npc: INTERIOR_NPCS.store,
             actions: [
                 { id: 'store', label: 'Shop counter', panel: 'store' },
             ],
@@ -32,6 +65,8 @@ export function buildingInteriorDefinition(role) {
             role,
             title: label,
             scene: 'market',
+            backdrop: INTERIOR_BACKDROPS.market,
+            npc: INTERIOR_NPCS.market,
             actions: [
                 { id: 'market', label: 'Listings board', panel: 'market' },
             ],
@@ -42,6 +77,8 @@ export function buildingInteriorDefinition(role) {
             role,
             title: label,
             scene: 'bank',
+            backdrop: INTERIOR_BACKDROPS.bank,
+            npc: INTERIOR_NPCS.bank,
             actions: [
                 { id: 'exchange', label: 'Exchange desk', panel: 'trader' },
                 { id: 'treasury', label: 'House treasury', treasury: true },
@@ -54,6 +91,8 @@ export function buildingInteriorDefinition(role) {
             role,
             title: label,
             scene: 'gallery',
+            backdrop: INTERIOR_BACKDROPS.gallery,
+            npc: INTERIOR_NPCS.gallery,
             actions: [
                 { id: 'gallery', label: 'View wall', toast: 'Gallery opens soon' },
             ],
@@ -64,6 +103,8 @@ export function buildingInteriorDefinition(role) {
             role,
             title: label,
             scene: 'hall',
+            backdrop: INTERIOR_BACKDROPS.hall,
+            npc: INTERIOR_NPCS.hall,
             actions: [
                 { id: 'hall', label: 'Notice board', toast: 'Community hall opens soon' },
             ],
@@ -121,13 +162,16 @@ export function installBuildingInteriorHUD(game) {
 
         const scene = div('building-window__scene');
         scene.setAttribute('aria-label', `${current.title} interior`);
-        scene.appendChild(div('building-window__back-wall'));
-        scene.appendChild(div('building-window__counter'));
-        scene.appendChild(div('building-window__shelf building-window__shelf--left'));
-        scene.appendChild(div('building-window__shelf building-window__shelf--right'));
-        scene.appendChild(div('building-window__accent building-window__accent--one'));
-        scene.appendChild(div('building-window__accent building-window__accent--two'));
-        scene.appendChild(div('building-window__floor'));
+        scene.style.backgroundImage = current.backdrop ? `url("${current.backdrop}")` : '';
+        scene.appendChild(div('building-window__shade'));
+        if (current.npc) {
+            const npc = document.createElement('img');
+            npc.className = 'building-window__npc';
+            npc.src = current.npc.src;
+            npc.alt = current.npc.name;
+            npc.loading = 'lazy';
+            scene.appendChild(npc);
+        }
         panel.appendChild(scene);
 
         const actions = div('building-window__actions');
@@ -217,8 +261,8 @@ export function installBuildingInteriorHUD(game) {
             repay.type = 'button';
             repay.className = 'building-window__loan-action';
             repay.textContent = 'Repay balance';
-            repay.addEventListener('click', () => {
-                game.repayBankLoan?.('max');
+            repay.addEventListener('click', async () => {
+                await game.repayBankLoan?.('max');
                 renderLoans();
             });
             loans.appendChild(repay);
@@ -236,8 +280,8 @@ export function installBuildingInteriorHUD(game) {
             borrow.className = 'building-window__loan-action';
             borrow.textContent = offer.enabled ? 'Borrow' : 'Locked';
             borrow.disabled = !offer.enabled;
-            borrow.addEventListener('click', () => {
-                game.borrowBankLoan?.(offer.id);
+            borrow.addEventListener('click', async () => {
+                await game.borrowBankLoan?.(offer.id);
                 renderLoans();
             });
             row.appendChild(borrow);

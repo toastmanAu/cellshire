@@ -3,12 +3,12 @@ import { formatCurrencyAmount } from '../mining/cryptoEconomy.js';
 import { normalizePropertyTier } from '../property/propertyExpansion.js';
 
 export const GENERAL_STORE_ITEMS = Object.freeze([
-    Object.freeze({ assetId: 'blue_railing',    rarity: 'common',   unlockTier: 1, price: Object.freeze({ currency: 'ckb', amount: 500 }) }),
-    Object.freeze({ assetId: 'hay_bale',        rarity: 'common',   unlockTier: 1, price: Object.freeze({ currency: 'ckb', amount: 650 }) }),
-    Object.freeze({ assetId: 'stone_lantern',   rarity: 'common',   unlockTier: 1, price: Object.freeze({ currency: 'ckb', amount: 900 }) }),
-    Object.freeze({ assetId: 'stone_basin',     rarity: 'common',   unlockTier: 2, price: Object.freeze({ currency: 'ckb', amount: 1250 }) }),
-    Object.freeze({ assetId: 'well',            rarity: 'common',   unlockTier: 2, price: Object.freeze({ currency: 'ckb', amount: 1600 }) }),
-    Object.freeze({ assetId: 'veg_garden',      rarity: 'common',   unlockTier: 2, price: Object.freeze({ currency: 'ckb', amount: 1800 }) }),
+    Object.freeze({ assetId: 'blue_railing',    rarity: 'common',   unlockTier: 1, price: Object.freeze({ currency: 'ckb', amount: 350 }) }),
+    Object.freeze({ assetId: 'hay_bale',        rarity: 'common',   unlockTier: 1, price: Object.freeze({ currency: 'ckb', amount: 500 }) }),
+    Object.freeze({ assetId: 'stone_lantern',   rarity: 'common',   unlockTier: 1, price: Object.freeze({ currency: 'ckb', amount: 800 }) }),
+    Object.freeze({ assetId: 'stone_basin',     rarity: 'common',   unlockTier: 2, price: Object.freeze({ currency: 'ckb', amount: 1100 }) }),
+    Object.freeze({ assetId: 'well',            rarity: 'common',   unlockTier: 2, price: Object.freeze({ currency: 'ckb', amount: 1400 }) }),
+    Object.freeze({ assetId: 'veg_garden',      rarity: 'common',   unlockTier: 2, price: Object.freeze({ currency: 'ckb', amount: 1500 }) }),
     Object.freeze({ assetId: 'small_bridge',    rarity: 'uncommon', unlockTier: 3, price: Object.freeze({ currency: 'ckb', amount: 2400 }) }),
     Object.freeze({ assetId: 'house',           rarity: 'uncommon', unlockTier: 3, price: Object.freeze({ currency: 'ckb', amount: 6500 }) }),
     Object.freeze({ assetId: 'windmill',        rarity: 'rare',     unlockTier: 4, price: Object.freeze({ currency: 'ckb', amount: 12000 }) }),

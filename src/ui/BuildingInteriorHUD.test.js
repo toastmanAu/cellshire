@@ -2,6 +2,8 @@ import { describe, it, expect } from '../test/harness.js';
 import { TOWNSHIP_BUILDING_ROLES } from '../township/townshipZone.js';
 import {
     buildingInteriorDefinition,
+    INTERIOR_BACKDROPS,
+    INTERIOR_NPCS,
     installBuildingInteriorHUD,
 } from './BuildingInteriorHUD.js';
 
@@ -29,7 +31,10 @@ function fakeGame() {
 
 describe('BuildingInteriorHUD', () => {
     it('defines data-driven interiors for township landmarks', () => {
-        expect(buildingInteriorDefinition(TOWNSHIP_BUILDING_ROLES.store).actions[0].panel).toBe('store');
+        const store = buildingInteriorDefinition(TOWNSHIP_BUILDING_ROLES.store);
+        expect(store.actions[0].panel).toBe('store');
+        expect(store.backdrop).toBe(INTERIOR_BACKDROPS.store);
+        expect(store.npc).toBe(INTERIOR_NPCS.store);
         expect(buildingInteriorDefinition(TOWNSHIP_BUILDING_ROLES.market).actions[0].panel).toBe('market');
         expect(buildingInteriorDefinition(TOWNSHIP_BUILDING_ROLES.bank).actions[0].panel).toBe('trader');
         expect(buildingInteriorDefinition('unknown')).toBeNull();
@@ -43,6 +48,11 @@ describe('BuildingInteriorHUD', () => {
         expect(hud.open(TOWNSHIP_BUILDING_ROLES.store)).toBe(true);
         expect(hud.root.dataset.open).toBe('1');
         expect(document.querySelector('.building-window__title').textContent).toBe('General Store');
+        expect(document.querySelector('.building-window__scene').style.backgroundImage
+            .includes('assets/interiors/interior_store.png')).toBe(true);
+        expect(document.querySelector('.building-window__npc').src
+            .includes('assets/npc_storekeeper.png')).toBe(true);
+        expect(document.querySelector('.building-window__npc').alt).toBe('Storekeeper');
 
         document.querySelector('.building-window__action').click();
         expect(game.opened[0]).toBe('store');

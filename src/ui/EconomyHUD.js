@@ -15,6 +15,7 @@ import {
     priceUsdForCurrency,
     usdValueForAmount,
 } from '../mining/cryptoEconomy.js';
+import { hudMount } from './hudMount.js';
 
 const MAX_ROWS = 5;
 
@@ -83,16 +84,28 @@ export function buildEconomySummary(inventory, priceSnapshot) {
     };
 }
 
-export function installEconomyHUD({ player, game, inventoryAdapter = null, priceSnapshot = null }) {
+export function installEconomyHUD({
+    player,
+    game,
+    inventoryAdapter = null,
+    inventoryAdapters = null,
+    initialInventorySource = null,
+    onInventorySourceChange = null,
+    priceSnapshot = null,
+}) {
     const card = document.createElement('section');
     card.id = 'economy-hud';
     card.setAttribute('aria-live', 'polite');
-    document.body.appendChild(card);
+    hudMount('economy').appendChild(card);
 
     let lastChange = null;
     let currentSnapshot = null;
     let currentInventory = player.inventory;
     let unsubscribeInventory = null;
+    const adapters = normalizeInventoryAdapters({ player, inventoryAdapter, inventoryAdapters });
+    let activeSource = initialInventorySource && adapters.has(initialInventorySource)
+        ? initialInventorySource
+        : adapters.keys().next().value;
 
     function makeRow(currencyId, amount) {
         const row = div('economy-hud__row');
@@ -120,9 +133,12 @@ export function installEconomyHUD({ player, game, inventoryAdapter = null, price
         const summary = buildEconomySummary(currentInventory, priceSnapshot);
         const snapshot = priceSnapshotDetail(priceSnapshot);
         const header = div('economy-hud__header');
+        const titleWrap = div('economy-hud__title-wrap');
         const title = div('economy-hud__title', 'Economy');
+        titleWrap.appendChild(title);
+        if (adapters.size > 1) titleWrap.appendChild(makeSourceToggle());
         const total = div('economy-hud__total', formatUsd(summary.totalUsd));
-        header.appendChild(title);
+        header.appendChild(titleWrap);
         header.appendChild(total);
         card.appendChild(header);
 
@@ -165,6 +181,25 @@ export function installEconomyHUD({ player, game, inventoryAdapter = null, price
         }
     }
 
+    function makeSourceToggle() {
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'economy-hud__source';
+        const isChain = currentSnapshot?.source === 'chain' || activeSource === 'chain';
+        toggle.textContent = isChain && currentSnapshot?.pending
+            ? 'Chain wallet · pending'
+            : isChain ? 'Chain wallet' : 'Local wallet';
+        toggle.title = activeSource === 'chain'
+            ? 'Showing chain wallet balances'
+            : 'Showing local prototype balances';
+        toggle.addEventListener('click', () => {
+            const sources = Array.from(adapters.keys());
+            const index = Math.max(0, sources.indexOf(activeSource));
+            setInventorySource(sources[(index + 1) % sources.length]);
+        });
+        return toggle;
+    }
+
     function subscribeToInventory(inventory) {
         unsubscribeInventory?.();
         unsubscribeInventory = inventory?.onChange
@@ -176,12 +211,20 @@ export function installEconomyHUD({ player, game, inventoryAdapter = null, price
     }
 
     async function refresh() {
-        if (!inventoryAdapter?.read) return currentSnapshot;
-        currentSnapshot = await inventoryAdapter.read();
+        const adapter = adapters.get(activeSource);
+        if (!adapter?.read) return currentSnapshot;
+        currentSnapshot = await adapter.read();
         if (currentSnapshot?.currencies) currentInventory = currentSnapshot.currencies;
         subscribeToInventory(currentInventory);
         render();
         return currentSnapshot;
+    }
+
+    async function setInventorySource(source) {
+        if (!adapters.has(source) || source === activeSource) return currentSnapshot;
+        activeSource = source;
+        onInventorySourceChange?.(source);
+        return refresh();
     }
 
     subscribeToInventory(currentInventory);
@@ -194,9 +237,35 @@ export function installEconomyHUD({ player, game, inventoryAdapter = null, price
         el: card,
         render,
         refresh,
+        getInventorySource: () => activeSource,
+        setInventorySource,
         dismiss() {
             unsubscribeInventory?.();
             card.remove();
         },
     };
+}
+
+function normalizeInventoryAdapters({ player, inventoryAdapter, inventoryAdapters }) {
+    const adapters = new Map();
+    const localAdapter = {
+        async read() {
+            return {
+                source: 'local',
+                stale: false,
+                pending: false,
+                currencies: player.inventory,
+            };
+        },
+    };
+    if (inventoryAdapters) {
+        for (const [source, adapter] of Object.entries(inventoryAdapters)) {
+            if (adapter?.read) adapters.set(source, adapter);
+        }
+    } else if (inventoryAdapter?.read) {
+        adapters.set('chain', inventoryAdapter);
+    }
+    if (!adapters.has('local')) adapters.set('local', localAdapter);
+    if (!adapters.size) adapters.set('local', localAdapter);
+    return adapters;
 }
