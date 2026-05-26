@@ -1,8 +1,73 @@
 # Cellshire Kanban
 
-Status captured 2026-05-25. This board tracks the next implementation
+Status captured 2026-05-27. This board tracks the next implementation
 cards needed to turn the current prototype into the game described in
 `docs/DESIGN.md`.
+
+## Session Wrap 2026-05-27
+
+**Latest completed card:** `Bank CCC Script-Configured Collateral Transaction`.
+
+**What landed since the last board save:**
+- Added `?chainBankSubmit=ccc-real` / `?chainBankMode=ccc-real` routing for
+  script-configured CCC/JoyID bank collateral transactions.
+- Added URL-driven bank script config parsing for debt type, bank book lock,
+  collateral lock, reserve lock, treasury lock, and optional cell deps.
+- Added a real-shaped CCC bank transaction builder:
+  BORROW emits player principal, debt cell data/type, and locked collateral
+  outputs; REPAY emits collateral release, bank reserve, and treasury fee
+  outputs.
+- Real CCC bank mode skips fixture settlement and returns `chain-ccc-real`,
+  while existing `?chainBankSubmit=ccc` remains the compact receipt path.
+
+**Verification saved on board:**
+- Full browser harness: `374 passed, 0 failed`.
+- `node netlify-build.mjs` passed after the script-configured CCC bank slice.
+- `git diff --check` passed after the script-configured CCC bank slice.
+
+**Current Next card:** `Bank Reserve/Input Provider` — feed real bank reserve,
+debt, and locked-collateral inputs into the CCC bank tx builder instead of
+only preparing the script-configured output shape.
+
+**Known caveat:** `ccc-real` prepares and submits the configured bank tx shape,
+but true BORROW still needs a bank reserve input/signing provider before it can
+be considered end-to-end settlement.
+
+## Session Wrap 2026-05-26
+
+**Latest completed cards:** `CCC Marketplace Receipt Submit` and
+`Bank Chain Design — v2 CKB collateral fixture settlement`.
+
+**What landed since the last board save:**
+- Chain Marketplace purchases now support CCC/JoyID receipt submit behind
+  `?chainMarketplace=1&chainMarketplaceSubmit=ccc`.
+- Added `cellshire.marketplace.purchase` receipt payload, CCC transaction
+  preparation, submitter factory, and adapter wiring.
+- Marketplace CCC mode is receipt-only: it skips fixture settlement, records
+  the pending CKB spend, grants the bought prop locally, and leaves real
+  marketplace settlement/Open Asset transfer deferred.
+- CCC receipt flags now opt the wallet connector into the real CCC/JoyID path
+  for Bank, Store, Trader, and Marketplace submit modes.
+- Chain Bank prototype submit now fixture-settles BORROW/REPAY against an
+  indexer-owned debt/locked-collateral state, so CKB collateral is locked on
+  borrow and released only by full repay in the fixture path.
+- Bank pending CKB reconciliation now records one net CKB delta per bank tx,
+  matching the indexed post-settlement balance when collateral and principal
+  move in the same transaction.
+
+**Verification saved on board:**
+- Full browser harness after Marketplace CCC receipt: `364 passed, 0 failed`.
+- Full browser harness after Bank fixture settlement: `368 passed, 0 failed`.
+- `node netlify-build.mjs` passed after both slices.
+- `git diff --check` passed after both slices.
+
+**Current Next card:** `Bank CCC Real Collateral Lock Transaction` — replace
+the bank-loan CCC receipt tx with the real CKB collateral-lock transaction
+once script deps and lock/type code hashes are available.
+
+**Known caveat:** Marketplace and Bank CCC submit paths are still compact
+receipts. The new Bank settlement is a fixture/indexer model, not a deployed
+CKB collateral-lock script.
 
 ## Session Wrap 2026-05-25
 
@@ -1034,8 +1099,9 @@ installed.
 
 ### Bank Chain Design — v2 CKB Collateral Slice
 
-**Status:** first fixture slice implemented 2026-05-25. CCC receipt submit is
-wired; full collateral-lock settlement remains the next follow-up.
+**Status:** fixture collateral settlement implemented 2026-05-26. Script-
+configured CCC bank collateral tx shape implemented 2026-05-27. Bank reserve
+input/signing remains a follow-up.
 
 **Spec:** [`2026-05-23-bank-chain-design.md`](specs/2026-05-23-bank-chain-design.md)
 
@@ -1050,8 +1116,15 @@ but deferred to a backend worker. Preserves local prototype fallback.
   pointer).
 - CKB-collateralised loan borrows and repays through a prototype fixture path,
   recording pending CKB deltas over the chain wallet view.
+- Fixture BORROW creates debt and locked-collateral records in the chain
+  indexer boundary; fixture REPAY consumes those records and releases CKB
+  collateral only on full repayment.
 - `?chainBankSubmit=ccc` signs/submits a bank-loan receipt through JoyID using
   the existing CCC receipt pattern.
+- `?chainBankSubmit=ccc-real` signs/submits the script-configured bank
+  collateral tx shape through JoyID when the debt type, bank book lock,
+  collateral lock, reserve lock, treasury lock, and optional cell deps are
+  provided in URL params.
 - Local Bank unchanged when flags are off.
 
 **Notes:**
@@ -1060,11 +1133,23 @@ but deferred to a backend worker. Preserves local prototype fallback.
 - `?chainBank=1&chainBankCollateral=ckb` routes the Bank interior through the
   chain bank adapter. `?chainCurrencyCkb=<amount>` sets the fixture CKB wallet
   balance.
+- Prototype submit now returns `chain-fixture-settled` when the fixture indexer
+  accepts BORROW/REPAY, and the active loan stores the fixture debt-cell
+  outpoint for REPAY.
+- Bank pending deltas are netted per tx (`principal - collateral` on borrow,
+  `collateral - owed` on repay), so chain wallet pending state clears cleanly
+  when the indexed balance reaches the final settlement amount.
 - `?chainBankSubmit=ccc` is receipt-only for now; it does not yet move real
   collateral under the final collateral lock script.
 - Verification: browser test harness (`336 passed, 0 failed`),
   `node netlify-build.mjs`, `git diff --check`, and a flagged boot smoke with
   `?chainBank=1&chainBankCollateral=ckb&chainCurrencyCkb=30000`.
+- Fixture collateral settlement addendum verified with the full browser
+  harness (`368 passed, 0 failed`), `node netlify-build.mjs`, and
+  `git diff --check`.
+- Script-configured CCC bank collateral tx addendum verified with the full
+  browser harness (`374 passed, 0 failed`), `node netlify-build.mjs`, and
+  `git diff --check`.
 
 ### Resource Model Boundary — Catalog Disjointness + Collateral Validator
 
@@ -1176,6 +1261,9 @@ surface behind `?chainCurrency=1`.
   grants the bought prop/skin locally, closes the listing, and lets pending CKB
   clear once the fixture indexer catches up. Listing and cancel remain local
   wallet-gated actions for this slice.
+- `?chainMarketplaceSubmit=ccc` now signs/submits a compact
+  `cellshire.marketplace.purchase` receipt through CCC/JoyID. Full real
+  marketplace settlement and Open Asset transfer remain deferred.
 
 Verified with the browser test harness (`325 passed, 0 failed`),
 `node netlify-build.mjs`, `git diff --check`, and a boot smoke with
@@ -1193,6 +1281,8 @@ CCC Store receipt addendum verified with focused CCC/store module tests
 Chain Marketplace fixture buy addendum verified with focused
 marketplace/store/trader/currency module tests (`30 passed, 0 failed`),
 `node netlify-build.mjs`, and `git diff --check`.
+CCC Marketplace receipt addendum verified with the full browser harness
+(`364 passed, 0 failed`), `node netlify-build.mjs`, and `git diff --check`.
 
 ### Pickaxe Upgrade Progression
 

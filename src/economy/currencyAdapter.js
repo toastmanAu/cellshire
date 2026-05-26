@@ -1,5 +1,9 @@
 import { Inventory } from '../core/Inventory.js';
 import { CURRENCY_CATALOG } from '../mining/cryptoEconomy.js';
+import {
+    settleBankBorrowFixture,
+    settleBankRepayFixture,
+} from '../chain/bankTx.js';
 import { settleMarketplacePurchaseFixture } from '../chain/marketplacePurchaseTx.js';
 import { settleStorePurchaseFixture } from '../chain/storePurchaseTx.js';
 import { settleTraderSwapFixture } from '../chain/traderSwapTx.js';
@@ -118,12 +122,32 @@ export class ReadOnlyChainCurrencyAdapter {
             txHash: receipt.txHash,
         }) ?? null;
     }
+
+    settleBankBorrowTx(tx, receipt = {}) {
+        return this.indexer?.applyBankBorrowTx?.(tx, {
+            txHash: receipt.txHash,
+        }) ?? null;
+    }
+
+    settleBankRepayTx(tx, receipt = {}) {
+        return this.indexer?.applyBankRepayTx?.(tx, {
+            txHash: receipt.txHash,
+        }) ?? null;
+    }
 }
 
 export class FixtureCurrencyIndexer {
-    constructor({ balances = {}, offline = false } = {}) {
+    constructor({ balances = {}, offline = false, bankState = null } = {}) {
         this.balances = balances;
         this.offline = offline;
+        this.bankState = bankState ?? {
+            debtCells: {},
+            lockedCollateral: {},
+            releasedCollateral: {},
+        };
+        this.bankState.debtCells = this.bankState.debtCells ?? {};
+        this.bankState.lockedCollateral = this.bankState.lockedCollateral ?? {};
+        this.bankState.releasedCollateral = this.bankState.releasedCollateral ?? {};
     }
 
     async getCurrencyBalances({ currencyIds } = {}) {
@@ -224,5 +248,58 @@ export class FixtureCurrencyIndexer {
             }
         }
         return settlement;
+    }
+
+    applyBankBorrowTx(tx, { txHash = null } = {}) {
+        if (this.offline) return { ok: false, reason: 'indexer-offline' };
+        const settlement = settleBankBorrowFixture({
+            tx,
+            indexedBalances: this.balances,
+            txHash,
+        });
+        if (!settlement.ok) return settlement;
+        this._applyCurrencyUpdates(settlement.updates, txHash);
+        Object.assign(this.bankState.debtCells, settlement.bankUpdates?.debtCells ?? {});
+        Object.assign(this.bankState.lockedCollateral, settlement.bankUpdates?.lockedCollateral ?? {});
+        return settlement;
+    }
+
+    applyBankRepayTx(tx, { txHash = null } = {}) {
+        if (this.offline) return { ok: false, reason: 'indexer-offline' };
+        const settlement = settleBankRepayFixture({
+            tx,
+            indexedBalances: this.balances,
+            bankState: this.bankState,
+            txHash,
+        });
+        if (!settlement.ok) return settlement;
+        this._applyCurrencyUpdates(settlement.updates, txHash);
+        for (const key of settlement.bankUpdates?.consumedDebtKeys ?? []) {
+            delete this.bankState.debtCells[key];
+            delete this.bankState.lockedCollateral[key];
+        }
+        Object.assign(this.bankState.releasedCollateral, settlement.bankUpdates?.releasedCollateral ?? {});
+        return settlement;
+    }
+
+    _applyCurrencyUpdates(updates = {}, txHash = null) {
+        for (const [currency, entry] of Object.entries(updates)) {
+            if (entry.spent || entry.amount === 0) {
+                this.balances[currency] = {
+                    amount: 0,
+                    stale: false,
+                    spent: true,
+                    outPoint: null,
+                    updatedByTxHash: txHash,
+                };
+            } else {
+                this.balances[currency] = {
+                    amount: entry.amount,
+                    stale: false,
+                    outPoint: entry.outPoint,
+                    updatedByTxHash: txHash,
+                };
+            }
+        }
     }
 }

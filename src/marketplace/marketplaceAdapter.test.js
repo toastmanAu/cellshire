@@ -12,6 +12,7 @@ import {
 } from './playerMarketplace.js';
 import {
     chainMarketplaceEnabled,
+    chainMarketplaceSubmitMode,
     ChainMarketplaceAdapter,
     LocalMarketplaceAdapter,
     makeMarketplaceAdapterFromParams,
@@ -81,9 +82,69 @@ describe('marketplace adapters', () => {
 
     it('selects the chain marketplace adapter only behind the explicit flag', () => {
         expect(chainMarketplaceEnabled(new URLSearchParams('chainMarketplace=1'))).toBe(true);
+        expect(chainMarketplaceSubmitMode(new URLSearchParams('chainMarketplaceSubmit=ccc'))).toBe('ccc-joyid');
         expect(makeMarketplaceAdapterFromParams({ params: new URLSearchParams('') }).constructor.name)
             .toBe('LocalMarketplaceAdapter');
         expect(makeMarketplaceAdapterFromParams({ params: new URLSearchParams('chainMarketplace=1') }).constructor.name)
             .toBe('ChainMarketplaceAdapter');
+    });
+
+    it('requires a CCC-backed JoyID wallet for CCC marketplace purchases', async () => {
+        const state = loadMarketplaceState({ get: () => null });
+        const listing = marketplaceListings(state).find(item => item.assetId === 'olive');
+        const out = await new ChainMarketplaceAdapter({
+            owner: 'ckt1buyer',
+            requireWallet: true,
+            inventoryAdapter: {
+                async read() {
+                    return { currencies: new Map([['ckb', 5000]]) };
+                },
+            },
+        }).buy({
+            listingId: listing.id,
+            buyer: { address: 'ckt1buyer', provider: 'joyid' },
+            propInventory: new PropInventory(),
+            state,
+        });
+        expect(out.ok).toBe(false);
+        expect(out.reason).toBe('wallet-disconnected');
+    });
+
+    it('submits CCC marketplace receipts without fixture-settling the listing payment', async () => {
+        const state = loadMarketplaceState({ get: () => null });
+        const listing = marketplaceListings(state).find(item => item.assetId === 'olive');
+        const props = new PropInventory();
+        let settled = false;
+        const out = await new ChainMarketplaceAdapter({
+            owner: 'ckt1buyer',
+            requireWallet: true,
+            submit: async tx => ({
+                ok: true,
+                mode: 'ccc-joyid',
+                txHash: '0xmarketreal',
+                payload: tx.witness.marketplace_purchase,
+            }),
+            inventoryAdapter: {
+                async read() {
+                    return { currencies: new Map([['ckb', 5000]]) };
+                },
+                settleMarketplacePurchaseTx() {
+                    settled = true;
+                    return { ok: true };
+                },
+                addPendingDelta(delta) {
+                    this.pending = delta;
+                },
+            },
+        }).buy({
+            listingId: listing.id,
+            buyer: { address: 'ckt1buyer', provider: 'joyid', signer: 'ccc-joyid' },
+            propInventory: props,
+            state,
+        });
+        expect(out.ok).toBe(true);
+        expect(out.mode).toBe('chain-ccc-receipt');
+        expect(settled).toBe(false);
+        expect(props.get('olive')).toBe(1);
     });
 });

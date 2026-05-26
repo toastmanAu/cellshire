@@ -3,6 +3,7 @@ import {
     makeDebtCell,
     ownerLockHash,
 } from './debtCell.js';
+import { amountToBaseUnits, baseUnitsToAmount } from './udtBalance.js';
 
 export function buildBankBorrowTransaction({
     walletAccount,
@@ -150,5 +151,212 @@ export function buildBankRepayTransaction({
                 tx_nonce: txNonce,
             },
         },
+    };
+}
+
+export function settleBankBorrowFixture({
+    tx,
+    indexedBalances = {},
+    txHash = null,
+} = {}) {
+    if (tx?.kind !== 'cellshire_bank_loan_tx' || tx.action !== 'borrow') {
+        return { ok: false, reason: 'invalid-bank-borrow-tx' };
+    }
+    const receipt = tx.witness?.bank_receipt;
+    const owner = tx.witness?.address ?? tx.inputs?.collateral_cell?.owner ?? null;
+    const principalUnits = amountToBaseUnits(receipt?.principal);
+    const collateralUnits = amountToBaseUnits(receipt?.collateral_amount);
+    if (!owner || principalUnits <= 0n || collateralUnits <= 0n) {
+        return { ok: false, reason: 'invalid-bank-borrow' };
+    }
+
+    const before = normalizedBalanceAmount(indexedBalances.ckb);
+    const beforeUnits = amountToBaseUnits(before);
+    if (beforeUnits < collateralUnits) {
+        return {
+            ok: false,
+            reason: 'insufficient-collateral',
+            balance: before,
+            required: receipt.collateral_amount,
+        };
+    }
+
+    const afterUnits = beforeUnits - collateralUnits + principalUnits;
+    const after = baseUnitsToAmount(afterUnits);
+    const ckbOutPoint = afterUnits > 0n ? fixtureOutPoint(txHash, 'ckb', 'bank-borrow') : null;
+    const debtOutPoint = fixtureOutPoint(txHash, 'debt', 'bank');
+    const lockedCollateralOutPoint = fixtureOutPoint(txHash, 'collateral', 'bank');
+    const debtCell = {
+        ...tx.outputs.debt_cell,
+        outPoint: debtOutPoint,
+    };
+    const lockedCollateral = {
+        ...tx.outputs.collateral_locked_cell,
+        owner,
+        outPoint: lockedCollateralOutPoint,
+        originalOutPoint: tx.inputs?.collateral_cell?.outpoint ?? null,
+        debtOutPoint,
+    };
+
+    return {
+        ok: true,
+        mode: 'fixture-settlement',
+        txHash,
+        owner,
+        debtKey: collateralKey(tx.outputs.debt_cell?.debt?.collateralOutpoint),
+        inputs: {
+            bank_reserve_cell: tx.inputs?.bank_reserve_cell ?? null,
+            collateral_cell: {
+                ...tx.inputs?.collateral_cell,
+                amount: receipt.collateral_amount,
+            },
+            player_ckb_cell: {
+                owner,
+                currency: 'ckb',
+                amount: before,
+                outPoint: indexedBalances.ckb?.outPoint ?? null,
+            },
+        },
+        outputs: {
+            player_ckb_cell: tx.outputs?.player_ckb_cell ?? null,
+            debt_cell: debtCell,
+            collateral_locked_cell: lockedCollateral,
+            bank_reserve_change: tx.outputs?.bank_reserve_change ?? null,
+        },
+        updates: {
+            ckb: {
+                owner,
+                currency: 'ckb',
+                amount: after,
+                stale: false,
+                outPoint: ckbOutPoint,
+                spent: afterUnits === 0n,
+            },
+        },
+        bankUpdates: {
+            debtCells: {
+                [collateralKey(debtCell.debt?.collateralOutpoint)]: debtCell,
+            },
+            lockedCollateral: {
+                [collateralKey(debtCell.debt?.collateralOutpoint)]: lockedCollateral,
+            },
+        },
+    };
+}
+
+export function settleBankRepayFixture({
+    tx,
+    indexedBalances = {},
+    bankState = null,
+    txHash = null,
+} = {}) {
+    if (tx?.kind !== 'cellshire_bank_loan_tx' || tx.action !== 'repay') {
+        return { ok: false, reason: 'invalid-bank-repay-tx' };
+    }
+    const debt = tx.inputs?.debt_cell?.debt;
+    const receipt = tx.witness?.bank_receipt;
+    const owner = tx.witness?.address ?? tx.inputs?.player_ckb_cell?.owner ?? null;
+    const key = collateralKey(debt?.collateralOutpoint);
+    if (!owner || !debt || !key) return { ok: false, reason: 'invalid-bank-repay' };
+
+    const storedDebt = bankState?.debtCells?.[key] ?? null;
+    const storedCollateral = bankState?.lockedCollateral?.[key] ?? null;
+    if (bankState && (!storedDebt || !storedCollateral)) {
+        return { ok: false, reason: 'locked-collateral-missing' };
+    }
+
+    const paymentUnits = amountToBaseUnits(receipt?.payment);
+    const owedUnits = amountToBaseUnits((Number(debt.principal) || 0) + (Number(debt.fee) || 0));
+    if (paymentUnits <= 0n || paymentUnits !== owedUnits) {
+        return {
+            ok: false,
+            reason: 'full-repayment-required',
+            payment: receipt?.payment,
+            required: baseUnitsToAmount(owedUnits),
+        };
+    }
+
+    const before = normalizedBalanceAmount(indexedBalances.ckb);
+    const beforeUnits = amountToBaseUnits(before);
+    if (beforeUnits < paymentUnits) {
+        return {
+            ok: false,
+            reason: 'insufficient-funds',
+            balance: before,
+            required: receipt.payment,
+        };
+    }
+
+    const collateralUnits = amountToBaseUnits(receipt.collateral_amount);
+    const afterUnits = beforeUnits - paymentUnits + collateralUnits;
+    const after = baseUnitsToAmount(afterUnits);
+    const ckbOutPoint = afterUnits > 0n ? fixtureOutPoint(txHash, 'ckb', 'bank-repay') : null;
+    return {
+        ok: true,
+        mode: 'fixture-settlement',
+        txHash,
+        owner,
+        debtKey: key,
+        inputs: {
+            debt_cell: storedDebt ?? tx.inputs.debt_cell,
+            player_ckb_cell: {
+                owner,
+                currency: 'ckb',
+                amount: before,
+                outPoint: indexedBalances.ckb?.outPoint ?? null,
+            },
+            collateral_locked_cell: storedCollateral ?? tx.inputs.collateral_locked_cell,
+        },
+        outputs: {
+            collateral_unlocked_cell: {
+                ...tx.outputs.collateral_unlocked_cell,
+                outPoint: fixtureOutPoint(txHash, 'collateral-release', 'bank'),
+            },
+            bank_reserve_cell: tx.outputs.bank_reserve_cell,
+            treasury_fee_receipt: tx.outputs.treasury_fee_receipt,
+            player_change_lock: tx.outputs.player_change_lock,
+        },
+        updates: {
+            ckb: {
+                owner,
+                currency: 'ckb',
+                amount: after,
+                stale: false,
+                outPoint: ckbOutPoint,
+                spent: afterUnits === 0n,
+            },
+        },
+        bankUpdates: {
+            consumedDebtKeys: [key],
+            releasedCollateral: {
+                [key]: tx.outputs.collateral_unlocked_cell,
+            },
+        },
+    };
+}
+
+export function bankDebtKeyFromDebtCell(debtCell) {
+    return collateralKey(debtCell?.debt?.collateralOutpoint);
+}
+
+function normalizedBalanceAmount(entry) {
+    if (typeof entry === 'number') return entry;
+    return Number(entry?.amount ?? 0) || 0;
+}
+
+function collateralKey(outpoint) {
+    if (!outpoint?.txHash || !Number.isFinite(Number(outpoint.index))) return null;
+    return `${String(outpoint.txHash).toLowerCase()}:${Math.floor(Number(outpoint.index))}`;
+}
+
+function fixtureOutPoint(txHash, role, namespace) {
+    const raw = `${txHash || 'fixture'}:${namespace}:${role}`;
+    let hex = '';
+    for (let i = 0; i < raw.length && hex.length < 64; i++) {
+        hex += raw.charCodeAt(i).toString(16).padStart(2, '0');
+    }
+    return {
+        txHash: `0x${hex.padEnd(64, '0')}`,
+        index: role.length % 4,
     };
 }

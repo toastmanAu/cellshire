@@ -26,6 +26,9 @@ export function chainBankEnabled(params) {
 
 export function chainBankSubmitMode(params) {
     const mode = params?.get?.('chainBankSubmit') || params?.get?.('chainBankMode');
+    if (mode === 'ccc-real' || mode === 'joyid-real' || mode === 'ccc-joyid-real') {
+        return 'ccc-joyid-real';
+    }
     return mode === 'ccc' || mode === 'joyid' || mode === 'ccc-joyid'
         ? 'ccc-joyid'
         : 'prototype';
@@ -146,6 +149,20 @@ export class ChainBankAdapter {
         const receipt = await this.submit(tx);
         if (!receipt.ok) return { ok: false, mode: 'chain', reason: receipt.reason || 'tx-failed', tx };
 
+        const settlement = receipt.mode?.startsWith?.('ccc-joyid')
+            ? null
+            : this.inventoryAdapter?.settleBankBorrowTx?.(tx, receipt);
+        if (settlement && !settlement.ok) {
+            return {
+                ok: false,
+                mode: 'chain',
+                reason: settlement.reason || 'settlement-failed',
+                message: 'Bank borrow settlement failed',
+                tx,
+                settlement,
+            };
+        }
+
         const loan = chainLoanFromOffer({
             offer: chainOffer,
             tx,
@@ -154,23 +171,29 @@ export class ChainBankAdapter {
             currentEpoch: this.currentEpoch(),
             termEpochs: this.termEpochs,
             loanIndex: this.loanBook?.loans?.length ?? 0,
+            settlement,
         });
         this.loanBook.loans.push(loan);
         this.loanBook._emit?.({ type: 'borrow', loan });
         this.inventoryAdapter?.addPendingDelta?.({
             currency: 'ckb',
-            amount: chainOffer.amount,
+            amount: chainOffer.amount - collateralAmount,
             txHash: receipt.txHash,
-            source: 'bank-borrow',
-        });
-        this.inventoryAdapter?.addPendingDelta?.({
-            currency: 'ckb',
-            amount: -collateralAmount,
-            txHash: receipt.txHash,
-            source: 'bank-collateral',
+            source: 'bank-borrow-net',
         });
         saveBankLoanBook(this.storage, this.loanBook);
-        return { ok: true, mode: 'chain-prototype', loan, tx, txHash: receipt.txHash };
+        return {
+            ok: true,
+            mode: receipt.mode === 'ccc-joyid-real'
+                ? 'chain-ccc-real'
+                : receipt.mode === 'ccc-joyid'
+                ? 'chain-ccc-receipt'
+                : settlement?.ok ? 'chain-fixture-settled' : 'chain-prototype',
+            loan,
+            tx,
+            txHash: receipt.txHash,
+            settlement,
+        };
     }
 
     async repay(amount = 'max') {
@@ -178,6 +201,9 @@ export class ChainBankAdapter {
         if (!loan) return { ok: false, reason: 'no-active-loan' };
         const payment = amount === 'max' ? loan.remainingOwed : Math.min(Number(amount), loan.remainingOwed);
         if (!Number.isFinite(payment) || payment <= 0) return { ok: false, reason: 'invalid-amount', loan };
+        if (payment !== loan.remainingOwed) {
+            return { ok: false, reason: 'full-repayment-required', loan, payment, required: loan.remainingOwed };
+        }
         const balance = await this._ckbBalance();
         if (balance < payment) return { ok: false, reason: 'insufficient-funds', loan, balance, payment };
         const walletAccount = this._walletAccount();
@@ -191,6 +217,20 @@ export class ChainBankAdapter {
         const receipt = await this.submit(tx);
         if (!receipt.ok) return { ok: false, mode: 'chain', reason: receipt.reason || 'tx-failed', tx };
 
+        const settlement = receipt.mode?.startsWith?.('ccc-joyid')
+            ? null
+            : this.inventoryAdapter?.settleBankRepayTx?.(tx, receipt);
+        if (settlement && !settlement.ok) {
+            return {
+                ok: false,
+                mode: 'chain',
+                reason: settlement.reason || 'settlement-failed',
+                message: 'Bank repay settlement failed',
+                tx,
+                settlement,
+            };
+        }
+
         loan.remainingOwed = Number((loan.remainingOwed - payment).toFixed(8));
         if (loan.remainingOwed <= 0) {
             loan.remainingOwed = 0;
@@ -201,20 +241,25 @@ export class ChainBankAdapter {
         this.loanBook._emit?.({ type: 'repay', loan, payment });
         this.inventoryAdapter?.addPendingDelta?.({
             currency: 'ckb',
-            amount: -payment,
+            amount: -payment + (loan.status === 'paid' ? Number(loan.collateralAmount || 0) : 0),
             txHash: receipt.txHash,
-            source: 'bank-repay',
+            source: 'bank-repay-net',
         });
-        if (loan.status === 'paid' && loan.collateralAmount) {
-            this.inventoryAdapter?.addPendingDelta?.({
-                currency: 'ckb',
-                amount: loan.collateralAmount,
-                txHash: receipt.txHash,
-                source: 'bank-collateral-release',
-            });
-        }
         saveBankLoanBook(this.storage, this.loanBook);
-        return { ok: true, mode: 'chain-prototype', loan, payment, paid: loan.status === 'paid', tx, txHash: receipt.txHash };
+        return {
+            ok: true,
+            mode: receipt.mode === 'ccc-joyid-real'
+                ? 'chain-ccc-real'
+                : receipt.mode === 'ccc-joyid'
+                ? 'chain-ccc-receipt'
+                : settlement?.ok ? 'chain-fixture-settled' : 'chain-prototype',
+            loan,
+            payment,
+            paid: loan.status === 'paid',
+            tx,
+            txHash: receipt.txHash,
+            settlement,
+        };
     }
 
     async _ckbBalance() {
@@ -280,6 +325,23 @@ export function makeBankAdapterFromParams({
             submit: createCccJoyIdBankLoanSubmitter({ params, location, importModule }),
         });
     }
+    if (chainBankSubmitMode(params) === 'ccc-joyid-real') {
+        return new ChainBankAdapter({
+            storage,
+            owner,
+            loanBook,
+            treasury,
+            priceSnapshot,
+            inventoryAdapter,
+            currentEpoch,
+            submit: createCccJoyIdBankLoanSubmitter({
+                params,
+                location,
+                importModule,
+                realBankTx: true,
+            }),
+        });
+    }
     return new ChainBankAdapter({ storage, owner, loanBook, treasury, priceSnapshot, inventoryAdapter, currentEpoch });
 }
 
@@ -293,8 +355,9 @@ function chainOfferFromLocalOffer(offer, priceSnapshot) {
     };
 }
 
-function chainLoanFromOffer({ offer, tx, txHash, collateralAmount, currentEpoch, termEpochs, loanIndex }) {
+function chainLoanFromOffer({ offer, tx, txHash, collateralAmount, currentEpoch, termEpochs, loanIndex, settlement = null }) {
     const borrowedAt = Date.now();
+    const debtCell = settlement?.outputs?.debt_cell ?? tx.outputs.debt_cell;
     return {
         id: `chain-loan:${txHash}:${loanIndex}`,
         offerId: offer.id,
@@ -314,8 +377,8 @@ function chainLoanFromOffer({ offer, tx, txHash, collateralAmount, currentEpoch,
         collateralKind: 'ckb',
         collateralAmount,
         borrowTxHash: txHash,
-        debt: tx.outputs.debt_cell.debt,
-        debtCell: tx.outputs.debt_cell,
+        debt: debtCell.debt,
+        debtCell,
     };
 }
 

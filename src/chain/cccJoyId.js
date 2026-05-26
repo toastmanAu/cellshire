@@ -34,6 +34,31 @@ export function resolveCccJoyIdConfig({ params, location, now = Date.now } = {})
     };
 }
 
+export function resolveCccBankScriptConfig({ params } = {}) {
+    const debtType = scriptFromParams(params, 'chainBankDebtType');
+    const bankBookLock = scriptFromParams(params, 'chainBankBookLock');
+    const collateralLock = scriptFromParams(params, 'chainBankCollateralLock');
+    const bankReserveLock = scriptFromParams(params, 'chainBankReserveLock');
+    const treasuryLock = scriptFromParams(params, 'chainBankTreasuryLock');
+    const cellDeps = [
+        cellDepFromParams(params, 'chainBankDebtTypeDep'),
+        cellDepFromParams(params, 'chainBankBookLockDep'),
+        cellDepFromParams(params, 'chainBankCollateralLockDep'),
+        cellDepFromParams(params, 'chainBankReserveLockDep'),
+        cellDepFromParams(params, 'chainBankTreasuryLockDep'),
+    ].filter(Boolean);
+    return {
+        complete: !!(debtType && bankBookLock && collateralLock && bankReserveLock && treasuryLock),
+        debtType,
+        bankBookLock,
+        collateralLock,
+        bankReserveLock,
+        treasuryLock,
+        cellDeps,
+        debtCellCapacityCkb: numberParam(params, 'chainBankDebtCellCapacityCkb', 61),
+    };
+}
+
 export async function loadCcc({ ccc, cccUrl = DEFAULT_CCC_ESM_URL, importModule = spec => import(spec) } = {}) {
     if (ccc) return ccc;
     const mod = await importModule(cccUrl);
@@ -196,6 +221,33 @@ export function storePurchaseReceiptPayload(storeTx) {
     };
 }
 
+export function marketplacePurchaseReceiptPayload(marketplaceTx) {
+    const purchase = marketplaceTx?.witness?.marketplace_purchase;
+    if (!purchase || marketplaceTx?.kind !== 'cellshire_marketplace_purchase_tx') {
+        throw new Error('marketplace purchase transaction payload required');
+    }
+    const payment = marketplaceTx.inputs?.payment_balance_cell;
+    const buyer = marketplaceTx.outputs?.buyer_receipt;
+    const seller = marketplaceTx.outputs?.seller_receipt;
+    return {
+        protocol: 'cellshire.marketplace.purchase',
+        version: 1,
+        action: marketplaceTx.action || 'purchase',
+        tx_nonce: marketplaceTx.tx_nonce,
+        buyer: marketplaceTx.witness?.address ?? payment?.owner ?? buyer?.owner ?? null,
+        seller: purchase.seller ?? seller?.owner ?? null,
+        listing_id: purchase.listing_id,
+        listing_cell_id: purchase.cell_id ?? null,
+        item_type: purchase.item_type,
+        asset_id: purchase.asset_id,
+        quantity: buyer?.quantity ?? 1,
+        price_currency: purchase.price_currency,
+        price_amount: purchase.price_amount,
+        seller_currency: seller?.currency ?? purchase.price_currency,
+        seller_amount: seller?.amount ?? purchase.price_amount,
+    };
+}
+
 export function utf8ToHex(value) {
     const bytes = new TextEncoder().encode(String(value));
     let out = '0x';
@@ -296,6 +348,40 @@ export async function buildCccBankLoanTransaction({
     return { tx, payload, payloadHex };
 }
 
+export async function buildCccBankCollateralTransaction({
+    ccc,
+    client,
+    signer,
+    bankTx,
+    scriptConfig,
+}) {
+    const address = await signer.getRecommendedAddress();
+    const expected = bankTx?.witness?.address;
+    if (expected && expected !== address) {
+        throw new Error('connected JoyID address does not match bank wallet');
+    }
+    const config = scriptConfig ?? {};
+    if (!config.complete) {
+        throw new Error('bank script config required for real collateral transaction');
+    }
+
+    const { script: playerLock } = await ccc.Address.fromString(address, client);
+    const def = bankTx.action === 'borrow'
+        ? bankBorrowCccDef({ ccc, bankTx, playerLock, config })
+        : bankTx.action === 'repay'
+            ? bankRepayCccDef({ ccc, bankTx, playerLock, config })
+            : null;
+    if (!def) throw new Error('unsupported bank collateral action');
+
+    const tx = ccc.Transaction.from(def);
+    await tx.completeInputsByCapacity(signer);
+    if (!Array.isArray(tx.witnesses)) tx.witnesses = [];
+    if (tx.witnesses.length === 0) tx.witnesses.push('0x');
+    tx.witnesses.push(utf8ToHex(JSON.stringify(bankLoanReceiptPayload(bankTx))));
+    await tx.completeFeeBy(signer);
+    return { tx, payload: bankLoanReceiptPayload(bankTx), scriptConfig: config };
+}
+
 export async function buildCccTraderSwapTransaction({
     ccc,
     client,
@@ -358,6 +444,37 @@ export async function buildCccStorePurchaseTransaction({
     return { tx, payload, payloadHex };
 }
 
+export async function buildCccMarketplacePurchaseTransaction({
+    ccc,
+    client,
+    signer,
+    marketplaceTx,
+    receiptCapacityCkb = 61,
+}) {
+    const address = await signer.getRecommendedAddress();
+    const expected = marketplaceTx?.witness?.address;
+    if (expected && expected !== address) {
+        throw new Error('connected JoyID address does not match marketplace wallet');
+    }
+
+    const { script: lock } = await ccc.Address.fromString(address, client);
+    const payload = marketplacePurchaseReceiptPayload(marketplaceTx);
+    const payloadHex = utf8ToHex(JSON.stringify(payload));
+    const tx = ccc.Transaction.from({
+        outputs: [{
+            capacity: ccc.fixedPointFrom(receiptCapacityCkb),
+            lock,
+        }],
+    });
+
+    await tx.completeInputsByCapacity(signer);
+    if (!Array.isArray(tx.witnesses)) tx.witnesses = [];
+    if (tx.witnesses.length === 0) tx.witnesses.push('0x');
+    tx.witnesses.push(payloadHex);
+    await tx.completeFeeBy(signer);
+    return { tx, payload, payloadHex };
+}
+
 export async function submitCccJoyIdPropertySnapshotTx(propertySnapshotTx, {
     params,
     location,
@@ -403,6 +520,8 @@ export async function submitCccJoyIdBankLoanTx(bankTx, {
     importModule,
     shouldFail = false,
     receiptCapacityCkb,
+    realBankTx = false,
+    scriptConfig,
 } = {}) {
     try {
         if (shouldFail) throw new Error('JoyID signature cancelled');
@@ -411,17 +530,25 @@ export async function submitCccJoyIdBankLoanTx(bankTx, {
         const client = createCccClient(cccModule, config);
         const signer = new cccModule.JoyId.CkbSigner(client, config.name, config.logo);
         await signer.connect();
-        const prepared = await buildCccBankLoanTransaction({
-            ccc: cccModule,
-            client,
-            signer,
-            bankTx,
-            receiptCapacityCkb,
-        });
+        const prepared = realBankTx
+            ? await buildCccBankCollateralTransaction({
+                ccc: cccModule,
+                client,
+                signer,
+                bankTx,
+                scriptConfig: scriptConfig ?? resolveCccBankScriptConfig({ params }),
+            })
+            : await buildCccBankLoanTransaction({
+                ccc: cccModule,
+                client,
+                signer,
+                bankTx,
+                receiptCapacityCkb,
+            });
         const txHash = await signer.sendTransaction(prepared.tx);
         return {
             ok: true,
-            mode: 'ccc-joyid',
+            mode: realBankTx ? 'ccc-joyid-real' : 'ccc-joyid',
             txHash,
             payload: prepared.payload,
         };
@@ -510,6 +637,44 @@ export async function submitCccJoyIdStorePurchaseTx(storeTx, {
     }
 }
 
+export async function submitCccJoyIdMarketplacePurchaseTx(marketplaceTx, {
+    params,
+    location,
+    ccc,
+    importModule,
+    shouldFail = false,
+    receiptCapacityCkb,
+} = {}) {
+    try {
+        if (shouldFail) throw new Error('JoyID signature cancelled');
+        const config = resolveCccJoyIdConfig({ params, location });
+        const cccModule = await loadCcc({ ccc, cccUrl: config.cccUrl, importModule });
+        const client = createCccClient(cccModule, config);
+        const signer = new cccModule.JoyId.CkbSigner(client, config.name, config.logo);
+        await signer.connect();
+        const prepared = await buildCccMarketplacePurchaseTransaction({
+            ccc: cccModule,
+            client,
+            signer,
+            marketplaceTx,
+            receiptCapacityCkb,
+        });
+        const txHash = await signer.sendTransaction(prepared.tx);
+        return {
+            ok: true,
+            mode: 'ccc-joyid',
+            txHash,
+            payload: prepared.payload,
+        };
+    } catch (err) {
+        return {
+            ok: false,
+            reason: classifyCccJoyIdError(err),
+            message: err?.message || 'CCC/JoyID marketplace purchase submit failed',
+        };
+    }
+}
+
 export async function submitCccJoyIdMiningTx(miningTx, {
     params,
     location,
@@ -568,10 +733,117 @@ export function createCccJoyIdStorePurchaseSubmitter(options = {}) {
     return (tx, runtime = {}) => submitCccJoyIdStorePurchaseTx(tx, { ...options, ...runtime });
 }
 
+export function createCccJoyIdMarketplacePurchaseSubmitter(options = {}) {
+    return (tx, runtime = {}) => submitCccJoyIdMarketplacePurchaseTx(tx, { ...options, ...runtime });
+}
+
 export function classifyCccJoyIdError(err) {
     const msg = err?.message || String(err || '');
     if (CANCEL_RE.test(msg)) return 'signature-cancelled';
     if (CAPACITY_RE.test(msg)) return 'insufficient-capacity';
     if (/module|import|constructor|unavailable/i.test(msg)) return 'ccc-unavailable';
     return 'tx-failed';
+}
+
+function bankBorrowCccDef({ ccc, bankTx, playerLock, config }) {
+    const debtCell = bankTx.outputs?.debt_cell;
+    const collateral = bankTx.outputs?.collateral_locked_cell;
+    const principal = bankTx.outputs?.player_ckb_cell?.amount;
+    if (!debtCell?.data || !collateral || !Number.isFinite(Number(principal))) {
+        throw new Error('bank borrow collateral tx payload required');
+    }
+    const outputs = [
+        {
+            capacity: ccc.fixedPointFrom(principal),
+            lock: playerLock,
+        },
+        {
+            capacity: ccc.fixedPointFrom(config.debtCellCapacityCkb),
+            lock: config.bankBookLock,
+            type: {
+                ...config.debtType,
+                args: debtCell.type?.args ?? config.debtType.args ?? '0x',
+            },
+        },
+        {
+            capacity: ccc.fixedPointFrom(collateral.amount),
+            lock: {
+                ...config.collateralLock,
+                args: collateral.lock?.args ?? config.collateralLock.args ?? '0x',
+            },
+        },
+    ];
+    return {
+        cellDeps: config.cellDeps,
+        outputs,
+        outputsData: ['0x', debtCell.data, '0x'],
+    };
+}
+
+function bankRepayCccDef({ ccc, bankTx, playerLock, config }) {
+    const release = bankTx.outputs?.collateral_unlocked_cell;
+    const reserve = bankTx.outputs?.bank_reserve_cell;
+    const fee = bankTx.outputs?.treasury_fee_receipt;
+    if (!release || !reserve || !fee) throw new Error('bank repay collateral tx payload required');
+    return {
+        cellDeps: config.cellDeps,
+        outputs: [
+            {
+                capacity: ccc.fixedPointFrom(release.amount),
+                lock: playerLock,
+            },
+            {
+                capacity: ccc.fixedPointFrom(reserve.amount),
+                lock: config.bankReserveLock,
+            },
+            {
+                capacity: ccc.fixedPointFrom(fee.amount),
+                lock: config.treasuryLock,
+            },
+        ],
+        outputsData: ['0x', '0x', '0x'],
+    };
+}
+
+function scriptFromParams(params, prefix) {
+    const codeHash = normalizeHashParam(params?.get?.(`${prefix}CodeHash`));
+    if (!codeHash) return null;
+    const hashType = params?.get?.(`${prefix}HashType`) || 'type';
+    if (!['data', 'type', 'data1', 'data2'].includes(hashType)) return null;
+    return {
+        codeHash,
+        hashType,
+        args: normalizeHexParam(params?.get?.(`${prefix}Args`)) ?? '0x',
+    };
+}
+
+function cellDepFromParams(params, prefix) {
+    const txHash = normalizeHashParam(params?.get?.(`${prefix}TxHash`));
+    if (!txHash) return null;
+    const index = Number(params?.get?.(`${prefix}Index`) ?? 0);
+    if (!Number.isInteger(index) || index < 0) return null;
+    const depType = params?.get?.(`${prefix}Type`) === 'depGroup' ? 'depGroup' : 'code';
+    return {
+        outPoint: { txHash, index },
+        depType,
+    };
+}
+
+function normalizeHashParam(value) {
+    const hex = normalizeHexParam(value);
+    if (!hex) return null;
+    const body = hex.slice(2);
+    return /^[0-9a-f]{64}$/i.test(body) ? `0x${body.toLowerCase()}` : null;
+}
+
+function normalizeHexParam(value) {
+    if (typeof value !== 'string') return null;
+    const body = value.startsWith('0x') ? value.slice(2) : value;
+    if (!/^[0-9a-f]*$/i.test(body) || body.length % 2 !== 0) return null;
+    return `0x${body.toLowerCase()}`;
+}
+
+function numberParam(params, key, fallback) {
+    const value = Number(params?.get?.(key));
+    return Number.isFinite(value) && value > 0 ? value : fallback;
 }

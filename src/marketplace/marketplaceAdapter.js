@@ -1,4 +1,5 @@
 import { buildMarketplacePurchaseTransaction } from '../chain/marketplacePurchaseTx.js';
+import { createCccJoyIdMarketplacePurchaseSubmitter } from '../chain/cccJoyId.js';
 import {
     buyMarketplaceListing,
     grantMarketplaceListing,
@@ -15,19 +16,35 @@ export function chainMarketplaceEnabled(params) {
     return params?.get?.('chainMarketplace') === '1';
 }
 
+export function chainMarketplaceSubmitMode(params) {
+    const mode = params?.get?.('chainMarketplaceSubmit') || params?.get?.('chainMarketplaceMode');
+    return mode === 'ccc' || mode === 'joyid' || mode === 'ccc-joyid'
+        ? 'ccc-joyid'
+        : 'prototype';
+}
+
 export class ChainMarketplaceAdapter {
     constructor({
         owner = 'local',
         inventoryAdapter = null,
         submit = defaultSubmitPrototypeMarketplacePurchase,
+        requireWallet = false,
     } = {}) {
         this.owner = owner;
         this.inventoryAdapter = inventoryAdapter;
         this.submit = submit;
+        this.requireWallet = requireWallet;
     }
 
     async buy({ listingId, buyer, propInventory, state }) {
         if (!buyer?.address) return { ok: false, reason: 'wallet-disconnected' };
+        if (this.requireWallet && buyer.signer !== 'ccc-joyid') {
+            return {
+                ok: false,
+                reason: 'wallet-disconnected',
+                message: 'Connect JoyID before chain Marketplace purchases',
+            };
+        }
         const listing = marketplaceListings(state).find(item => item.id === listingId);
         if (!listing) return { ok: false, reason: 'missing-listing' };
         if (listing.seller === buyer.address) return { ok: false, reason: 'own-listing', listing };
@@ -57,7 +74,9 @@ export class ChainMarketplaceAdapter {
                 tx,
             };
         }
-        const settlement = this.inventoryAdapter?.settleMarketplacePurchaseTx?.(tx, receipt);
+        const settlement = receipt.mode === 'ccc-joyid'
+            ? null
+            : this.inventoryAdapter?.settleMarketplacePurchaseTx?.(tx, receipt);
         if (settlement && !settlement.ok) {
             return {
                 ok: false,
@@ -79,7 +98,9 @@ export class ChainMarketplaceAdapter {
         if (!grant.ok) return grant;
         return {
             ok: true,
-            mode: settlement?.ok ? 'chain-fixture-settled' : 'chain-prototype',
+            mode: receipt.mode === 'ccc-joyid'
+                ? 'chain-ccc-receipt'
+                : settlement?.ok ? 'chain-fixture-settled' : 'chain-prototype',
             listing,
             tx,
             txHash: receipt.txHash,
@@ -99,7 +120,15 @@ export async function defaultSubmitPrototypeMarketplacePurchase(tx) {
     };
 }
 
-export function makeMarketplaceAdapterFromParams({ params, owner, inventoryAdapter } = {}) {
+export function makeMarketplaceAdapterFromParams({ params, owner, inventoryAdapter, location, importModule } = {}) {
     if (!chainMarketplaceEnabled(params)) return new LocalMarketplaceAdapter();
+    if (chainMarketplaceSubmitMode(params) === 'ccc-joyid') {
+        return new ChainMarketplaceAdapter({
+            owner,
+            inventoryAdapter,
+            requireWallet: true,
+            submit: createCccJoyIdMarketplacePurchaseSubmitter({ params, location, importModule }),
+        });
+    }
     return new ChainMarketplaceAdapter({ owner, inventoryAdapter });
 }

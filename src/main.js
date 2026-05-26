@@ -316,6 +316,7 @@ async function main() {
                 params,
                 owner: homeOwner,
                 inventoryAdapter: chainCurrencyAdapter,
+                location: window.location,
             });
             game.marketplaceBalanceAdapter = params.get('chainMarketplace') === '1' ? chainCurrencyAdapter : null;
             game.hudPanels.market = installMarketplaceHUD(game);
@@ -367,7 +368,9 @@ async function main() {
     installEpochHUD(game, genStats);
     installPropertyHUD(game);
     if (walletSurfaceEnabled) {
-        const useRealJoyId = cccJoyIdEnabled(params) || cccJoyIdMiningEnabled(params);
+        const useRealJoyId = cccJoyIdEnabled(params)
+            || cccJoyIdMiningEnabled(params)
+            || cccReceiptSubmitRequested(params);
         installWalletHUD({
             storage: safeStorage,
             game,
@@ -385,6 +388,28 @@ async function main() {
     loadingScreen.classList.add('hidden');
     app.classList.remove('hidden');
     document.body.dataset.cellshireBoot = 'ready';
+}
+
+function cccReceiptSubmitRequested(params) {
+    const flags = [
+        'chainBankSubmit',
+        'chainBankMode',
+        'chainStoreSubmit',
+        'chainStoreMode',
+        'chainTraderSubmit',
+        'chainTraderMode',
+        'chainMarketplaceSubmit',
+        'chainMarketplaceMode',
+    ];
+    return flags.some(key => {
+        const value = params.get(key);
+        return value === 'ccc'
+            || value === 'joyid'
+            || value === 'ccc-joyid'
+            || value === 'ccc-real'
+            || value === 'joyid-real'
+            || value === 'ccc-joyid-real';
+    });
 }
 
 const WALLET_INVENTORY_SOURCE_KEY = 'cellshire:wallet-inventory-source:v1';

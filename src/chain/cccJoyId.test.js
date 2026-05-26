@@ -1,7 +1,9 @@
 import { describe, it, expect } from '../test/harness.js';
 import {
     bankLoanReceiptPayload,
+    buildCccBankCollateralTransaction,
     buildCccBankLoanTransaction,
+    buildCccMarketplacePurchaseTransaction,
     buildCccStorePurchaseTransaction,
     buildCccTraderSwapTransaction,
     buildCccPropertySnapshotTransaction,
@@ -10,10 +12,13 @@ import {
     cccJoyIdMiningEnabled,
     classifyCccJoyIdError,
     connectCccJoyId,
+    marketplacePurchaseReceiptPayload,
     miningReceiptPayload,
     propertySnapshotReceiptPayload,
+    resolveCccBankScriptConfig,
     resolveCccJoyIdConfig,
     submitCccJoyIdBankLoanTx,
+    submitCccJoyIdMarketplacePurchaseTx,
     submitCccJoyIdStorePurchaseTx,
     submitCccJoyIdTraderSwapTx,
     submitCccJoyIdPropertySnapshotTx,
@@ -24,11 +29,16 @@ import {
 import { BANK_LOAN_OFFERS, loanFeeAmount, loanTotalOwed } from '../bank/bankLoans.js';
 import { buildPropertySnapshotPayload } from '../property/propertySnapshotWriter.js';
 import { createStarterPropertyMap } from '../property/propertyZone.js';
-import { buildBankBorrowTransaction } from './bankTx.js';
+import {
+    buildBankBorrowTransaction,
+    buildBankRepayTransaction,
+} from './bankTx.js';
+import { buildMarketplacePurchaseTransaction } from './marketplacePurchaseTx.js';
 import { buildPropertySnapshotTransaction } from './propertySnapshotTx.js';
 import { buildStorePurchaseTransaction } from './storePurchaseTx.js';
 import { buildTraderSwapTransaction } from './traderSwapTx.js';
 import { generalStoreItem } from '../store/generalStoreCatalog.js';
+import { loadMarketplaceState, marketplaceListings } from '../marketplace/playerMarketplace.js';
 
 const address = 'ckt1qyq9xcellshirejoyidreal00000000000000000000';
 
@@ -36,6 +46,8 @@ function fakeCcc(capture = {}) {
     class FakeTransaction {
         constructor(def) {
             this.outputs = def.outputs || [];
+            this.outputsData = def.outputsData || [];
+            this.cellDeps = def.cellDeps || [];
             this.witnesses = def.witnesses || [];
             capture.tx = this;
         }
@@ -217,6 +229,41 @@ function bankBorrowTx() {
     });
 }
 
+function bankRepayTx() {
+    const borrow = bankBorrowTx();
+    return buildBankRepayTransaction({
+        walletAccount: {
+            provider: 'joyid',
+            address,
+        },
+        loan: {
+            id: 'loan-1',
+            offerId: 'starter-float',
+            principal: 7500,
+            feeAmount: 187.5,
+            totalOwed: 7687.5,
+            remainingOwed: 7687.5,
+            feeBps: 250,
+            collateralAmount: 11250,
+        },
+        debtCell: borrow.outputs.debt_cell,
+        txNonce: 'bank-repay-1',
+    });
+}
+
+function bankScriptParams() {
+    return new URLSearchParams([
+        ['chainBankDebtTypeCodeHash', `0x${'1'.repeat(64)}`],
+        ['chainBankBookLockCodeHash', `0x${'2'.repeat(64)}`],
+        ['chainBankBookLockArgs', '0x1234'],
+        ['chainBankCollateralLockCodeHash', `0x${'3'.repeat(64)}`],
+        ['chainBankReserveLockCodeHash', `0x${'4'.repeat(64)}`],
+        ['chainBankTreasuryLockCodeHash', `0x${'5'.repeat(64)}`],
+        ['chainBankDebtTypeDepTxHash', `0x${'6'.repeat(64)}`],
+        ['chainBankDebtTypeDepIndex', '1'],
+    ]);
+}
+
 function traderSwapTx() {
     return buildTraderSwapTransaction({
         walletAccount: {
@@ -252,6 +299,20 @@ function storePurchaseTx() {
     });
 }
 
+function marketplacePurchaseTx() {
+    const state = loadMarketplaceState({ get: () => null });
+    const listing = marketplaceListings(state).find(item => item.assetId === 'olive');
+    return buildMarketplacePurchaseTransaction({
+        walletAccount: {
+            provider: 'joyid',
+            address,
+            network: 'testnet',
+        },
+        listing,
+        txNonce: 'marketplace-purchase-1',
+    });
+}
+
 describe('CCC JoyID flags', () => {
     it('enables wallet and mining submit modes through explicit flags', () => {
         expect(cccJoyIdEnabled(new URLSearchParams('wallet=joyid'))).toBe(true);
@@ -270,6 +331,15 @@ describe('CCC JoyID flags', () => {
         expect(config.rpcURL).toBe('https://example.test');
         expect(config.connectedAt).toBe(123);
         expect(config.logo).toBe('https://cellshire.test/assets/cellshire_logo.png');
+    });
+
+    it('resolves real bank script config from URL params', () => {
+        const config = resolveCccBankScriptConfig({ params: bankScriptParams() });
+        expect(config.complete).toBe(true);
+        expect(config.debtType.codeHash).toBe(`0x${'1'.repeat(64)}`);
+        expect(config.bankBookLock.args).toBe('0x1234');
+        expect(config.cellDeps.length).toBe(1);
+        expect(config.cellDeps[0].outPoint.index).toBe(1);
     });
 });
 
@@ -433,6 +503,67 @@ describe('CCC bank loan submit', () => {
         expect(out.txHash).toBe('0xrealhash');
         expect(capture.sent).toBe(capture.tx);
     });
+
+    it('prepares a real-shaped CCC borrow transaction when bank scripts are configured', async () => {
+        const capture = {};
+        const ccc = fakeCcc(capture);
+        const client = new ccc.ClientPublicTestnet({ url: 'https://testnet.ckb.dev' });
+        const signer = new ccc.JoyId.CkbSigner(client, 'Cellshire', 'logo.png');
+        const prepared = await buildCccBankCollateralTransaction({
+            ccc,
+            client,
+            signer,
+            bankTx: bankBorrowTx(),
+            scriptConfig: resolveCccBankScriptConfig({ params: bankScriptParams() }),
+        });
+        expect(prepared.tx.completedInputs).toBe(true);
+        expect(prepared.tx.completedFee).toBe(true);
+        expect(prepared.tx.outputs.length).toBe(3);
+        expect(prepared.tx.outputs[0].capacity).toBe('fixed:7500');
+        expect(prepared.tx.outputs[1].type.codeHash).toBe(`0x${'1'.repeat(64)}`);
+        expect(prepared.tx.outputsData[1]).toBe(bankBorrowTx().outputs.debt_cell.data);
+        expect(prepared.tx.cellDeps.length).toBe(1);
+    });
+
+    it('prepares a real-shaped CCC repay transaction when bank scripts are configured', async () => {
+        const capture = {};
+        const ccc = fakeCcc(capture);
+        const client = new ccc.ClientPublicTestnet({ url: 'https://testnet.ckb.dev' });
+        const signer = new ccc.JoyId.CkbSigner(client, 'Cellshire', 'logo.png');
+        const prepared = await buildCccBankCollateralTransaction({
+            ccc,
+            client,
+            signer,
+            bankTx: bankRepayTx(),
+            scriptConfig: resolveCccBankScriptConfig({ params: bankScriptParams() }),
+        });
+        expect(prepared.tx.outputs.length).toBe(3);
+        expect(prepared.tx.outputs[0].capacity).toBe('fixed:11250');
+        expect(prepared.tx.outputs[1].lock.codeHash).toBe(`0x${'4'.repeat(64)}`);
+        expect(prepared.tx.outputs[2].capacity).toBe('fixed:187.5');
+    });
+
+    it('signs and submits real-shaped bank collateral transactions through CCC JoyID', async () => {
+        const capture = {};
+        const out = await submitCccJoyIdBankLoanTx(bankBorrowTx(), {
+            ccc: fakeCcc(capture),
+            params: bankScriptParams(),
+            realBankTx: true,
+        });
+        expect(out.ok).toBe(true);
+        expect(out.mode).toBe('ccc-joyid-real');
+        expect(out.txHash).toBe('0xrealhash');
+        expect(capture.sent).toBe(capture.tx);
+    });
+
+    it('rejects real bank collateral transactions without script config', async () => {
+        const out = await submitCccJoyIdBankLoanTx(bankBorrowTx(), {
+            ccc: fakeCcc(),
+            realBankTx: true,
+        });
+        expect(out.ok).toBe(false);
+        expect(out.reason).toBe('tx-failed');
+    });
 });
 
 describe('CCC trader swap submit', () => {
@@ -508,6 +639,48 @@ describe('CCC store purchase submit', () => {
     it('signs and submits store purchase receipts through CCC JoyID', async () => {
         const capture = {};
         const out = await submitCccJoyIdStorePurchaseTx(storePurchaseTx(), {
+            ccc: fakeCcc(capture),
+        });
+        expect(out.ok).toBe(true);
+        expect(out.mode).toBe('ccc-joyid');
+        expect(out.txHash).toBe('0xrealhash');
+        expect(capture.sent).toBe(capture.tx);
+    });
+});
+
+describe('CCC marketplace purchase submit', () => {
+    it('builds a compact marketplace purchase receipt payload', () => {
+        const payload = marketplacePurchaseReceiptPayload(marketplacePurchaseTx());
+        expect(payload.protocol).toBe('cellshire.marketplace.purchase');
+        expect(payload.action).toBe('purchase');
+        expect(payload.buyer).toBe(address);
+        expect(payload.asset_id).toBe('olive');
+        expect(payload.price_currency).toBe('ckb');
+        expect(payload.price_amount).toBe(2200);
+        expect(payload.seller_amount).toBe(2200);
+    });
+
+    it('prepares a CCC transaction with a marketplace purchase witness', async () => {
+        const capture = {};
+        const ccc = fakeCcc(capture);
+        const client = new ccc.ClientPublicTestnet({ url: 'https://testnet.ckb.dev' });
+        const signer = new ccc.JoyId.CkbSigner(client, 'Cellshire', 'logo.png');
+        const prepared = await buildCccMarketplacePurchaseTransaction({
+            ccc,
+            client,
+            signer,
+            marketplaceTx: marketplacePurchaseTx(),
+        });
+        expect(prepared.tx.completedInputs).toBe(true);
+        expect(prepared.tx.completedFee).toBe(true);
+        expect(prepared.tx.outputs[0].capacity).toBe('fixed:61');
+        expect(prepared.tx.witnesses.length).toBe(2);
+        expect(prepared.payload.asset_id).toBe('olive');
+    });
+
+    it('signs and submits marketplace purchase receipts through CCC JoyID', async () => {
+        const capture = {};
+        const out = await submitCccJoyIdMarketplacePurchaseTx(marketplacePurchaseTx(), {
             ccc: fakeCcc(capture),
         });
         expect(out.ok).toBe(true);

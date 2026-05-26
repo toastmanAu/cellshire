@@ -322,6 +322,40 @@ collateral-lock settlement is still the next CCC slice.
   `node netlify-build.mjs`, `git diff --check`, and a flagged boot smoke with
   `?chainBank=1&chainBankCollateral=ckb&chainCurrencyCkb=30000`.
 
+## Implementation Notes 2026-05-26
+
+- Added fixture settlement for CKB-collateral BORROW/REPAY:
+  `settleBankBorrowFixture` creates debt and locked-collateral records, and
+  `settleBankRepayFixture` consumes them while releasing collateral on full
+  repayment.
+- `FixtureCurrencyIndexer` now owns bank debt/locked-collateral fixture state
+  alongside indexed CKB balances.
+- `ChainBankAdapter` uses fixture settlement for prototype submits and keeps
+  CCC/JoyID submit receipt-only until real collateral-lock script transactions
+  are wired.
+- Bank pending CKB deltas are netted per transaction, because principal,
+  repayment, and collateral all move in CKB inside the same wallet balance.
+- Verification: full browser harness `368 passed, 0 failed`,
+  `node netlify-build.mjs`, and `git diff --check`.
+
+## Implementation Notes 2026-05-27
+
+- Added `?chainBankSubmit=ccc-real` / `?chainBankMode=ccc-real` as the opt-in
+  script-configured CCC/JoyID bank transaction path.
+- Added URL-resolved bank script config for debt type, bank book lock,
+  collateral lock, reserve lock, treasury lock, and optional cell deps.
+- Added a real-shaped CCC bank collateral tx builder:
+  - BORROW outputs player principal, debt cell with encoded debt data/type,
+    and CKB collateral under the configured collateral lock.
+  - REPAY outputs released collateral to the player, principal to the bank
+    reserve lock, and fee to the treasury lock.
+- Existing `?chainBankSubmit=ccc` remains the compact receipt path.
+- Remaining gap: BORROW still needs a real bank reserve input/signing provider
+  and REPAY needs real debt/collateral input selection before this is
+  end-to-end settlement.
+- Verification: full browser harness `374 passed, 0 failed`,
+  `node netlify-build.mjs`, and `git diff --check`.
+
 ## Open Questions
 
 1. **Term length.** Current local prototype uses 7 days; chain v2 needs

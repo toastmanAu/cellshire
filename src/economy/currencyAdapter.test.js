@@ -6,6 +6,11 @@ import {
     ReadOnlyChainCurrencyAdapter,
 } from './currencyAdapter.js';
 import { PendingCurrencyDeltaStore } from './pendingCurrencyDeltas.js';
+import { BANK_LOAN_OFFERS, loanFeeAmount, loanTotalOwed } from '../bank/bankLoans.js';
+import {
+    buildBankBorrowTransaction,
+    buildBankRepayTransaction,
+} from '../chain/bankTx.js';
 
 function fakeStorage() {
     const m = new Map();
@@ -120,5 +125,57 @@ describe('currency adapters', () => {
         const snapshot = await adapter.read();
         expect(snapshot.currencies.get('bch')).toBe(0.9);
         expect(snapshot.currencies.get('zec')).toBe(0.25);
+    });
+
+    it('applies fixture Bank borrow and repay settlement against indexed CKB', async () => {
+        const indexer = new FixtureCurrencyIndexer({
+            balances: { ckb: { amount: 20000, stale: false } },
+        });
+        const adapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            owner: 'ckt1owner',
+            chainCurrencyIds: ['ckb'],
+            indexer,
+        });
+        const offer = {
+            ...BANK_LOAN_OFFERS[0],
+            currency: 'ckb',
+            totalOwed: loanTotalOwed(BANK_LOAN_OFFERS[0]),
+            feeAmount: loanFeeAmount(BANK_LOAN_OFFERS[0]),
+        };
+        const borrow = buildBankBorrowTransaction({
+            walletAccount: { provider: 'joyid', address: 'ckt1owner', network: 'testnet' },
+            offer,
+            collateral: {
+                kind: 'ckb',
+                amount: 11250,
+                outpoint: { txHash: `0x${'4'.repeat(64)}`, index: 0 },
+            },
+            currentEpoch: 14400,
+            txNonce: 'borrow-1',
+        });
+        const borrowSettlement = adapter.settleBankBorrowTx(borrow, { txHash: '0xborrow' });
+        expect(borrowSettlement.ok).toBe(true);
+        expect((await adapter.read()).currencies.get('ckb')).toBe(16250);
+
+        const repay = buildBankRepayTransaction({
+            walletAccount: { provider: 'joyid', address: 'ckt1owner', network: 'testnet' },
+            loan: {
+                id: 'loan-1',
+                offerId: offer.id,
+                principal: offer.amount,
+                feeAmount: offer.feeAmount,
+                totalOwed: offer.totalOwed,
+                remainingOwed: offer.totalOwed,
+                feeBps: offer.feeBps,
+                collateralAmount: 11250,
+            },
+            debtCell: borrowSettlement.outputs.debt_cell,
+            txNonce: 'repay-1',
+        });
+        const repaySettlement = adapter.settleBankRepayTx(repay, { txHash: '0xrepay' });
+        expect(repaySettlement.ok).toBe(true);
+        expect((await adapter.read()).currencies.get('ckb')).toBe(19812.5);
+        expect(Object.keys(indexer.bankState.debtCells).length).toBe(0);
     });
 });

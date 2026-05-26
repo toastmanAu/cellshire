@@ -2107,6 +2107,7 @@ function bankLoanFailureMessage(reason) {
     if (reason === 'unsupported-collateral') return 'Bank collateral type is not supported yet';
     if (reason === 'no-active-loan') return 'No active loan';
     if (reason === 'invalid-amount') return 'Enter a valid repayment';
+    if (reason === 'full-repayment-required') return 'Chain loans must be repaid in full';
     return 'Bank action failed';
 }
 
