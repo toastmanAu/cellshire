@@ -46,6 +46,37 @@ describe('bank chain transactions', () => {
         expect(tx.outputs.collateral_locked_cell.amount).toBe(11250);
     });
 
+    it('builds a BORROW transaction with provider-selected reserve and collateral cells', () => {
+        const offer = {
+            ...BANK_LOAN_OFFERS[0],
+            currency: 'ckb',
+            totalOwed: loanTotalOwed(BANK_LOAN_OFFERS[0]),
+            feeAmount: loanFeeAmount(BANK_LOAN_OFFERS[0]),
+        };
+        const tx = buildBankBorrowTransaction({
+            walletAccount,
+            offer,
+            collateral: {
+                ...collateral,
+                outpoint: { txHash: `0x${'4'.repeat(64)}`, index: 2 },
+                cell: {
+                    outPoint: { txHash: `0x${'4'.repeat(64)}`, index: 2 },
+                    amount: 11250,
+                },
+            },
+            bankReserveCell: {
+                outPoint: { txHash: `0x${'5'.repeat(64)}`, index: 1 },
+                amount: 50000,
+            },
+            currentEpoch: 14400,
+            termEpochs: 42,
+            txNonce: 'borrow-provider-1',
+        });
+        expect(tx.inputs.bank_reserve_cell.outPoint.txHash).toBe(`0x${'5'.repeat(64)}`);
+        expect(tx.inputs.collateral_cell.outPoint.index).toBe(2);
+        expect(tx.outputs.debt_cell.debt.collateralOutpoint.txHash).toBe(`0x${'4'.repeat(64)}`);
+    });
+
     it('builds a REPAY transaction that consumes debt and releases collateral to the player', () => {
         const offer = {
             ...BANK_LOAN_OFFERS[0],
@@ -81,6 +112,48 @@ describe('bank chain transactions', () => {
         expect(repay.outputs.bank_reserve_cell.amount).toBe(7500);
         expect(repay.outputs.treasury_fee_receipt.amount).toBe(187.5);
         expect(repay.outputs.collateral_unlocked_cell.owner).toBe('ckt1-player');
+    });
+
+    it('builds a REPAY transaction with provider-selected debt and locked collateral inputs', () => {
+        const offer = {
+            ...BANK_LOAN_OFFERS[0],
+            currency: 'ckb',
+            totalOwed: loanTotalOwed(BANK_LOAN_OFFERS[0]),
+            feeAmount: loanFeeAmount(BANK_LOAN_OFFERS[0]),
+        };
+        const borrow = buildBankBorrowTransaction({
+            walletAccount,
+            offer,
+            collateral,
+            currentEpoch: 14400,
+            termEpochs: 42,
+        });
+        const loan = {
+            id: 'loan-1',
+            offerId: offer.id,
+            principal: offer.amount,
+            feeAmount: offer.feeAmount,
+            totalOwed: offer.totalOwed,
+            remainingOwed: offer.totalOwed,
+            feeBps: offer.feeBps,
+            collateralAmount: collateral.amount,
+        };
+        const repay = buildBankRepayTransaction({
+            walletAccount,
+            loan,
+            debtCell: {
+                ...borrow.outputs.debt_cell,
+                outPoint: { txHash: `0x${'6'.repeat(64)}`, index: 0 },
+            },
+            lockedCollateralCell: {
+                ...borrow.outputs.collateral_locked_cell,
+                outPoint: { txHash: `0x${'7'.repeat(64)}`, index: 3 },
+            },
+            txNonce: 'repay-provider-1',
+        });
+        expect(repay.inputs.debt_cell.outPoint.txHash).toBe(`0x${'6'.repeat(64)}`);
+        expect(repay.inputs.collateral_locked_cell.outPoint.index).toBe(3);
+        expect(repay.outputs.bank_reserve_cell.amount).toBe(7500);
     });
 
     it('settles a CKB-collateral BORROW into debt and locked collateral fixture cells', () => {

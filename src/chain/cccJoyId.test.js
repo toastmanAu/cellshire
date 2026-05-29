@@ -1,5 +1,6 @@
 import { describe, it, expect } from '../test/harness.js';
 import {
+    BANK_RESERVE_SIGNER_RESPONSE_PROTOCOL,
     bankLoanReceiptPayload,
     buildCccBankCollateralTransaction,
     buildCccBankLoanTransaction,
@@ -8,13 +9,17 @@ import {
     buildCccTraderSwapTransaction,
     buildCccPropertySnapshotTransaction,
     buildCccMiningTransaction,
+    cccBankScriptConfigIssues,
     cccJoyIdEnabled,
     cccJoyIdMiningEnabled,
     classifyCccJoyIdError,
     connectCccJoyId,
+    createHttpBankReserveSigner,
     marketplacePurchaseReceiptPayload,
     miningReceiptPayload,
+    normalizeBankReserveSignerResponse,
     propertySnapshotReceiptPayload,
+    resolveCccBankReserveSignerConfig,
     resolveCccBankScriptConfig,
     resolveCccJoyIdConfig,
     submitCccJoyIdBankLoanTx,
@@ -41,10 +46,23 @@ import { generalStoreItem } from '../store/generalStoreCatalog.js';
 import { loadMarketplaceState, marketplaceListings } from '../marketplace/playerMarketplace.js';
 
 const address = 'ckt1qyq9xcellshirejoyidreal00000000000000000000';
+const bankWitnessHex = '0x62616e6b726573657276657769746e657373';
+const bankExtraWitnessHex = '0x62616e6b6578747261';
+
+function expectThrows(fn) {
+    let threw = false;
+    try {
+        fn();
+    } catch {
+        threw = true;
+    }
+    expect(threw).toBe(true);
+}
 
 function fakeCcc(capture = {}) {
     class FakeTransaction {
         constructor(def) {
+            this.inputs = def.inputs || [];
             this.outputs = def.outputs || [];
             this.outputsData = def.outputsData || [];
             this.cellDeps = def.cellDeps || [];
@@ -229,6 +247,46 @@ function bankBorrowTx() {
     });
 }
 
+function bankBorrowTxWithInputs() {
+    const offer = {
+        ...BANK_LOAN_OFFERS[0],
+        currency: 'ckb',
+        totalOwed: loanTotalOwed(BANK_LOAN_OFFERS[0]),
+        feeAmount: loanFeeAmount(BANK_LOAN_OFFERS[0]),
+    };
+    return buildBankBorrowTransaction({
+        walletAccount: {
+            provider: 'joyid',
+            address,
+        },
+        offer,
+        collateral: {
+            kind: 'ckb',
+            amount: 11250,
+            outpoint: {
+                txHash: `0x${'8'.repeat(64)}`,
+                index: 1,
+            },
+            cell: {
+                outPoint: {
+                    txHash: `0x${'8'.repeat(64)}`,
+                    index: 1,
+                },
+                amount: 11250,
+            },
+        },
+        bankReserveCell: {
+            outPoint: {
+                txHash: `0x${'7'.repeat(64)}`,
+                index: 0,
+            },
+            amount: 100000,
+        },
+        currentEpoch: 14400,
+        txNonce: 'bank-borrow-inputs-1',
+    });
+}
+
 function bankRepayTx() {
     const borrow = bankBorrowTx();
     return buildBankRepayTransaction({
@@ -251,6 +309,35 @@ function bankRepayTx() {
     });
 }
 
+function bankRepayTxWithInputs() {
+    const repay = bankRepayTx();
+    return buildBankRepayTransaction({
+        walletAccount: {
+            provider: 'joyid',
+            address,
+        },
+        loan: {
+            id: 'loan-1',
+            offerId: 'starter-float',
+            principal: 7500,
+            feeAmount: 187.5,
+            totalOwed: 7687.5,
+            remainingOwed: 7687.5,
+            feeBps: 250,
+            collateralAmount: 11250,
+        },
+        debtCell: {
+            ...repay.inputs.debt_cell,
+            outPoint: { txHash: `0x${'9'.repeat(64)}`, index: 0 },
+        },
+        lockedCollateralCell: {
+            ...repay.inputs.collateral_locked_cell,
+            outPoint: { txHash: `0x${'a'.repeat(64)}`, index: 2 },
+        },
+        txNonce: 'bank-repay-inputs-1',
+    });
+}
+
 function bankScriptParams() {
     return new URLSearchParams([
         ['chainBankDebtTypeCodeHash', `0x${'1'.repeat(64)}`],
@@ -261,6 +348,20 @@ function bankScriptParams() {
         ['chainBankTreasuryLockCodeHash', `0x${'5'.repeat(64)}`],
         ['chainBankDebtTypeDepTxHash', `0x${'6'.repeat(64)}`],
         ['chainBankDebtTypeDepIndex', '1'],
+    ]);
+}
+
+function productionBankScriptParams() {
+    return new URLSearchParams([
+        ['chainBankScriptMode', 'production'],
+        ['chainBankDebtTypeCodeHash', `0x${'a'.repeat(64)}`],
+        ['chainBankBookLockCodeHash', `0x${'b'.repeat(64)}`],
+        ['chainBankBookLockArgs', '0xabcd'],
+        ['chainBankCollateralLockCodeHash', `0x${'c'.repeat(64)}`],
+        ['chainBankReserveLockCodeHash', `0x${'d'.repeat(64)}`],
+        ['chainBankTreasuryLockCodeHash', `0x${'e'.repeat(64)}`],
+        ['chainBankDebtTypeDepTxHash', `0x${'f'.repeat(64)}`],
+        ['chainBankDebtTypeDepIndex', '0'],
     ]);
 }
 
@@ -336,10 +437,56 @@ describe('CCC JoyID flags', () => {
     it('resolves real bank script config from URL params', () => {
         const config = resolveCccBankScriptConfig({ params: bankScriptParams() });
         expect(config.complete).toBe(true);
+        expect(config.production).toBe(false);
+        expect(config.issues.length).toBe(0);
         expect(config.debtType.codeHash).toBe(`0x${'1'.repeat(64)}`);
         expect(config.bankBookLock.args).toBe('0x1234');
         expect(config.cellDeps.length).toBe(1);
         expect(config.cellDeps[0].outPoint.index).toBe(1);
+    });
+
+    it('flags smoke placeholder hashes when production bank scripts are required', () => {
+        const placeholderParams = bankScriptParams();
+        placeholderParams.set('chainBankScriptMode', 'production');
+        const placeholderConfig = resolveCccBankScriptConfig({ params: placeholderParams });
+        expect(placeholderConfig.production).toBe(true);
+        expect(placeholderConfig.issues.includes('bank-script-placeholder-code-hash')).toBe(true);
+
+        const productionConfig = resolveCccBankScriptConfig({ params: productionBankScriptParams() });
+        expect(productionConfig.production).toBe(true);
+        expect(cccBankScriptConfigIssues(productionConfig).length).toBe(0);
+    });
+
+    it('resolves the optional bank reserve signer endpoint from URL params', () => {
+        const config = resolveCccBankReserveSignerConfig({
+            params: new URLSearchParams('chainBankReserveSignerUrl=https%3A%2F%2Fbank.test%2Fsign&chainBankReserveSignerToken=secret'),
+        });
+        expect(config.enabled).toBe(true);
+        expect(config.url).toBe('https://bank.test/sign');
+        expect(config.token).toBe('secret');
+    });
+
+    it('validates the bank reserve signer response contract', () => {
+        const normalized = normalizeBankReserveSignerResponse({
+            protocol: BANK_RESERVE_SIGNER_RESPONSE_PROTOCOL,
+            version: 1,
+            bankWitness: bankWitnessHex,
+        });
+        expect(normalized.bankWitness).toBe(bankWitnessHex);
+        expectThrows(() => normalizeBankReserveSignerResponse({
+            protocol: 'wrong',
+            version: 1,
+            bankWitness: bankWitnessHex,
+        }));
+        expectThrows(() => normalizeBankReserveSignerResponse({
+            protocol: BANK_RESERVE_SIGNER_RESPONSE_PROTOCOL,
+            version: 1,
+            bankWitness: '0xnot-hex',
+        }));
+        expectThrows(() => normalizeBankReserveSignerResponse({
+            protocol: BANK_RESERVE_SIGNER_RESPONSE_PROTOCOL,
+            version: 1,
+        }));
     });
 });
 
@@ -525,6 +672,89 @@ describe('CCC bank loan submit', () => {
         expect(prepared.tx.cellDeps.length).toBe(1);
     });
 
+    it('includes provider-selected borrow inputs in real-shaped CCC bank transactions', async () => {
+        const capture = {};
+        const ccc = fakeCcc(capture);
+        const client = new ccc.ClientPublicTestnet({ url: 'https://testnet.ckb.dev' });
+        const signer = new ccc.JoyId.CkbSigner(client, 'Cellshire', 'logo.png');
+        const prepared = await buildCccBankCollateralTransaction({
+            ccc,
+            client,
+            signer,
+            bankTx: bankBorrowTxWithInputs(),
+            scriptConfig: resolveCccBankScriptConfig({ params: bankScriptParams() }),
+        });
+        expect(prepared.tx.inputs.length).toBe(2);
+        expect(prepared.tx.inputs[0].previousOutput.txHash).toBe(`0x${'7'.repeat(64)}`);
+        expect(prepared.tx.inputs[1].previousOutput.index).toBe(1);
+    });
+
+    it('applies a bank reserve co-signature when building real-shaped borrow transactions', async () => {
+        const capture = {};
+        const ccc = fakeCcc(capture);
+        const client = new ccc.ClientPublicTestnet({ url: 'https://testnet.ckb.dev' });
+        const signer = new ccc.JoyId.CkbSigner(client, 'Cellshire', 'logo.png');
+        let seenPayload = null;
+        const prepared = await buildCccBankCollateralTransaction({
+            ccc,
+            client,
+            signer,
+            bankTx: bankBorrowTxWithInputs(),
+            scriptConfig: resolveCccBankScriptConfig({ params: bankScriptParams() }),
+            bankReserveSigner: async ({ tx, payload }) => {
+                seenPayload = payload;
+                expect(tx.inputs.length).toBe(2);
+                return {
+                    protocol: BANK_RESERVE_SIGNER_RESPONSE_PROTOCOL,
+                    version: 1,
+                    bankWitness: bankWitnessHex,
+                };
+            },
+        });
+        expect(prepared.bankReserveSigned).toBe(true);
+        expect(seenPayload.action).toBe('borrow');
+        expect(prepared.tx.witnesses[prepared.tx.witnesses.length - 1]).toBe(bankWitnessHex);
+    });
+
+    it('posts real-shaped borrow transactions to a configured bank reserve signer', async () => {
+        const calls = [];
+        const reserveSigner = createHttpBankReserveSigner({
+            url: 'https://bank.test/sign',
+            token: 'secret',
+            fetchImpl: async (url, init) => {
+                calls.push({ url, init, body: JSON.parse(init.body) });
+                return {
+                    ok: true,
+                    async json() {
+                        return {
+                            ok: true,
+                            protocol: BANK_RESERVE_SIGNER_RESPONSE_PROTOCOL,
+                            version: 1,
+                            extraWitnesses: [bankExtraWitnessHex],
+                        };
+                    },
+                };
+            },
+        });
+        const capture = {};
+        const ccc = fakeCcc(capture);
+        const client = new ccc.ClientPublicTestnet({ url: 'https://testnet.ckb.dev' });
+        const signer = new ccc.JoyId.CkbSigner(client, 'Cellshire', 'logo.png');
+        const prepared = await buildCccBankCollateralTransaction({
+            ccc,
+            client,
+            signer,
+            bankTx: bankBorrowTxWithInputs(),
+            scriptConfig: resolveCccBankScriptConfig({ params: bankScriptParams() }),
+            bankReserveSigner: reserveSigner,
+        });
+        expect(calls.length).toBe(1);
+        expect(calls[0].init.headers.authorization).toBe('Bearer secret');
+        expect(calls[0].body.protocol).toBe('cellshire.bank.reserve-sign');
+        expect(calls[0].body.tx.inputs.length).toBe(2);
+        expect(prepared.tx.witnesses[prepared.tx.witnesses.length - 1]).toBe(bankExtraWitnessHex);
+    });
+
     it('prepares a real-shaped CCC repay transaction when bank scripts are configured', async () => {
         const capture = {};
         const ccc = fakeCcc(capture);
@@ -543,6 +773,23 @@ describe('CCC bank loan submit', () => {
         expect(prepared.tx.outputs[2].capacity).toBe('fixed:187.5');
     });
 
+    it('includes provider-selected repay inputs in real-shaped CCC bank transactions', async () => {
+        const capture = {};
+        const ccc = fakeCcc(capture);
+        const client = new ccc.ClientPublicTestnet({ url: 'https://testnet.ckb.dev' });
+        const signer = new ccc.JoyId.CkbSigner(client, 'Cellshire', 'logo.png');
+        const prepared = await buildCccBankCollateralTransaction({
+            ccc,
+            client,
+            signer,
+            bankTx: bankRepayTxWithInputs(),
+            scriptConfig: resolveCccBankScriptConfig({ params: bankScriptParams() }),
+        });
+        expect(prepared.tx.inputs.length).toBe(2);
+        expect(prepared.tx.inputs[0].previousOutput.txHash).toBe(`0x${'9'.repeat(64)}`);
+        expect(prepared.tx.inputs[1].previousOutput.index).toBe(2);
+    });
+
     it('signs and submits real-shaped bank collateral transactions through CCC JoyID', async () => {
         const capture = {};
         const out = await submitCccJoyIdBankLoanTx(bankBorrowTx(), {
@@ -556,9 +803,52 @@ describe('CCC bank loan submit', () => {
         expect(capture.sent).toBe(capture.tx);
     });
 
+    it('co-signs and submits real-shaped bank collateral borrow transactions through CCC JoyID', async () => {
+        const capture = {};
+        const out = await submitCccJoyIdBankLoanTx(bankBorrowTxWithInputs(), {
+            ccc: fakeCcc(capture),
+            params: bankScriptParams(),
+            realBankTx: true,
+            bankReserveSigner: async () => ({
+                protocol: BANK_RESERVE_SIGNER_RESPONSE_PROTOCOL,
+                version: 1,
+                bankWitness: bankWitnessHex,
+            }),
+        });
+        expect(out.ok).toBe(true);
+        expect(out.mode).toBe('ccc-joyid-real');
+        expect(out.bankReserveSigned).toBe(true);
+        expect(capture.sent.witnesses.includes(bankWitnessHex)).toBe(true);
+    });
+
+    it('normalizes bank reserve signer failures', async () => {
+        const out = await submitCccJoyIdBankLoanTx(bankBorrowTxWithInputs(), {
+            ccc: fakeCcc(),
+            params: bankScriptParams(),
+            realBankTx: true,
+            bankReserveSigner: async () => {
+                throw new Error('bank reserve signer failed: rejected');
+            },
+        });
+        expect(out.ok).toBe(false);
+        expect(out.reason).toBe('bank-signer-failed');
+    });
+
     it('rejects real bank collateral transactions without script config', async () => {
         const out = await submitCccJoyIdBankLoanTx(bankBorrowTx(), {
             ccc: fakeCcc(),
+            realBankTx: true,
+        });
+        expect(out.ok).toBe(false);
+        expect(out.reason).toBe('tx-failed');
+    });
+
+    it('rejects production real bank transactions with smoke placeholder scripts', async () => {
+        const params = bankScriptParams();
+        params.set('chainBankScriptMode', 'production');
+        const out = await submitCccJoyIdBankLoanTx(bankBorrowTx(), {
+            ccc: fakeCcc(),
+            params,
             realBankTx: true,
         });
         expect(out.ok).toBe(false);

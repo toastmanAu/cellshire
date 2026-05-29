@@ -9,6 +9,7 @@ export function buildBankBorrowTransaction({
     walletAccount,
     offer,
     collateral,
+    bankReserveCell = null,
     currentEpoch = 0,
     termEpochs = 42,
     txNonce = 'bank-borrow',
@@ -35,17 +36,18 @@ export function buildBankBorrowTransaction({
         tx_nonce: txNonce,
         action: 'borrow',
         inputs: {
-            bank_reserve_cell: {
+            bank_reserve_cell: normalizeBankTxCell(bankReserveCell, {
                 currency: 'ckb',
                 amount: offer.amount,
-            },
+            }),
             player_funding_lock: walletAccount.address,
-            collateral_cell: {
+            collateral_cell: normalizeBankTxCell(collateral.cell, {
                 kind: 'ckb',
                 amount: collateral.amount,
                 outpoint: collateral.outpoint,
+                outPoint: collateral.outpoint,
                 owner: walletAccount.address,
-            },
+            }),
         },
         outputs: {
             player_ckb_cell: {
@@ -91,6 +93,8 @@ export function buildBankRepayTransaction({
     walletAccount,
     loan,
     debtCell,
+    lockedCollateralCell = null,
+    playerPaymentCell = null,
     txNonce = 'bank-repay',
 } = {}) {
     if (!walletAccount?.address) throw new Error('wallet account required');
@@ -106,16 +110,17 @@ export function buildBankRepayTransaction({
         tx_nonce: txNonce,
         action: 'repay',
         inputs: {
-            debt_cell: debtCell,
-            player_ckb_cell: {
+            debt_cell: normalizeBankTxCell(debtCell, debtCell),
+            player_ckb_cell: normalizeBankTxCell(playerPaymentCell, {
                 owner: walletAccount.address,
                 amount: payment,
-            },
-            collateral_locked_cell: {
+            }),
+            collateral_locked_cell: normalizeBankTxCell(lockedCollateralCell, {
                 kind: debtCell.debt.collateralKind,
                 outpoint: debtCell.debt.collateralOutpoint,
+                outPoint: debtCell.debt.collateralOutpoint,
                 amount: loan.collateralAmount,
-            },
+            }),
         },
         outputs: {
             collateral_unlocked_cell: {
@@ -342,6 +347,35 @@ export function bankDebtKeyFromDebtCell(debtCell) {
 function normalizedBalanceAmount(entry) {
     if (typeof entry === 'number') return entry;
     return Number(entry?.amount ?? 0) || 0;
+}
+
+function normalizeBankTxCell(cell, fallback) {
+    const source = cell && typeof cell === 'object' ? cell : {};
+    const base = fallback && typeof fallback === 'object' ? fallback : {};
+    const outPoint = normalizeOutPoint(source.outPoint ?? source.outpoint ?? source.previousOutput)
+        ?? normalizeOutPoint(base.outPoint ?? base.outpoint ?? base.previousOutput);
+    const out = {
+        ...base,
+        ...source,
+    };
+    if (outPoint) {
+        out.outPoint = outPoint;
+        out.outpoint = outPoint;
+    }
+    return out;
+}
+
+function normalizeOutPoint(value) {
+    if (!value || typeof value !== 'object') return null;
+    const txHash = typeof value.txHash === 'string'
+        ? value.txHash
+        : typeof value.tx_hash === 'string'
+            ? value.tx_hash
+            : null;
+    const body = txHash?.startsWith?.('0x') ? txHash.slice(2) : txHash;
+    const index = Math.floor(Number(value.index));
+    if (!/^[0-9a-f]{64}$/i.test(body || '') || !Number.isFinite(index) || index < 0) return null;
+    return { txHash: `0x${body.toLowerCase()}`, index };
 }
 
 function collateralKey(outpoint) {

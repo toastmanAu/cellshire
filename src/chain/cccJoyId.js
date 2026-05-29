@@ -1,7 +1,15 @@
 export const DEFAULT_CCC_ESM_URL = 'https://esm.sh/@ckb-ccc/ccc@1.1.17';
 export const DEFAULT_TESTNET_RPC_URL = 'https://testnet.ckb.dev';
 export const DEFAULT_TESTNET_JOYID_APP_URL = 'https://testnet.joyid.dev';
+export const BANK_RESERVE_SIGNER_RESPONSE_PROTOCOL = 'cellshire.bank.reserve-sign.response';
 
+const BANK_SMOKE_SCRIPT_CODE_HASHES = new Set([
+    `0x${'1'.repeat(64)}`,
+    `0x${'2'.repeat(64)}`,
+    `0x${'3'.repeat(64)}`,
+    `0x${'4'.repeat(64)}`,
+    `0x${'5'.repeat(64)}`,
+]);
 const CANCEL_RE = /cancel|reject|denied|closed|timeout/i;
 const CAPACITY_RE = /capacity|balance|insufficient|cell/i;
 
@@ -47,8 +55,10 @@ export function resolveCccBankScriptConfig({ params } = {}) {
         cellDepFromParams(params, 'chainBankReserveLockDep'),
         cellDepFromParams(params, 'chainBankTreasuryLockDep'),
     ].filter(Boolean);
-    return {
+    const production = bankProductionScriptMode(params);
+    const config = {
         complete: !!(debtType && bankBookLock && collateralLock && bankReserveLock && treasuryLock),
+        production,
         debtType,
         bankBookLock,
         collateralLock,
@@ -57,6 +67,102 @@ export function resolveCccBankScriptConfig({ params } = {}) {
         cellDeps,
         debtCellCapacityCkb: numberParam(params, 'chainBankDebtCellCapacityCkb', 61),
     };
+    return {
+        ...config,
+        issues: cccBankScriptConfigIssues(config),
+    };
+}
+
+export function cccBankScriptConfigIssues(config = {}) {
+    const issues = [];
+    if (!config.complete) issues.push('missing-bank-script-config');
+    if (config.production) {
+        const scripts = [
+            config.debtType,
+            config.bankBookLock,
+            config.collateralLock,
+            config.bankReserveLock,
+            config.treasuryLock,
+        ];
+        if (scripts.some(script => BANK_SMOKE_SCRIPT_CODE_HASHES.has(script?.codeHash))) {
+            issues.push('bank-script-placeholder-code-hash');
+        }
+        if (!Array.isArray(config.cellDeps) || config.cellDeps.length === 0) {
+            issues.push('bank-script-cell-deps-required');
+        }
+    }
+    return issues;
+}
+
+export function resolveCccBankReserveSignerConfig({ params } = {}) {
+    const url = params?.get?.('chainBankReserveSignerUrl') || '';
+    return {
+        enabled: !!url,
+        url,
+        token: params?.get?.('chainBankReserveSignerToken') || '',
+    };
+}
+
+export function createHttpBankReserveSigner({
+    url,
+    token = '',
+    fetchImpl = globalThis.fetch,
+} = {}) {
+    return async ({ tx, payload, bankTx, scriptConfig } = {}) => {
+        if (!url) return null;
+        if (typeof fetchImpl !== 'function') throw new Error('bank reserve signer unavailable');
+        const headers = { 'content-type': 'application/json' };
+        if (token) headers.authorization = `Bearer ${token}`;
+        const response = await fetchImpl(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                protocol: 'cellshire.bank.reserve-sign',
+                version: 1,
+                action: bankTx?.action ?? payload?.action ?? null,
+                payload,
+                tx: serializeCccTransaction(tx),
+                script_config: summarizeBankScriptConfig(scriptConfig),
+            }),
+        });
+        if (!response?.ok) {
+            throw new Error(`bank reserve signer failed: ${response?.status || 'network'}`);
+        }
+        const body = await response.json();
+        if (body?.ok === false) {
+            throw new Error(`bank reserve signer failed: ${body.reason || 'rejected'}`);
+        }
+        return normalizeBankReserveSignerResponse(body);
+    };
+}
+
+export function normalizeBankReserveSignerResponse(body) {
+    if (!body || typeof body !== 'object') {
+        throw new Error('bank reserve signer failed: invalid-response');
+    }
+    if (body.protocol && body.protocol !== BANK_RESERVE_SIGNER_RESPONSE_PROTOCOL) {
+        throw new Error('bank reserve signer failed: invalid-protocol');
+    }
+    if (body.version != null && Number(body.version) !== 1) {
+        throw new Error('bank reserve signer failed: unsupported-version');
+    }
+    if (body.bankWitness != null && !isHexString(body.bankWitness)) {
+        throw new Error('bank reserve signer failed: invalid-bank-witness');
+    }
+    if (body.witnesses != null && !isHexArray(body.witnesses)) {
+        throw new Error('bank reserve signer failed: invalid-witnesses');
+    }
+    if (body.extraWitnesses != null && !isHexArray(body.extraWitnesses)) {
+        throw new Error('bank reserve signer failed: invalid-extra-witnesses');
+    }
+    const hasSignedTx = body.tx && typeof body.tx === 'object';
+    const hasWitnesses = Array.isArray(body.witnesses) && body.witnesses.length > 0;
+    const hasBankWitness = typeof body.bankWitness === 'string';
+    const hasExtraWitnesses = Array.isArray(body.extraWitnesses) && body.extraWitnesses.length > 0;
+    if (!hasSignedTx && !hasWitnesses && !hasBankWitness && !hasExtraWitnesses) {
+        throw new Error('bank reserve signer failed: empty-signature');
+    }
+    return body;
 }
 
 export async function loadCcc({ ccc, cccUrl = DEFAULT_CCC_ESM_URL, importModule = spec => import(spec) } = {}) {
@@ -354,6 +460,7 @@ export async function buildCccBankCollateralTransaction({
     signer,
     bankTx,
     scriptConfig,
+    bankReserveSigner = null,
 }) {
     const address = await signer.getRecommendedAddress();
     const expected = bankTx?.witness?.address;
@@ -363,6 +470,10 @@ export async function buildCccBankCollateralTransaction({
     const config = scriptConfig ?? {};
     if (!config.complete) {
         throw new Error('bank script config required for real collateral transaction');
+    }
+    const configIssues = cccBankScriptConfigIssues(config);
+    if (config.production && configIssues.length > 0) {
+        throw new Error(`bank production script config invalid: ${configIssues.join(',')}`);
     }
 
     const { script: playerLock } = await ccc.Address.fromString(address, client);
@@ -377,9 +488,19 @@ export async function buildCccBankCollateralTransaction({
     await tx.completeInputsByCapacity(signer);
     if (!Array.isArray(tx.witnesses)) tx.witnesses = [];
     if (tx.witnesses.length === 0) tx.witnesses.push('0x');
-    tx.witnesses.push(utf8ToHex(JSON.stringify(bankLoanReceiptPayload(bankTx))));
+    const payload = bankLoanReceiptPayload(bankTx);
+    tx.witnesses.push(utf8ToHex(JSON.stringify(payload)));
     await tx.completeFeeBy(signer);
-    return { tx, payload: bankLoanReceiptPayload(bankTx), scriptConfig: config };
+    const signerResult = bankTxNeedsReserveSignature(bankTx) && bankReserveSigner
+        ? await bankReserveSigner({ tx, payload, bankTx, scriptConfig: config })
+        : null;
+    const signedTx = applyBankReserveSignerResult(tx, signerResult);
+    return {
+        tx: signedTx,
+        payload,
+        scriptConfig: config,
+        bankReserveSigned: !!signerResult,
+    };
 }
 
 export async function buildCccTraderSwapTransaction({
@@ -522,6 +643,8 @@ export async function submitCccJoyIdBankLoanTx(bankTx, {
     receiptCapacityCkb,
     realBankTx = false,
     scriptConfig,
+    bankReserveSigner,
+    fetchImpl,
 } = {}) {
     try {
         if (shouldFail) throw new Error('JoyID signature cancelled');
@@ -530,6 +653,14 @@ export async function submitCccJoyIdBankLoanTx(bankTx, {
         const client = createCccClient(cccModule, config);
         const signer = new cccModule.JoyId.CkbSigner(client, config.name, config.logo);
         await signer.connect();
+        const reserveSignerConfig = resolveCccBankReserveSignerConfig({ params });
+        const resolvedReserveSigner = bankReserveSigner
+            ?? (reserveSignerConfig.enabled
+                ? createHttpBankReserveSigner({
+                    ...reserveSignerConfig,
+                    fetchImpl,
+                })
+                : null);
         const prepared = realBankTx
             ? await buildCccBankCollateralTransaction({
                 ccc: cccModule,
@@ -537,6 +668,7 @@ export async function submitCccJoyIdBankLoanTx(bankTx, {
                 signer,
                 bankTx,
                 scriptConfig: scriptConfig ?? resolveCccBankScriptConfig({ params }),
+                bankReserveSigner: resolvedReserveSigner,
             })
             : await buildCccBankLoanTransaction({
                 ccc: cccModule,
@@ -551,6 +683,7 @@ export async function submitCccJoyIdBankLoanTx(bankTx, {
             mode: realBankTx ? 'ccc-joyid-real' : 'ccc-joyid',
             txHash,
             payload: prepared.payload,
+            bankReserveSigned: !!prepared.bankReserveSigned,
         };
     } catch (err) {
         return {
@@ -739,6 +872,7 @@ export function createCccJoyIdMarketplacePurchaseSubmitter(options = {}) {
 
 export function classifyCccJoyIdError(err) {
     const msg = err?.message || String(err || '');
+    if (/bank reserve signer|co-?sign/i.test(msg)) return 'bank-signer-failed';
     if (CANCEL_RE.test(msg)) return 'signature-cancelled';
     if (CAPACITY_RE.test(msg)) return 'insufficient-capacity';
     if (/module|import|constructor|unavailable/i.test(msg)) return 'ccc-unavailable';
@@ -773,8 +907,13 @@ function bankBorrowCccDef({ ccc, bankTx, playerLock, config }) {
             },
         },
     ];
+    const inputs = [
+        cccInputFromBankCell(bankTx.inputs?.bank_reserve_cell),
+        cccInputFromBankCell(bankTx.inputs?.collateral_cell),
+    ].filter(Boolean);
     return {
         cellDeps: config.cellDeps,
+        ...(inputs.length ? { inputs } : {}),
         outputs,
         outputsData: ['0x', debtCell.data, '0x'],
     };
@@ -785,8 +924,14 @@ function bankRepayCccDef({ ccc, bankTx, playerLock, config }) {
     const reserve = bankTx.outputs?.bank_reserve_cell;
     const fee = bankTx.outputs?.treasury_fee_receipt;
     if (!release || !reserve || !fee) throw new Error('bank repay collateral tx payload required');
+    const inputs = [
+        cccInputFromBankCell(bankTx.inputs?.debt_cell),
+        cccInputFromBankCell(bankTx.inputs?.collateral_locked_cell),
+        cccInputFromBankCell(bankTx.inputs?.player_ckb_cell),
+    ].filter(Boolean);
     return {
         cellDeps: config.cellDeps,
+        ...(inputs.length ? { inputs } : {}),
         outputs: [
             {
                 capacity: ccc.fixedPointFrom(release.amount),
@@ -803,6 +948,78 @@ function bankRepayCccDef({ ccc, bankTx, playerLock, config }) {
         ],
         outputsData: ['0x', '0x', '0x'],
     };
+}
+
+function cccInputFromBankCell(cell) {
+    const outPoint = cell?.outPoint ?? cell?.outpoint ?? cell?.previousOutput;
+    if (!outPoint?.txHash || !Number.isFinite(Number(outPoint.index))) return null;
+    return {
+        since: cell.since ?? '0x0',
+        previousOutput: {
+            txHash: String(outPoint.txHash).toLowerCase(),
+            index: Math.floor(Number(outPoint.index)),
+        },
+    };
+}
+
+function bankTxNeedsReserveSignature(bankTx) {
+    return bankTx?.action === 'borrow' && !!cccInputFromBankCell(bankTx.inputs?.bank_reserve_cell);
+}
+
+function applyBankReserveSignerResult(tx, result) {
+    if (!result) return tx;
+    const normalized = normalizeBankReserveSignerResponse(result);
+    const signedTx = normalized.tx ?? tx;
+    if (normalized.tx && normalized.tx !== tx) return normalized.tx;
+    if (Array.isArray(normalized.witnesses)) {
+        signedTx.witnesses = normalized.witnesses;
+    }
+    if (typeof normalized.bankWitness === 'string') {
+        if (!Array.isArray(signedTx.witnesses)) signedTx.witnesses = [];
+        signedTx.witnesses.push(normalized.bankWitness);
+    }
+    if (Array.isArray(normalized.extraWitnesses)) {
+        if (!Array.isArray(signedTx.witnesses)) signedTx.witnesses = [];
+        signedTx.witnesses.push(...normalized.extraWitnesses);
+    }
+    return signedTx;
+}
+
+function serializeCccTransaction(tx) {
+    const fromMethod = tx?.toJson?.() ?? tx?.toJSON?.();
+    if (fromMethod) return fromMethod;
+    return {
+        inputs: tx?.inputs ?? [],
+        outputs: tx?.outputs ?? [],
+        outputsData: tx?.outputsData ?? [],
+        cellDeps: tx?.cellDeps ?? [],
+        witnesses: tx?.witnesses ?? [],
+    };
+}
+
+function summarizeBankScriptConfig(config = {}) {
+    return {
+        complete: !!config.complete,
+        production: !!config.production,
+        issues: Array.isArray(config.issues) ? config.issues : [],
+        debtType: config.debtType ?? null,
+        bankBookLock: config.bankBookLock ?? null,
+        collateralLock: config.collateralLock ?? null,
+        bankReserveLock: config.bankReserveLock ?? null,
+        treasuryLock: config.treasuryLock ?? null,
+        cellDeps: config.cellDeps ?? [],
+        debtCellCapacityCkb: config.debtCellCapacityCkb ?? null,
+    };
+}
+
+function isHexString(value) {
+    return typeof value === 'string'
+        && /^0x[0-9a-f]*$/i.test(value)
+        && value.length % 2 === 0;
+}
+
+function isHexArray(value) {
+    return Array.isArray(value) && value.every(isHexString);
 }
 
 function scriptFromParams(params, prefix) {
@@ -846,4 +1063,12 @@ function normalizeHexParam(value) {
 function numberParam(params, key, fallback) {
     const value = Number(params?.get?.(key));
     return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function bankProductionScriptMode(params) {
+    const mode = params?.get?.('chainBankScriptMode') || params?.get?.('chainBankScripts');
+    return mode === 'production'
+        || mode === 'prod'
+        || params?.get?.('chainBankProduction') === '1'
+        || params?.get?.('chainBankRequireProductionScripts') === '1';
 }

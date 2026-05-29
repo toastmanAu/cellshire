@@ -9,6 +9,11 @@ import {
     saveBankLoanBook,
 } from './bankLoans.js';
 import {
+    createBankInputProviderFromParams,
+    EmptyBankInputProvider,
+    normalizeBankInputCell,
+} from './bankInputProvider.js';
+import {
     buildBankBorrowTransaction,
     buildBankRepayTransaction,
 } from '../chain/bankTx.js';
@@ -81,6 +86,7 @@ export class ChainBankAdapter {
         currentEpoch = () => 0,
         termEpochs = 42,
         submit = defaultSubmitPrototypeBankTx,
+        bankInputProvider = new EmptyBankInputProvider(),
         loadWallet = loadWalletIdentity,
     } = {}) {
         this.storage = storage;
@@ -92,6 +98,7 @@ export class ChainBankAdapter {
         this.currentEpoch = currentEpoch;
         this.termEpochs = termEpochs;
         this.submit = submit;
+        this.bankInputProvider = bankInputProvider;
         this.loadWallet = loadWallet;
     }
 
@@ -129,7 +136,15 @@ export class ChainBankAdapter {
         }
         const walletAccount = this._walletAccount();
         const chainOffer = chainOfferFromLocalOffer(offer, this.priceSnapshot);
-        const collateralOutpoint = fixtureOutpoint({
+        const provided = await this._borrowInputs({
+            walletAccount,
+            offer: chainOffer,
+            collateralAmount,
+        });
+        if (provided?.ok === false) return { ok: false, mode: 'chain', reason: provided.reason || 'bank-inputs-unavailable' };
+        const collateralCell = normalizeBankInputCell(provided?.collateralCell) ?? null;
+        const bankReserveCell = normalizeBankInputCell(provided?.bankReserveCell) ?? null;
+        const collateralOutpoint = collateralCell?.outPoint ?? fixtureOutpoint({
             owner: walletAccount.address,
             offerId,
             amount: collateralAmount,
@@ -141,7 +156,9 @@ export class ChainBankAdapter {
                 kind: 'ckb',
                 amount: collateralAmount,
                 outpoint: collateralOutpoint,
+                cell: collateralCell,
             },
+            bankReserveCell,
             currentEpoch: this.currentEpoch(),
             termEpochs: this.termEpochs,
             txNonce: `${Date.now()}`,
@@ -207,11 +224,20 @@ export class ChainBankAdapter {
         const balance = await this._ckbBalance();
         if (balance < payment) return { ok: false, reason: 'insufficient-funds', loan, balance, payment };
         const walletAccount = this._walletAccount();
-        const debtCell = loan.debtCell ?? makeDebtCell(loan.debt);
+        const provided = await this._repayInputs({
+            walletAccount,
+            loan,
+        });
+        if (provided?.ok === false) return { ok: false, mode: 'chain', reason: provided.reason || 'bank-inputs-unavailable' };
+        const providedDebtCell = normalizeBankInputCell(provided?.debtCell) ?? null;
+        const providedLockedCollateral = normalizeBankInputCell(provided?.lockedCollateralCell) ?? null;
+        const debtCell = withDebtShape(providedDebtCell, loan.debtCell ?? makeDebtCell(loan.debt));
+        const lockedCollateralCell = providedLockedCollateral ?? loan.collateralLockedCell ?? null;
         const tx = buildBankRepayTransaction({
             walletAccount,
             loan: { ...loan, remainingOwed: payment },
             debtCell,
+            lockedCollateralCell,
             txNonce: `${Date.now()}`,
         });
         const receipt = await this.submit(tx);
@@ -273,6 +299,14 @@ export class ChainBankAdapter {
             ? wallet.account
             : { provider: 'prototype', address: this.owner || 'local', network: 'testnet' };
     }
+
+    async _borrowInputs(context) {
+        return await this.bankInputProvider?.selectBorrowInputs?.(context);
+    }
+
+    async _repayInputs(context) {
+        return await this.bankInputProvider?.selectRepayInputs?.(context);
+    }
 }
 
 export async function defaultSubmitPrototypeBankTx(tx) {
@@ -297,6 +331,7 @@ export function makeBankAdapterFromParams({
     currentEpoch,
     location,
     importModule,
+    fetchImpl,
 } = {}) {
     if (!chainBankEnabled(params)) {
         return new LocalBankAdapter({ storage, loanBook, treasury, priceSnapshot, inventory });
@@ -310,6 +345,7 @@ export function makeBankAdapterFromParams({
             priceSnapshot,
             inventoryAdapter,
             currentEpoch,
+            bankInputProvider: createBankInputProviderFromParams(params, { fetchImpl }),
             submit: async () => ({ ok: false, reason: 'unsupported-collateral' }),
         });
     }
@@ -322,6 +358,7 @@ export function makeBankAdapterFromParams({
             priceSnapshot,
             inventoryAdapter,
             currentEpoch,
+            bankInputProvider: createBankInputProviderFromParams(params, { fetchImpl }),
             submit: createCccJoyIdBankLoanSubmitter({ params, location, importModule }),
         });
     }
@@ -334,15 +371,26 @@ export function makeBankAdapterFromParams({
             priceSnapshot,
             inventoryAdapter,
             currentEpoch,
+            bankInputProvider: createBankInputProviderFromParams(params, { fetchImpl }),
             submit: createCccJoyIdBankLoanSubmitter({
                 params,
                 location,
                 importModule,
+                fetchImpl,
                 realBankTx: true,
             }),
         });
     }
-    return new ChainBankAdapter({ storage, owner, loanBook, treasury, priceSnapshot, inventoryAdapter, currentEpoch });
+    return new ChainBankAdapter({
+        storage,
+        owner,
+        loanBook,
+        treasury,
+        priceSnapshot,
+        inventoryAdapter,
+        currentEpoch,
+        bankInputProvider: createBankInputProviderFromParams(params, { fetchImpl }),
+    });
 }
 
 function chainOfferFromLocalOffer(offer, priceSnapshot) {
@@ -379,6 +427,23 @@ function chainLoanFromOffer({ offer, tx, txHash, collateralAmount, currentEpoch,
         borrowTxHash: txHash,
         debt: debtCell.debt,
         debtCell,
+        collateralLockedCell: settlement?.outputs?.collateral_locked_cell ?? tx.outputs.collateral_locked_cell,
+    };
+}
+
+function withDebtShape(candidate, fallback) {
+    if (!candidate) return fallback;
+    const debt = candidate.debt ?? fallback?.debt ?? null;
+    const data = candidate.data ?? fallback?.data ?? null;
+    const type = candidate.type ?? fallback?.type ?? null;
+    const lock = candidate.lock ?? fallback?.lock ?? null;
+    return {
+        ...fallback,
+        ...candidate,
+        debt,
+        data,
+        type,
+        lock,
     };
 }
 

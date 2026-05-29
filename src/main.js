@@ -331,6 +331,7 @@ async function main() {
                 inventoryAdapter: chainCurrencyAdapter,
                 currentEpoch: () => Number(game.currentEpoch) || 0,
                 location: window.location,
+                fetchImpl: window.fetch.bind(window),
             });
             installBuildingInteriorHUD(game);
 

@@ -3,7 +3,7 @@
  *
  * Tiny "build" step for the static site: copies just the runtime files
  * (HTML / CSS / JS / referenced PNG + OGG assets) into `dist/` so that
- * Netlify ships a clean publish directory and not the 4 MB of design
+ * static hosts ship a clean publish directory and not the 4 MB of design
  * reference PNGs, the prompt notes, the local .DS_Store entries, the
  * tooling scripts, and the editor's .webp duplicates that nothing on
  * the page actually loads.
@@ -32,6 +32,7 @@ const AUDIO_FILES = [
 const ENTRIES = [
     'index.html',
     'styles.css',
+    '_headers',
     'src',
     'assets',
     'logos',

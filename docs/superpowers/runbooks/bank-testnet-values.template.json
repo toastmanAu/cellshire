@@ -1,0 +1,67 @@
+{
+  "params": {
+    "chainBankDebtTypeCodeHash": "",
+    "chainBankDebtTypeHashType": "type",
+    "chainBankDebtTypeArgs": "0x",
+    "chainBankDebtTypeDepTxHash": "",
+    "chainBankDebtTypeDepIndex": "0",
+    "chainBankDebtTypeDepType": "code",
+
+    "chainBankBookLockCodeHash": "",
+    "chainBankBookLockHashType": "type",
+    "chainBankBookLockArgs": "",
+    "chainBankBookLockDepTxHash": "",
+    "chainBankBookLockDepIndex": "0",
+    "chainBankBookLockDepType": "code",
+
+    "chainBankCollateralLockCodeHash": "",
+    "chainBankCollateralLockHashType": "type",
+    "chainBankCollateralLockArgs": "0x",
+    "chainBankCollateralLockDepTxHash": "",
+    "chainBankCollateralLockDepIndex": "0",
+    "chainBankCollateralLockDepType": "code",
+
+    "chainBankReserveLockCodeHash": "",
+    "chainBankReserveLockHashType": "type",
+    "chainBankReserveLockArgs": "",
+    "chainBankReserveLockDepTxHash": "",
+    "chainBankReserveLockDepIndex": "0",
+    "chainBankReserveLockDepType": "code",
+
+    "chainBankTreasuryLockCodeHash": "",
+    "chainBankTreasuryLockHashType": "type",
+    "chainBankTreasuryLockArgs": "",
+    "chainBankTreasuryLockDepTxHash": "",
+    "chainBankTreasuryLockDepIndex": "0",
+    "chainBankTreasuryLockDepType": "code",
+
+    "chainBankDebtCellCapacityCkb": "61"
+  },
+  "backend": {
+    "inputProviderUrl": "",
+    "borrowInputProviderUrl": "",
+    "repayInputProviderUrl": "",
+    "reserveSignerUrl": "",
+    "token": ""
+  },
+  "funding": {
+    "bankReserveCells": [
+      {
+        "outPoint": {
+          "txHash": "",
+          "index": 0
+        },
+        "amount": ""
+      }
+    ],
+    "borrowerCollateralCells": [
+      {
+        "outPoint": {
+          "txHash": "",
+          "index": 0
+        },
+        "amount": ""
+      }
+    ]
+  }
+}

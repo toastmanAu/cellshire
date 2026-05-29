@@ -356,6 +356,348 @@ collateral-lock settlement is still the next CCC slice.
 - Verification: full browser harness `374 passed, 0 failed`,
   `node netlify-build.mjs`, and `git diff --check`.
 
+## Implementation Notes 2026-05-28
+
+- Added a bank input provider boundary for `ccc-real` bank transactions:
+  BORROW can carry selected bank reserve and CKB collateral inputs, and REPAY
+  can carry selected debt and locked-collateral inputs.
+- Added URL smoke params for selected input cells:
+  `chainBankReserveCell*`, `chainBankCollateralCell*`,
+  `chainBankDebtCell*`, and `chainBankLockedCollateralCell*`.
+- Added optional bank reserve co-sign plumbing for BORROW via
+  `chainBankReserveSignerUrl` and `chainBankReserveSignerToken`.
+- Added `scripts/bank_reserve_signer_fixture.py` as a local HTTP fixture:
+
+```bash
+python3 scripts/bank_reserve_signer_fixture.py --port 8791
+curl -s http://127.0.0.1:8791/reserve-inputs
+curl -s 'http://127.0.0.1:8791/smoke-params?game=http://127.0.0.1:8766/'
+```
+
+The game can then be opened with `?chainBank=1&chainBankCollateral=ckb`
+plus `chainBankSubmit=ccc-real`, the script config params, selected input
+params or `chainBankInputProviderUrl`, and
+`chainBankReserveSignerUrl=http://127.0.0.1:8791/sign`. For local repeatability,
+`/smoke-params` returns one complete query bundle with placeholder script
+params, `chainBankInputProviderUrl`, and the signer URL.
+
+- Remaining gap: the fixture returns deterministic witness data for frontend
+  smoke only. Production settlement still needs a real bank backend that
+  indexes spendable reserve cells, signs with the bank key, and enforces the
+  deployed script's witness format.
+- Verification: full browser harness `385 passed, 0 failed`,
+  `node netlify-build.mjs`, `git diff --check`, and
+  `python3 scripts/bank_reserve_signer_fixture.py --self-test`.
+
+## Implementation Notes 2026-05-29
+
+- Added an end-to-end flagged browser-harness smoke that starts at URL params
+  and runs through `makeBankAdapterFromParams`, the URL bank input provider,
+  real-shaped CCC bank tx preparation, HTTP reserve-signer request creation,
+  bank witness append, JoyID submit, and `chain-ccc-real` adapter result.
+- The smoke uses fake CCC/JoyID and fake HTTP fetch inside the browser harness,
+  so it verifies the frontend contract without needing deployed script deps or
+  real CKB testnet capacity.
+- Extended the reserve signer fixture with `GET /smoke-params`; the response
+  includes:
+  - `params`: full key/value params for the flagged borrow smoke.
+  - `queryString`: URL-encoded params for appending to a local game URL.
+  - `url`: returned when `?game=<base-url>` is provided.
+- The fixture still exposes `/reserve-inputs` for callers that want only the
+  bank reserve cell params.
+- Remaining production gap: `/smoke-params` uses deterministic placeholder
+  script hashes. A real testnet run must provide deployed code hashes, cell
+  deps, spendable bank reserve inputs, and backend witness validation.
+- Verification: full browser harness `386 passed, 0 failed`,
+  `node netlify-build.mjs`, `git diff --check`, and
+  `python3 scripts/bank_reserve_signer_fixture.py --self-test`. A local HTTP
+  check of `GET /smoke-params?game=...` returned the expected query bundle.
+
+### Bank Reserve Signer Response Contract
+
+Reserve signer success responses use a versioned envelope:
+
+```json
+{
+  "ok": true,
+  "protocol": "cellshire.bank.reserve-sign.response",
+  "version": 1,
+  "bankWitness": "0x..."
+}
+```
+
+The frontend accepts any one of:
+
+- `tx`: a replacement CCC transaction object.
+- `witnesses`: a full replacement witness array.
+- `bankWitness`: one hex witness appended to the prepared transaction.
+- `extraWitnesses`: additional hex witnesses appended to the prepared
+  transaction.
+
+Validation now rejects invalid protocol/version values, non-hex witness
+strings, malformed witness arrays, and otherwise-empty success responses before
+JoyID submission. These failures normalize to `bank-signer-failed`. The local
+fixture emits the same protocol/version envelope.
+
+Verification 2026-05-29: full browser harness `387 passed, 0 failed`,
+`node netlify-build.mjs`, `git diff --check`, and
+`python3 scripts/bank_reserve_signer_fixture.py --self-test`.
+
+### Bank Reserve Indexer HTTP Input Provider
+
+The frontend can now ask a backend/indexer for BORROW or REPAY inputs instead
+of embedding bank outpoints directly in URL params.
+
+Flags:
+
+- `chainBankInputProviderUrl=<url>` — shared POST endpoint for selecting bank
+  inputs.
+- `chainBankBorrowInputProviderUrl=<url>` — BORROW-specific POST endpoint.
+- `chainBankRepayInputProviderUrl=<url>` — REPAY-specific POST endpoint.
+- `chainBankInputProviderToken=<token>` — optional bearer token for the input
+  provider.
+- `chainBankReserveIndexerUrl` / `chainBankReserveIndexerToken` are accepted as
+  BORROW-focused aliases.
+- `chainBankRepayIndexerUrl` is accepted as a REPAY-focused alias.
+- Manual `chainBankReserveCell*` and `chainBankCollateralCell*` params still
+  work as a local BORROW fallback. Manual `chainBankDebtCell*` and
+  `chainBankLockedCollateralCell*` params still work as a local REPAY fallback.
+
+BORROW request:
+
+```json
+{
+  "protocol": "cellshire.bank.inputs.select",
+  "version": 1,
+  "action": "borrow",
+  "walletAccount": {
+    "provider": "joyid",
+    "address": "ckt1...",
+    "network": "testnet"
+  },
+  "offer": {
+    "id": "starter-float",
+    "amount": 7500,
+    "currency": "ckb",
+    "totalOwed": 7687.5,
+    "feeAmount": 187.5
+  },
+  "collateralAmount": 11250
+}
+```
+
+BORROW response:
+
+```json
+{
+  "ok": true,
+  "protocol": "cellshire.bank.inputs.response",
+  "version": 1,
+  "borrow": {
+    "bankReserveCell": {
+      "outPoint": { "txHash": "0x...", "index": 0 },
+      "capacity": 100000,
+      "amount": 100000
+    },
+    "collateralCell": {
+      "outPoint": { "txHash": "0x...", "index": 1 },
+      "capacity": 11250,
+      "amount": 11250
+    }
+  }
+}
+```
+
+The frontend validates protocol/version and requires both borrow cells before
+building the real-shaped CCC bank transaction.
+
+REPAY request:
+
+```json
+{
+  "protocol": "cellshire.bank.inputs.select",
+  "version": 1,
+  "action": "repay",
+  "walletAccount": {
+    "provider": "joyid",
+    "address": "ckt1...",
+    "network": "testnet"
+  },
+  "loan": {
+    "id": "chain-loan:...",
+    "offerId": "starter-float",
+    "principal": 7500,
+    "feeAmount": 187.5,
+    "totalOwed": 7687.5,
+    "remainingOwed": 7687.5,
+    "collateralAmount": 11250,
+    "collateralKind": "ckb",
+    "borrowTxHash": "0x...",
+    "debtOutPoint": { "txHash": "0x...", "index": 0 },
+    "lockedCollateralOutPoint": { "txHash": "0x...", "index": 1 }
+  }
+}
+```
+
+REPAY response:
+
+```json
+{
+  "ok": true,
+  "protocol": "cellshire.bank.inputs.response",
+  "version": 1,
+  "repay": {
+    "debtCell": {
+      "outPoint": { "txHash": "0x...", "index": 0 },
+      "capacity": 61,
+      "amount": 61
+    },
+    "lockedCollateralCell": {
+      "outPoint": { "txHash": "0x...", "index": 2 },
+      "capacity": 11250,
+      "amount": 11250
+    }
+  }
+}
+```
+
+The frontend validates protocol/version and requires both repay cells before
+building the real-shaped CCC bank transaction. The local fixture now exposes
+`POST /borrow-inputs` and `POST /repay-inputs`; `/smoke-params` emits
+`chainBankInputProviderUrl=http://127.0.0.1:8791/borrow-inputs` and
+`chainBankRepayInputProviderUrl=http://127.0.0.1:8791/repay-inputs` so local
+smoke runs no longer need manual bank-cell URL params.
+
+Verification 2026-05-29: full browser harness `388 passed, 0 failed`,
+`node netlify-build.mjs`, `git diff --check`,
+`python3 scripts/bank_reserve_signer_fixture.py --self-test`, and a local HTTP
+check of `POST /borrow-inputs`.
+
+Verification 2026-05-29 after REPAY provider: full browser harness
+`389 passed, 0 failed`, `node netlify-build.mjs`, `git diff --check`,
+`python3 scripts/bank_reserve_signer_fixture.py --self-test`, and a local HTTP
+check of `POST /repay-inputs`.
+
+### Bank Production Script/Backend Integration Guard
+
+Production-intended bank smoke flows can now opt into an explicit script guard:
+
+- `chainBankScriptMode=production`
+- `chainBankProduction=1`
+- `chainBankRequireProductionScripts=1`
+
+Any of those flags mark the real bank script config as production mode. In
+production mode the frontend rejects the deterministic smoke placeholder code
+hashes (`0x111...`, `0x222...`, `0x333...`, `0x444...`, `0x555...`) and
+requires at least one configured cell dep before building/submitting a
+real-shaped CCC bank transaction. The bank reserve signer request includes the
+script config's `production` flag and `issues` list in `script_config`, so a
+backend can reject unexpected fixture or incomplete bundles independently.
+
+The local bank fixture can also emit production smoke bundles without using the
+deterministic localhost endpoints:
+
+```bash
+python3 scripts/bank_reserve_signer_fixture.py --production-smoke \
+  --script-params-json bank-scripts.json \
+  --bank-borrow-input-provider-url https://bank.example/borrow-inputs \
+  --bank-repay-input-provider-url https://bank.example/repay-inputs \
+  --bank-reserve-signer-url https://bank.example/sign
+```
+
+`bank-scripts.json` may be either a JSON object of URL params or an object with
+a `params` field. The required production script params are:
+
+- `chainBankDebtTypeCodeHash`
+- `chainBankBookLockCodeHash`
+- `chainBankCollateralLockCodeHash`
+- `chainBankReserveLockCodeHash`
+- `chainBankTreasuryLockCodeHash`
+
+Cell dep params use the existing URL names, for example
+`chainBankDebtTypeDepTxHash`, `chainBankDebtTypeDepIndex`, and
+`chainBankDebtTypeDepType`. The production smoke server refuses to start when
+backend URLs are missing or any required script code hash is still one of the
+known fixture placeholders.
+
+Verification 2026-05-29: full browser harness `391 passed, 0 failed`,
+`node netlify-build.mjs`, `git diff --check`, and
+`python3 scripts/bank_reserve_signer_fixture.py --self-test`.
+
+### Bank Testnet Deployment Runbook
+
+The testnet deployment handoff now lives at
+`docs/superpowers/runbooks/2026-05-29-bank-testnet-deployment.md`. It records
+the required deployed script params, backend endpoint contract, funding checks,
+production preflight, browser smoke sequence, and done criteria for the guarded
+BORROW/REPAY testnet run.
+
+The fixture script also has a non-server preflight mode:
+
+```bash
+python3 scripts/bank_reserve_signer_fixture.py --validate-production-smoke \
+  --script-params-json bank-scripts.json \
+  --bank-borrow-input-provider-url https://bank.example/borrow-inputs \
+  --bank-repay-input-provider-url https://bank.example/repay-inputs \
+  --bank-reserve-signer-url https://bank.example/sign
+```
+
+The command prints the smoke bundle JSON on success and exits `2` with a
+concrete issue list when production URLs, deployed script hashes, or script
+cell deps are missing or malformed.
+
+### Bank Testnet Deployment Values
+
+The production smoke preflight now also accepts a unified deployment values
+manifest:
+
+```bash
+python3 scripts/bank_reserve_signer_fixture.py --validate-production-smoke \
+  --deployment-values-json bank-testnet-values.json
+```
+
+Use `docs/superpowers/runbooks/bank-testnet-values.template.json` as the local
+fill-in template. The manifest can include:
+
+- `params`: deployed `chainBank*` script params and cell deps.
+- `backend`: `inputProviderUrl` or action-specific borrow/repay provider URLs,
+  `reserveSignerUrl`, and optional `token`.
+- `funding`: funded `bankReserveCells` and optional borrower collateral cells.
+
+When `--deployment-values-json` is used, validation requires at least one
+funded bank reserve cell outpoint and validates funded cell tx hash/index/amount
+shape before printing the production smoke bundle.
+
+The same preflight can write an execution report:
+
+```bash
+python3 scripts/bank_reserve_signer_fixture.py --validate-production-smoke \
+  --deployment-values-json bank-testnet-values.json \
+  --write-smoke-report bank-testnet-smoke-report.json
+```
+
+The report uses protocol `cellshire.bank.testnet-smoke.report`, redacts tokens,
+and provides placeholders for BORROW/REPAY tx hashes plus backend/indexer
+evidence.
+
+### Bank Backend Readiness Probe
+
+Added `scripts/bank_backend_readiness_probe.py` as the HTTP contract probe for a
+filled `bank-testnet-values.json`:
+
+```bash
+python3 scripts/bank_backend_readiness_probe.py \
+  --deployment-values-json bank-testnet-values.json \
+  --output-json bank-backend-readiness-report.json
+```
+
+The probe posts representative BORROW input, REPAY input, and reserve signer
+requests. It requires valid BORROW/REPAY input provider envelopes and accepts
+either a valid reserve signer response envelope or an explicit signer rejection,
+because a production signer may reject the synthetic tx while still proving the
+endpoint and JSON contract. `--require-signer-success` makes signer rejection a
+hard failure.
+
 ## Open Questions
 
 1. **Term length.** Current local prototype uses 7 days; chain v2 needs
