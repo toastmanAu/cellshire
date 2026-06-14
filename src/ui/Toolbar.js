@@ -21,7 +21,7 @@ const TOOL_BUTTONS = [
     { id: 'place',  label: 'Place'  },
     { id: 'fill',   label: 'Fill'   },
     { id: 'erase',  label: 'Erase'  },
-    { id: 'pan',    label: 'Pan'    },
+    { id: 'pan',    label: 'Move'   },
     { id: 'grid',   label: 'Grid'   },
     { id: 'save',   label: 'Save'   },
     { id: 'reset',  label: 'Reset'  },

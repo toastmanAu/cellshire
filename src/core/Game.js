@@ -357,9 +357,11 @@ export class Game {
         if (this.isVisitingProperty() && t !== 'pan') t = 'pan';
         this.tool = t;
         this.renderer.eraseMode = (t === 'erase');
-        this.canvas.style.cursor = t === 'pan' ? CELL_CURSORS.pan
-                                  : t === 'erase' ? CELL_CURSORS.erase
-                                  : CELL_CURSORS.place;
+        if (this.renderer.hoverCell) {
+            this._syncCursorForCell(this.renderer.hoverCell);
+        } else {
+            this.canvas.style.cursor = this._defaultCursorForTool(t);
+        }
         this.renderer.markDirty();
         this.ui?.update();
     }
@@ -585,8 +587,9 @@ export class Game {
         // reserved for context actions (item swap, cancel walk). Block
         // the erase path so a stray right-click can't damage the world.
         if (this.mode === 'play') return;
+        if (this.mapKind === 'property' && this.tool === 'pan') return;
 
-        // Right click always erases.
+        // Editing modes still support right-click / long-press erase.
         if (!this.tileMap.inBounds(gx, gy)) return;
         if (this.mapKind === 'property' && !this._canErasePropertyAt(gx, gy)) return;
         const objHere = this.tileMap.objectAt(gx, gy);
@@ -801,9 +804,13 @@ export class Game {
         }
         if (this.mapKind === 'property') {
             if (this.tool === 'pan') {
-                this.canvas.style.cursor = isInteractable(this.tileMap, cell.gx, cell.gy) || this._canPlantFarmAt(cell.gx, cell.gy)
-                    ? CELL_CURSORS.interact
-                    : CELL_CURSORS.pan;
+                if (isInteractable(this.tileMap, cell.gx, cell.gy) || this._canPlantFarmAt(cell.gx, cell.gy)) {
+                    this.canvas.style.cursor = CELL_CURSORS.interact;
+                } else if (isWalkable(this.tileMap, cell.gx, cell.gy)) {
+                    this.canvas.style.cursor = CELL_CURSORS.walk;
+                } else {
+                    this.canvas.style.cursor = CELL_CURSORS.blocked;
+                }
                 return;
             }
             if (this.tool === 'erase') {
@@ -817,7 +824,7 @@ export class Game {
                 : CELL_CURSORS.blocked;
             return;
         }
-        if (this.tool === 'pan') {
+        if (this.tool === 'pan' && this.mode !== 'play') {
             this.canvas.style.cursor = CELL_CURSORS.pan;
             return;
         }
@@ -832,6 +839,16 @@ export class Game {
         } else {
             this.canvas.style.cursor = CELL_CURSORS.blocked;
         }
+    }
+
+    _defaultCursorForTool(tool) {
+        if (tool === 'erase') return CELL_CURSORS.erase;
+        if (tool === 'pan') {
+            return this.mode === 'play' || this.mode === 'property' || this.mode === 'visit'
+                ? CELL_CURSORS.walk
+                : CELL_CURSORS.pan;
+        }
+        return CELL_CURSORS.place;
     }
 
     /**
@@ -1812,7 +1829,9 @@ export class Game {
             ? this.selectedAssetId
             : 'path';
         this.category = assetDefinitionFor(this.selectedAssetId)?.category ?? 'terrain';
-        this.tool = this.propertyReadOnly ? 'pan' : 'place';
+        this.tool = 'pan';
+        this.renderer.eraseMode = false;
+        this.canvas.style.cursor = this._defaultCursorForTool(this.tool);
         this._resetFlip();
         this.renderer.markDirty();
         this.movePlayerTo(entrySpawn.gx, entrySpawn.gy);
