@@ -46,6 +46,13 @@ describe('open asset standard', () => {
         }
     });
 
+    it('registers the home boundary fence as a prop asset', () => {
+        const def = assetDefinitionFor('home_fence');
+        expect(def.category).toBe('props');
+        expect(def.kind).toBe('object');
+        expect(def.filename).toBe('home_fence.png');
+    });
+
     it('maps a compliant prop cell to a runtime asset definition', () => {
         clearOpenAssetDefinitions();
         const out = definitionFromOpenAssetCell(fixtureCell());

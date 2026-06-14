@@ -68,6 +68,7 @@ export const ASSET_MANIFEST = [
     // Walls, railings, gates, archways — span the full cell because they
     // are architectural pieces meant to align with adjacent tiles.
     { ...P('low_wall',        'Low Wall',        { w: 1, d: 1 }, 1.00), builder: A.lowWhiteWall },
+    { ...P('home_fence',      'Home Fence',      { w: 1, d: 1 }, 1.00), flatBase: true, noShadow: true, builder: A.woodenGateFence },
     { ...P('blue_railing',    'Blue Railing',    { w: 1, d: 1 }, 0.65), flatBase: true, shadowStyle: 'contact', builder: A.blueRailing },
     { ...P('corner_wall',     'Corner Wall',     { w: 1, d: 1 }, 1.00), builder: A.cornerWall },
     { ...P('gate_fence',      'Gate Fence',      { w: 1, d: 1 }, 0.70), flatBase: true, shadowStyle: 'contact', builder: A.woodenGateFence },

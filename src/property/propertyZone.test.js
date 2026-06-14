@@ -25,6 +25,8 @@ describe('property zone starter map', () => {
         expect(map.objectAt(12, PROPERTY_EDIT_BOUNDS.minGy).role).toBe(PROPERTY_MINE_PORTAL_ROLE);
         expect(map.objectAt(PROPERTY_EDIT_BOUNDS.minGx + 2, PROPERTY_EDIT_BOUNDS.minGy + 1).role)
             .toBe(TOWNSHIP_PORTAL_ROLE);
+        expect(map.objectAt(PROPERTY_EDIT_BOUNDS.minGx - 1, PROPERTY_EDIT_BOUNDS.minGy - 1).assetId)
+            .toBe('home_fence');
         expect(map.objectAt(PROPERTY_EDIT_BOUNDS.minGx + 3, PROPERTY_EDIT_BOUNDS.minGy + 3).assetId)
             .toBe('house');
     });
@@ -37,6 +39,7 @@ describe('property zone starter map', () => {
     it('allows only starter-owned assets inside the claim footprint', () => {
         expect(isStarterPropertyAsset('bench')).toBe(true);
         expect(isStarterPropertyAsset('house')).toBe(true);
+        expect(isStarterPropertyAsset('home_fence')).toBe(true);
         expect(canPlacePropertyAsset('bench', PROPERTY_EDIT_BOUNDS.minGx, PROPERTY_EDIT_BOUNDS.minGy)).toBe(true);
         expect(canPlacePropertyAsset('coal_seam', PROPERTY_EDIT_BOUNDS.minGx, PROPERTY_EDIT_BOUNDS.minGy)).toBe(false);
         expect(canPlacePropertyAsset('bench', PROPERTY_EDIT_BOUNDS.maxGx + 1, PROPERTY_EDIT_BOUNDS.maxGy)).toBe(false);

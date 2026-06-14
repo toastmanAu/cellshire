@@ -26,6 +26,7 @@ export const STARTER_PROPERTY_ASSETS = Object.freeze([
     'dry_grass',
     'flower_pot',
     'low_wall',
+    'home_fence',
     'gate_fence',
     'house',
     'lantern_post',
@@ -98,12 +99,12 @@ export function createStarterPropertyMap() {
     const fenceMaxX = PROPERTY_EDIT_BOUNDS.maxGx + 1;
     const fenceMaxY = PROPERTY_EDIT_BOUNDS.maxGy + 1;
     for (let gx = fenceMinX; gx <= fenceMaxX; gx++) {
-        if (gx !== PROPERTY_SPAWN.gx) addObject(tileMap, 'low_wall', gx, fenceMinY);
-        if (gx !== PROPERTY_SPAWN.gx) addObject(tileMap, 'low_wall', gx, fenceMaxY);
+        if (gx !== PROPERTY_SPAWN.gx) addObject(tileMap, 'home_fence', gx, fenceMinY);
+        if (gx !== PROPERTY_SPAWN.gx) addObject(tileMap, 'home_fence', gx, fenceMaxY);
     }
     for (let gy = fenceMinY + 1; gy <= fenceMaxY - 1; gy++) {
-        addObject(tileMap, 'low_wall', fenceMinX, gy);
-        addObject(tileMap, 'low_wall', fenceMaxX, gy);
+        addObject(tileMap, 'home_fence', fenceMinX, gy);
+        addObject(tileMap, 'home_fence', fenceMaxX, gy);
     }
 
     addObject(tileMap, 'gate_fence', PROPERTY_SPAWN.gx - 1, fenceMaxY);
