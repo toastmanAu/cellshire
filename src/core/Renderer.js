@@ -65,17 +65,47 @@ const WORLD_PAD_X      = 320;
  */
 const _DPR = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
 // Spike: cache scale becomes world-size adaptive. We choose the largest
-// scale ≤ ideal that keeps each cache-canvas dimension ≤ MAX_CACHE_DIM.
-// Chrome caps Canvas2D at 16384px on either axis; Firefox is higher but
-// we target the floor. Lowered minimum to 1 so very large worlds can
-// still render (softer when zoomed in, but functional) rather than fail.
+// scale <= ideal that keeps each cache-canvas dimension and total pixel
+// area inside conservative browser limits. Mobile Safari can silently
+// fail draws from oversized canvases by painting them blank; the area cap
+// is the important guard for the default 100x100 world.
 const MAX_CACHE_DIM = 16384;
+const CONSTRAINED_CACHE_AREA = 15_000_000;
+const DESKTOP_CACHE_AREA = 128_000_000;
+
+function isConstrainedCanvasDevice() {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    const platform = navigator.platform || '';
+    const isiOS = /iPad|iPhone|iPod/.test(ua)
+        || (platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const screenW = typeof window === 'undefined' ? 0 : (window.screen?.width || window.innerWidth || 0);
+    const screenH = typeof window === 'undefined' ? 0 : (window.screen?.height || window.innerHeight || 0);
+    const narrowTouch = navigator.maxTouchPoints > 0 && Math.min(screenW, screenH) <= 1024;
+    return isiOS || narrowTouch;
+}
+
+const MAX_CACHE_AREA = isConstrainedCanvasDevice()
+    ? CONSTRAINED_CACHE_AREA
+    : DESKTOP_CACHE_AREA;
+const USE_LIVE_WORLD_LAYERS = isConstrainedCanvasDevice();
+
 function chooseCacheScale(worldW, worldH) {
     const ideal = Math.min(3, Math.max(1, Math.ceil(_DPR * 1.5)));
-    const maxByW = Math.floor(MAX_CACHE_DIM / Math.max(1, worldW));
-    const maxByH = Math.floor(MAX_CACHE_DIM / Math.max(1, worldH));
-    const cap = Math.max(1, Math.min(maxByW, maxByH));
-    return Math.min(ideal, cap);
+    const safeW = Math.max(1, worldW);
+    const safeH = Math.max(1, worldH);
+    const maxByW = MAX_CACHE_DIM / safeW;
+    const maxByH = MAX_CACHE_DIM / safeH;
+    const maxByArea = Math.sqrt(MAX_CACHE_AREA / (safeW * safeH));
+    const cap = Math.min(maxByW, maxByH, maxByArea);
+    return Math.max(0.25, Math.min(ideal, cap));
+}
+
+function scaledCacheSize(bounds, scale) {
+    return {
+        w: Math.max(1, Math.ceil(bounds.w * scale)),
+        h: Math.max(1, Math.ceil(bounds.h * scale)),
+    };
 }
 
 // Shadow tuning. Pre-blurring happens once at asset-load time; the
@@ -661,9 +691,11 @@ export class Renderer {
         ctx.clearRect(0, 0, w, h);
 
         this._ensureChromeCache(w, h);
-        this._ensurePlatformCache();
-        this._ensureTerrainCache();
-        this._ensureObjectsCache();
+        if (!USE_LIVE_WORLD_LAYERS) {
+            this._ensurePlatformCache();
+            this._ensureTerrainCache();
+            this._ensureObjectsCache();
+        }
 
         // 1. Static screen-space chrome (backdrop dots + bloom + sky).
         ctx.drawImage(this._chromeCanvas.bottom, 0, 0, w, h);
@@ -673,16 +705,22 @@ export class Renderer {
         //    and four stamped images.
         ctx.save();
         this._applyCamera();
-        const wb = this._worldBounds;
-
-        if (this._platformCanvas) ctx.drawImage(this._platformCanvas, wb.x, wb.y);
-        // Terrain + objects caches are stored at this._cacheScale world DPR for
-        // crisp pixels at zoom; we explicitly size the stamp to world
-        // units so the browser does the high-quality downsample as part
-        // of the same hardware-resampled draw.
-        if (this._terrainCanvas)  ctx.drawImage(this._terrainCanvas,  wb.x, wb.y, wb.w, wb.h);
-        if (this.showGrid)        this._drawGrid();
-        if (this._objectsCanvas)  ctx.drawImage(this._objectsCanvas,  wb.x, wb.y, wb.w, wb.h);
+        if (USE_LIVE_WORLD_LAYERS) {
+            this._paintPlatform(ctx);
+            this._drawLiveTerrainLayer();
+            if (this.showGrid) this._drawGrid();
+            this._drawLiveStaticObjectLayers();
+        } else {
+            const wb = this._worldBounds;
+            if (this._platformCanvas) ctx.drawImage(this._platformCanvas, wb.x, wb.y, wb.w, wb.h);
+            // World caches are stored at this._cacheScale world DPR. On large
+            // maps this may be fractional to stay under mobile canvas limits;
+            // we explicitly stamp back to world units so the transform remains
+            // consistent across cache scales.
+            if (this._terrainCanvas)  ctx.drawImage(this._terrainCanvas,  wb.x, wb.y, wb.w, wb.h);
+            if (this.showGrid)        this._drawGrid();
+            if (this._objectsCanvas)  ctx.drawImage(this._objectsCanvas,  wb.x, wb.y, wb.w, wb.h);
+        }
 
         // 3. Live overlays: actively-animating objects/tiles + hover +
         //    preview ghost. Sorted together so depth is sane.
@@ -766,13 +804,16 @@ export class Renderer {
         // Grid size changed (or first build): invalidate every world cache
         // since they all share the same world-coordinate frame.
         this._worldBounds = this._computeWorldBounds();
+        this._cacheScale = chooseCacheScale(this._worldBounds.w, this._worldBounds.h);
         this._terrainCanvas = null;
         this._objectsCanvas = null;
         const wb = this._worldBounds;
+        const cache = scaledCacheSize(wb, this._cacheScale);
         const c = document.createElement('canvas');
-        c.width  = wb.w;
-        c.height = wb.h;
+        c.width  = cache.w;
+        c.height = cache.h;
         const ctx = c.getContext('2d');
+        ctx.scale(this._cacheScale, this._cacheScale);
         ctx.translate(-wb.x, -wb.y);
         this._paintPlatform(ctx);
         this._platformCanvas = c;
@@ -902,6 +943,45 @@ export class Renderer {
 
     /* ── Terrain cache ────────────────────────────────────────── */
 
+    _visibleWorldRect(pad = 0) {
+        const { w, h } = this.cssSize();
+        const a = this.camera.screenToWorld(0, 0);
+        const b = this.camera.screenToWorld(w, h);
+        return {
+            minX: Math.min(a.x, b.x) - pad,
+            maxX: Math.max(a.x, b.x) + pad,
+            minY: Math.min(a.y, b.y) - pad,
+            maxY: Math.max(a.y, b.y) + pad,
+        };
+    }
+
+    _rectIntersectsVisible(x, y, w, h, visible) {
+        return x <= visible.maxX
+            && x + w >= visible.minX
+            && y <= visible.maxY
+            && y + h >= visible.minY;
+    }
+
+    _drawLiveTerrainLayer() {
+        const ctx = this.ctx;
+        const visible = this._visibleWorldRect(160);
+
+        for (let gy = 0; gy < this.tileMap.height; gy++)
+        for (let gx = 0; gx < this.tileMap.width; gx++) {
+            const id = this.tileMap.getTerrain(gx, gy);
+            if (!id) continue;
+            if (this._animTerrainKeys.has(`${gx},${gy}`)) continue;
+            const asset = getAsset(id);
+            if (!asset) continue;
+            const { x, y } = cellToScreen(gx, gy);
+            const dx = x - asset.anchorX;
+            const dy = y - asset.anchorY;
+            if (!this._rectIntersectsVisible(dx, dy, asset.width, asset.height, visible)) continue;
+            const src = asset.displayCanvas || asset.canvas;
+            ctx.drawImage(src, dx, dy, asset.width, asset.height);
+        }
+    }
+
     _ensureTerrainCache() {
         if (this._terrainCanvas && this._terrainVersion === this.tileMap.terrainVersion) {
             return;
@@ -909,8 +989,7 @@ export class Renderer {
         if (!this._worldBounds) this._worldBounds = this._computeWorldBounds();
         const wb = this._worldBounds;
         if (!this._cacheScale) this._cacheScale = chooseCacheScale(wb.w, wb.h);
-        const cw = wb.w * this._cacheScale;
-        const ch = wb.h * this._cacheScale;
+        const { w: cw, h: ch } = scaledCacheSize(wb, this._cacheScale);
         if (!this._terrainCanvas
             || this._terrainCanvas.width  !== cw
             || this._terrainCanvas.height !== ch) {
@@ -956,6 +1035,40 @@ export class Renderer {
 
     /* ── Static-objects cache (objects + their cast shadows) ──── */
 
+    _drawLiveStaticObjectLayers() {
+        const tm = this.tileMap;
+        const visible = this._visibleWorldRect(320);
+
+        const visibleObjects = [];
+        for (const obj of tm.objects) {
+            if (this._animObjectIds.has(obj.id)) continue;
+            const asset = getAsset(obj.assetId);
+            if (!asset) continue;
+            const { x, y } = cellToScreen(obj.gx, obj.gy);
+            const dx = x - asset.anchorX;
+            const dy = y - asset.anchorY;
+            if (!this._rectIntersectsVisible(dx, dy, asset.width, asset.height, visible)) continue;
+            visibleObjects.push({ obj, asset });
+        }
+
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.globalAlpha = SHADOW_ALPHA;
+        for (const { obj, asset } of visibleObjects) {
+            if (!this._castsShadow(asset)) continue;
+            this._drawShadowFor(ctx, asset, obj.gx, obj.gy, obj.footprint, {
+                flipH: obj.flipH,
+                flipV: obj.flipV,
+            });
+        }
+        ctx.restore();
+
+        visibleObjects.sort((a, b) => a.obj.sortKey() - b.obj.sortKey());
+        for (const { obj } of visibleObjects) {
+            this._drawStaticObject(ctx, obj);
+        }
+    }
+
     _ensureObjectsCache() {
         const tm = this.tileMap;
         if (this._objectsCanvas
@@ -966,8 +1079,7 @@ export class Renderer {
         if (!this._worldBounds) this._worldBounds = this._computeWorldBounds();
         const wb = this._worldBounds;
         if (!this._cacheScale) this._cacheScale = chooseCacheScale(wb.w, wb.h);
-        const cw = wb.w * this._cacheScale;
-        const ch = wb.h * this._cacheScale;
+        const { w: cw, h: ch } = scaledCacheSize(wb, this._cacheScale);
         if (!this._objectsCanvas
             || this._objectsCanvas.width  !== cw
             || this._objectsCanvas.height !== ch) {
