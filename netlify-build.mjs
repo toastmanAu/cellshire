@@ -11,8 +11,18 @@
  * No external dependencies — runs on Node ≥ 16's built-in `fs.cpSync`.
  */
 
-import { rmSync, mkdirSync, cpSync, existsSync, statSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import {
+    cpSync,
+    existsSync,
+    mkdirSync,
+    readFileSync,
+    readdirSync,
+    rmSync,
+    statSync,
+    writeFileSync,
+} from 'node:fs';
+import { join, relative } from 'node:path';
 
 const ROOT = process.cwd();
 const DIST = join(ROOT, 'dist');
@@ -38,6 +48,10 @@ const ENTRIES = [
     'logos',
     ...AUDIO_FILES,
 ];
+
+const srcHash = contentHashForPaths([join(ROOT, 'src')]);
+const stylesHash = contentHashForPaths([join(ROOT, 'styles.css')]);
+const hashedSrcDir = `src-${srcHash}`;
 
 console.log('Building dist/ …');
 
@@ -71,9 +85,46 @@ for (const entry of ENTRIES) {
     console.log(`  ✓ ${entry.padEnd(34)} ${formatBytes(sz)}`);
 }
 
+cpSync(join(ROOT, 'src'), join(DIST, hashedSrcDir), {
+    recursive: true,
+    filter: (s) => s.split('/').pop() !== '.DS_Store',
+});
+rewriteIndexForVersionedAssets();
+console.log(`  ✓ ${hashedSrcDir.padEnd(34)} ${formatBytes(sizeOf(join(DIST, hashedSrcDir)))}`);
+
 const total = sizeOf(DIST);
 console.log(`Built dist/ — ${formatBytes(total)} ready to publish.`);
 if (skipped) process.exitCode = 1;
+
+function rewriteIndexForVersionedAssets() {
+    const indexPath = join(DIST, 'index.html');
+    let html = readFileSync(indexPath, 'utf8');
+    html = html
+        .replace(/href="styles\.css(?:\?[^"]*)?"/, `href="styles.css?v=${stylesHash}"`)
+        .replace(/src="src\/main\.js(?:\?[^"]*)?"/, `src="${hashedSrcDir}/main.js?v=${srcHash}"`);
+    writeFileSync(indexPath, html);
+}
+
+function contentHashForPaths(paths) {
+    const hash = createHash('sha256');
+    for (const p of paths) hashPath(hash, p, p);
+    return hash.digest('hex').slice(0, 12);
+}
+
+function hashPath(hash, root, p) {
+    const st = statSync(p);
+    if (st.isFile()) {
+        hash.update(relative(root, p));
+        hash.update('\0');
+        hash.update(readFileSync(p));
+        hash.update('\0');
+        return;
+    }
+    for (const child of readdirSync(p).sort()) {
+        if (child === '.DS_Store') continue;
+        hashPath(hash, root, join(p, child));
+    }
+}
 
 function sizeOf(p) {
     const st = statSync(p);
