@@ -1,5 +1,5 @@
 import { encodeOreArgs } from './oreArgs.js';
-import { buildYieldCell } from './miningTx.js';
+import { buildYieldCell, capacitySpentFromResult } from './miningTx.js';
 
 export function buildOreBirthTransaction({
     walletAccount,
@@ -23,12 +23,14 @@ export function buildOreDecrementTransaction({
     result,
     txNonce = 'decrement',
 }) {
+    const capacitySpent = capacitySpentFromResult(result, oreCell?.capacity_remaining);
+    const after = Math.max(0, (oreCell?.capacity_remaining ?? 0) - capacitySpent);
     return buildLifecycleTransaction({
         walletAccount,
         oreCell,
         result,
         txNonce,
-        action: oreCell.capacity_remaining <= 1 ? 'deplete' : 'decrement',
+        action: after <= 0 ? 'deplete' : 'decrement',
         inputOreCell: oreCell,
     });
 }
@@ -54,7 +56,8 @@ function buildLifecycleTransaction({
     const before = action === 'birth'
         ? oreCell.capacity_max
         : oreCell.capacity_remaining;
-    const after = Math.max(0, before - 1);
+    const capacitySpent = capacitySpentFromResult(result, before);
+    const after = Math.max(0, before - capacitySpent);
     const nextOreCell = after > 0
         ? { ...oreCell, capacity_remaining: after }
         : null;

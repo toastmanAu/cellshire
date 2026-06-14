@@ -64,23 +64,25 @@ export class OreState {
     }
 
     /**
-     * Attempt one mining hit. Rolls a yield in the catalog's yieldRange,
-     * applies the current epoch yield multiplier, decrements capacity,
-     * and returns the result. Returns null if the ore is already
-     * depleted (caller should remove the cell at that point).
+     * Attempt one mining action. Higher-tier tools can extract more than
+     * one capacity chunk at once, but the base USD value is still drawn
+     * from the ore's remaining value so the vein's total value stays fixed.
+     * Returns null if the ore is already depleted.
      */
-    mine(rand = Math.random, { yieldMultiplier = 1, priceSnapshot = null } = {}) {
+    mine(rand = Math.random, { yieldMultiplier = 1, priceSnapshot = null, capacityPerHit = 1 } = {}) {
         if (this.isDepleted()) return null;
         const multiplier = Number.isFinite(yieldMultiplier) && yieldMultiplier > 1
             ? Math.floor(yieldMultiplier)
             : 1;
-        const baseValueUsd = this.capacityRemaining <= 1
+        const requestedCapacity = Math.max(1, Math.floor(Number(capacityPerHit) || 1));
+        const capacitySpent = Math.min(this.capacityRemaining, requestedCapacity);
+        const baseValueUsd = this.capacityRemaining <= capacitySpent
             ? this.remainingValueUsd
-            : this.remainingValueUsd / this.capacityRemaining;
+            : (this.remainingValueUsd / this.capacityRemaining) * capacitySpent;
         const valueUsd = Number((baseValueUsd * multiplier).toFixed(8));
         this.remainingValueUsd = Number(Math.max(0, this.remainingValueUsd - baseValueUsd).toFixed(8));
         const currency = rewardCurrencyForOre(this.oreType);
-        this.capacityRemaining--;
+        this.capacityRemaining -= capacitySpent;
         return {
             oreType: this.oreType,
             currency,
@@ -88,6 +90,7 @@ export class OreState {
             baseValueUsd: Number(baseValueUsd.toFixed(8)),
             valueUsd,
             yieldMultiplier: multiplier,
+            capacitySpent,
             depleted: this.isDepleted(),
         };
     }

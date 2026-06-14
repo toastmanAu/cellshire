@@ -81,6 +81,21 @@ describe('mining dispatch (frame-loop simulation)', () => {
         expect(result.yieldMultiplier).toBe(3);
     });
 
+    it('can extract multiple ore capacity chunks without increasing total base value', () => {
+        const state = new OreState('iron_ore', 5, 5, { totalValueUsd: 50, remainingValueUsd: 50 });
+
+        const first = state.mine(() => 0, { capacityPerHit: 3 });
+        const second = state.mine(() => 0, { capacityPerHit: 3 });
+
+        expect(first.capacitySpent).toBe(3);
+        expect(first.baseValueUsd).toBe(30);
+        expect(first.depleted).toBe(false);
+        expect(second.capacitySpent).toBe(2);
+        expect(second.baseValueUsd).toBe(20);
+        expect(second.depleted).toBe(true);
+        expect(state.capacityRemaining).toBe(0);
+    });
+
     it('full pipeline: one click → one mine → capacity drops by exactly one', () => {
         const player = new Player({ gx: 3, gy: 3 });
         const state = OreState.fromAsset('iron_ore', () => 0.5);

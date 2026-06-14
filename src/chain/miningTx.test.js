@@ -39,6 +39,28 @@ describe('buildMiningTransaction', () => {
         expect(tx.witness.signature).toBe('pending');
     });
 
+    it('recreates the ore cell with multiple extracted capacity chunks', () => {
+        const oreCell = buildOreCell({
+            epoch: '14455',
+            obj: { gx: 5, gy: 7, assetId: 'coal_seam' },
+            state: new OreState('coal_seam', 5, 5),
+        });
+        const tx = buildMiningTransaction({
+            walletAccount,
+            oreCell,
+            result: {
+                oreType: 'coal_seam',
+                currency: 'zec',
+                amount: 0.005,
+                valueUsd: 3,
+                capacitySpent: 3,
+                depleted: false,
+            },
+            txNonce: 'test',
+        });
+        expect(tx.outputs.ore_cell.capacity_remaining).toBe(2);
+    });
+
     it('omits the ore output when the hit depletes the ore', () => {
         const oreCell = buildOreCell({
             epoch: '14455',
@@ -49,6 +71,20 @@ describe('buildMiningTransaction', () => {
             walletAccount,
             oreCell,
             result: { oreType: 'coal_seam', currency: 'zec', amount: 0.00190934, depleted: true },
+        });
+        expect(tx.outputs.ore_cell).toBeNull();
+    });
+
+    it('omits the ore output when a multi-capacity hit depletes the ore', () => {
+        const oreCell = buildOreCell({
+            epoch: '14455',
+            obj: { gx: 5, gy: 7, assetId: 'coal_seam' },
+            state: new OreState('coal_seam', 2, 5),
+        });
+        const tx = buildMiningTransaction({
+            walletAccount,
+            oreCell,
+            result: { oreType: 'coal_seam', currency: 'zec', amount: 0.003, capacitySpent: 3, depleted: true },
         });
         expect(tx.outputs.ore_cell).toBeNull();
     });

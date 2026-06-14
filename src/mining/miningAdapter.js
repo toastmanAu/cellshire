@@ -73,9 +73,10 @@ export class ChainMiningAdapter {
             };
         }
 
+        const capacitySpent = Math.max(1, Math.floor(Number(result?.capacitySpent) || 1));
         const beforeState = {
             ...state,
-            capacityRemaining: state.capacityRemaining + 1,
+            capacityRemaining: state.capacityRemaining + capacitySpent,
         };
         const oreCell = buildOreCell({
             epoch,

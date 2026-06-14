@@ -46,7 +46,8 @@ export function buildMiningTransaction({
         throw new Error(`yield source ore ${result.oreType} does not match ore ${oreCell.ore_type}`);
     }
 
-    const nextCapacity = oreCell.capacity_remaining - 1;
+    const capacitySpent = capacitySpentFromResult(result, oreCell.capacity_remaining);
+    const nextCapacity = oreCell.capacity_remaining - capacitySpent;
     const nextOreCell = nextCapacity > 0
         ? { ...oreCell, capacity_remaining: nextCapacity }
         : null;
@@ -72,4 +73,11 @@ export function buildMiningTransaction({
             signature: 'pending',
         },
     };
+}
+
+export function capacitySpentFromResult(result, beforeCapacity) {
+    const before = Math.max(0, Math.floor(Number(beforeCapacity) || 0));
+    if (before <= 0) return 0;
+    const spent = Math.max(1, Math.floor(Number(result?.capacitySpent) || 1));
+    return Math.min(before, spent);
 }

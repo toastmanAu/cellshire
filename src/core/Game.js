@@ -156,6 +156,7 @@ import {
     loadToolProgression,
     saveToolProgression,
     toolProgressSummary,
+    toolOreCapacityPerHit,
     toolResourceYieldAmount,
     upgradeTool as advanceToolProgression,
 } from '../tools/toolProgression.js';
@@ -914,6 +915,7 @@ export class Game {
         const result = state.mine(Math.random, {
             yieldMultiplier: this.epochYieldModifier,
             priceSnapshot: this.priceSnapshot,
+            capacityPerHit: toolOreCapacityPerHit(this.toolProgression),
         });
         if (!result) return;
 
@@ -926,7 +928,7 @@ export class Game {
     }
 
     async _mineOreViaChain(obj, state, result) {
-        const beforeCapacity = state.capacityRemaining + 1;
+        const beforeCapacity = state.capacityRemaining + Math.max(1, Number(result?.capacitySpent) || 1);
         this._pendingChainMines.add(obj.id);
         this.ui?.showToast?.('Preparing mining transaction', 1800);
         try {

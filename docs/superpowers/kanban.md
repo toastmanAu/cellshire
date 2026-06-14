@@ -1,12 +1,113 @@
 # Cellshire Kanban
 
-Status captured 2026-05-30. This board tracks the next implementation
+Status captured 2026-05-31. This board tracks the next implementation
 cards needed to turn the current prototype into the game described in
 `docs/DESIGN.md`.
 
+## Session Update 2026-05-31
+
+**Latest completed card:** `Cloudflare Custom-Domain Cache Mitigation`.
+
+**What landed since the last board save:**
+- Verified public DNS now uses Cloudflare nameservers:
+  `alexia.ns.cloudflare.com` and `arnold.ns.cloudflare.com`.
+- Verified both `cellshire.com` and `www.cellshire.com` resolve through
+  Cloudflare A/AAAA addresses and serve the Pages deployment over HTTPS.
+- Verified `https://cellshire.com/` and `https://www.cellshire.com/` return
+  `200` with the expected security headers.
+- Verified `https://cellshire.com/assets/cellshire_logo.png` and the `www`
+  variant return `200` with `Cache-Control: public, max-age=31536000,
+  immutable`.
+- Confirmed the Pages hostname still applies the repo `_headers` rule for
+  `/src/main.js` (`max-age=0`), while the custom domains currently return
+  `Cache-Control: public, max-age=14400, must-revalidate` for `/src/main.js`.
+  That points to a Cloudflare zone/browser-cache policy override rather than
+  a build artifact issue.
+
+**Verification saved on board:**
+- `dig +short NS cellshire.com` returned Cloudflare nameservers.
+- `dig +short A cellshire.com` and `dig +short A www.cellshire.com` returned
+  `172.67.151.126` and `104.21.0.246`.
+- `dig +short AAAA cellshire.com` and `dig +short AAAA www.cellshire.com`
+  returned Cloudflare IPv6 addresses.
+- `curl -I --max-time 15 https://cellshire.com/` returned `HTTP/2 200`.
+- `curl -I --max-time 15 https://www.cellshire.com/` returned `HTTP/2 200`.
+- `curl -I --max-time 15 https://cellshire.com/src/main.js` returned
+  `HTTP/2 200`, but with the zone-overridden `max-age=14400` cache header.
+- `curl -I --max-time 15 https://cellshire.pages.dev/src/main.js` returned
+  `HTTP/2 200` with the repo `_headers` cache policy, `max-age=0`.
+- Headless Chrome loaded `https://cellshire.com/` without module load failures
+  or uncaught JavaScript errors. The only console output was existing Canvas2D
+  readback performance advice and a deprecated Apple mobile web app meta tag
+  warning.
+- `git diff --check` passed.
+
+**Current Next card:** `Wire Township + Interior + NPC + Audio Assets` —
+integrate the finished generated asset sets into the playable build.
+
+**Known Cloudflare follow-up:** `Cloudflare Custom-Domain Cache Policy` remains
+unfixed at the zone-header level, but it is no longer release-blocking. Change
+the Cloudflare zone browser cache behavior so custom domains respect the Pages
+`_headers` policy for `/src/*`, or add an equivalent cache rule, when a token
+or dashboard access with Zone Settings edit permission is available.
+
+**2026-05-31 attempt note:** Rechecked the custom-domain headers and confirmed
+`cellshire.com/src/main.js` and `www.cellshire.com/src/main.js` still return
+`Cache-Control: public, max-age=14400, must-revalidate`, while
+`cellshire.pages.dev/src/main.js` returns the expected `max-age=0` policy.
+Wrangler is authenticated for Pages and can list the `cellshire.com` zone, but
+the current OAuth token cannot read the zone `browser_cache_ttl` setting:
+Cloudflare API returned `403 Authentication error` for
+`/zones/<zone_id>/settings/browser_cache_ttl`. Finish this card from the
+Cloudflare dashboard or with a Cloudflare API token that has Zone Settings edit
+permission by setting Browser Cache TTL to `Respect Existing Headers`
+(`browser_cache_ttl = 0`), then rerun the smoke checks.
+
+**Pickaxe progression addendum:** Completed the ore-specific mining balance
+pass without increasing total ore-cell value. Pickaxe tiers now control how
+many ore capacity chunks a mining action extracts: Tier 1-2 extract `1`,
+Tier 3-4 extract `2`, and Tier 5-6 extract `3`. `OreState.mine()` pays the
+corresponding larger slice of the ore's existing remaining USD value, so higher
+pickaxes clear veins faster but do not inflate the base value in the vein.
+Legacy and lazy chain mining tx builders now use `result.capacitySpent` when
+recreating ore cells and recording mining receipt before/after capacity. The
+Tool Rack HUD surfaces the ore extraction multiplier on pickaxe rows.
+
+**Pickaxe verification saved on board:**
+- Full browser harness: `396 passed, 0 failed`.
+- `node netlify-build.mjs` passed.
+- `git diff --check` passed.
+
+**Cloudflare cache mitigation addendum:** The Cloudflare zone still returns
+`Cache-Control: public, max-age=14400, must-revalidate` for custom-domain CSS
+and JS, including cache-busted MISS responses, so the underlying zone Cache/Page
+Rule override remains active. To remove the release blocker anyway, the static
+build now publishes a duplicate content-hashed ES-module tree at
+`dist/src-<hash>/` and rewrites production `index.html` to load
+`src-<hash>/main.js?v=<hash>`. Because `/` keeps `max-age=0`, each deploy can
+point browsers at a fresh module graph even if Cloudflare keeps a 4-hour
+browser TTL on JS modules. `styles.css` also gets a content-hash query in
+production HTML. Deployed this mitigation to Cloudflare Pages production at
+`https://4dfc4c29.cellshire.pages.dev`.
+
+**Cloudflare mitigation verification saved on board:**
+- `node netlify-build.mjs` produced `dist/src-246c43faaf15/` and rewrote
+  `dist/index.html` to load `src-246c43faaf15/main.js?v=246c43faaf15` plus
+  `styles.css?v=92b945e08153`.
+- Local `dist/` browser smoke loaded modules from the hashed source directory
+  without module load failures.
+- `wrangler pages deploy dist --project-name cellshire --branch main
+  --commit-dirty=true` completed and deployed
+  `https://4dfc4c29.cellshire.pages.dev`.
+- `https://cellshire.com/` now serves the hashed module script tag.
+- `https://cellshire.com/src-246c43faaf15/main.js` returns `200`.
+- Headless Chrome loaded `https://cellshire.com/` without module load failures
+  or uncaught JavaScript errors.
+- `git diff --check` passed after the runbook/board update.
+
 ## Session Wrap 2026-05-30
 
-**Latest completed card:** `Cloudflare Pages Deploy`.
+**Latest completed card:** `Cloudflare Pages Custom Domain Binding`.
 
 **What landed since the last board save:**
 - Added a browser-harness smoke test that drives URL-style
@@ -107,6 +208,12 @@ cards needed to turn the current prototype into the game described in
   `dist/` build to production.
 - Downloaded the Pages project config into `wrangler.toml` and added
   `pages_build_output_dir = "dist"` for repeatable Wrangler deploys.
+- Verified Wrangler `4.81.1` still has no Pages custom-domain command, then
+  attached `cellshire.com` and `www.cellshire.com` to the `cellshire` Pages
+  project through the official Cloudflare Pages Domains API.
+- Cloudflare accepted both domain bindings, but both remain pending because
+  the public DNS is still on Namecheap parking records instead of
+  `cellshire.pages.dev`.
 
 **Verification saved on board:**
 - Full browser harness after flagged smoke: `386 passed, 0 failed`.
@@ -144,10 +251,20 @@ cards needed to turn the current prototype into the game described in
   `https://b122b71e.cellshire.pages.dev/`.
 - `curl -I` smoke checks passed for `/`, `/src/main.js`, and
   `/assets/cellshire_logo.png`; cache/security headers from `_headers` are live.
+- `wrangler pages project list` now shows `cellshire` with only
+  `cellshire.pages.dev` before the API attach; the Pages Domains API returned
+  both custom domains as attached, then pending with `CNAME record not set`.
+- `curl -I --max-time 10 https://cellshire.pages.dev/`,
+  `/src/main.js`, and `/assets/cellshire_logo.png` returned `200` with the
+  expected cache/security headers.
+- DNS checks show `cellshire.com` still uses Namecheap nameservers,
+  `cellshire.com` points at `162.255.119.133`, and `www.cellshire.com` points
+  at `parkingpage.namecheap.com`.
 
-**Current Next card:** `Cloudflare Custom Domains` — attach `cellshire.com` and
-`www.cellshire.com` to the `cellshire` Pages project from the Cloudflare
-dashboard, then run the domain smoke checks.
+**Current Next card:** `Cloudflare DNS Cutover` — update registrar/DNS records
+so `cellshire.com` and `www.cellshire.com` point at `cellshire.pages.dev`, wait
+for Pages validation/certificate activation, then run the custom-domain smoke
+checks.
 
 **Known caveat:** the new smoke path proves the frontend contract with fake
 CCC/JoyID and deterministic fixture witness data. Real testnet submission still
@@ -1467,16 +1584,65 @@ CCC Marketplace receipt addendum verified with the full browser harness
 
 ### Pickaxe Upgrade Progression
 
-**Status:** covered by `Workbench Recipes + Tool Rack Upgrades`; keep this
-only for a later ore-specific mining balance pass.
+**Completed:** 2026-05-31
+
+**Status:** resource tool progression shipped in `Workbench Recipes + Tool
+Rack Upgrades`; ore-specific mining balance pass now implemented.
 
 **Goal:** give players long-term mining/harvesting progression without
 over-inflating crypto rewards.
 
 **Acceptance:**
-- Add local tool tier state and upgrade recipes.
-- Apply conservative modifiers to resource harvesting and/or ore extraction.
+- Add local tool tier state and upgrade recipes. Shipped through Tool Rack.
+- Apply conservative modifiers to resource harvesting and ore extraction.
 - Keep multiplier constants isolated for future economy tuning.
+
+**Notes:**
+- Pickaxe tiers 1-2 extract one ore capacity chunk per mining action, tiers
+  3-4 extract two, and tiers 5-6 extract three.
+- Ore extraction spends the matching number of capacity chunks from the ore's
+  existing remaining USD value. It accelerates mining but does not increase
+  the base value stored in an ore cell.
+- Legacy and lazy chain mining tx builders preserve correct before/after
+  capacity when a tool extracts multiple chunks in one action.
+
+Verified with the browser test harness (`396 passed, 0 failed`),
+`node netlify-build.mjs`, and `git diff --check`.
+
+### Cloudflare Custom-Domain Cache Mitigation
+
+**Completed:** 2026-05-31
+
+**Status:** release blocker mitigated; Cloudflare zone-header cleanup remains a
+non-blocking follow-up.
+
+**Goal:** prevent stale custom-domain JavaScript/CSS from blocking production
+deploys while Cloudflare keeps overriding the repo `_headers` policy.
+
+**Acceptance:**
+- Keep `/` revalidating on every load so each deploy can publish fresh asset
+  URLs.
+- Publish a content-hashed ES-module tree and make production HTML load that
+  tree.
+- Add a cache policy for hashed module paths.
+- Verify `cellshire.com` loads the deployed hashed module graph without module
+  failures.
+
+**Notes:**
+- `netlify-build.mjs` now writes `dist/src-<hash>/` and rewrites
+  `index.html` to load `src-<hash>/main.js?v=<hash>`.
+- `styles.css` receives a content-hash query in production HTML.
+- `_headers` marks `/src-*/*` as immutable while preserving the original
+  `/src/*` revalidation rule for compatibility.
+- The deployed production build at `https://4dfc4c29.cellshire.pages.dev`
+  serves `https://cellshire.com/` with the hashed module script tag.
+- The underlying custom-domain browser TTL override is still visible:
+  `https://cellshire.com/src-246c43faaf15/main.js` returns `200` with
+  `Cache-Control: public, max-age=14400, must-revalidate`.
+
+Verified with `node netlify-build.mjs`, local `dist/` browser smoke, live
+custom-domain browser smoke, Cloudflare Pages deployment verification, and
+`git diff --check`.
 
 ## Needs Decision
 

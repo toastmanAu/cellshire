@@ -10,12 +10,13 @@ export const TOOL_LINES = Object.freeze([
         resourceId: 'stone',
         resourceName: 'Stone',
         tiers: Object.freeze([
-            Object.freeze({ tier: 1, name: 'Rusted Pickaxe', requiredToolRackLevel: 0, resourceHarvestBonus: 0, cost: null }),
+            Object.freeze({ tier: 1, name: 'Rusted Pickaxe', requiredToolRackLevel: 0, resourceHarvestBonus: 0, oreCapacityPerHit: 1, cost: null }),
             Object.freeze({
                 tier: 2,
                 name: 'Reinforced Pickaxe',
                 requiredToolRackLevel: 1,
                 resourceHarvestBonus: 1,
+                oreCapacityPerHit: 1,
                 cost: Object.freeze({
                     resources: Object.freeze({ wood: 6, stone: 7, crop: 3 }),
                     ckb: 1100,
@@ -26,6 +27,7 @@ export const TOOL_LINES = Object.freeze([
                 name: 'Steel Pickaxe',
                 requiredToolRackLevel: 2,
                 resourceHarvestBonus: 2,
+                oreCapacityPerHit: 2,
                 cost: Object.freeze({
                     resources: Object.freeze({ wood: 24, stone: 32, crop: 10 }),
                     ckb: 7800,
@@ -36,6 +38,7 @@ export const TOOL_LINES = Object.freeze([
                 name: 'Silver Pickaxe',
                 requiredToolRackLevel: 3,
                 resourceHarvestBonus: 3,
+                oreCapacityPerHit: 2,
                 cost: Object.freeze({
                     resources: Object.freeze({ wood: 55, stone: 78, crop: 24 }),
                     ckb: 18000,
@@ -46,6 +49,7 @@ export const TOOL_LINES = Object.freeze([
                 name: 'Gold Pickaxe',
                 requiredToolRackLevel: 4,
                 resourceHarvestBonus: 4,
+                oreCapacityPerHit: 3,
                 cost: Object.freeze({
                     resources: Object.freeze({ wood: 110, stone: 150, crop: 50 }),
                     ckb: 42000,
@@ -56,6 +60,7 @@ export const TOOL_LINES = Object.freeze([
                 name: 'Diamond Pickaxe',
                 requiredToolRackLevel: 5,
                 resourceHarvestBonus: 6,
+                oreCapacityPerHit: 3,
                 cost: Object.freeze({
                     resources: Object.freeze({ wood: 210, stone: 280, crop: 95 }),
                     ckb: 95000,
@@ -313,9 +318,7 @@ function toolLineSummary({ line, toolProgression, toolRackLevel, resourceInvento
         label: `${current.name} · Tier ${current.tier}`,
         iconSrc: toolIconSrc(line.id, current.tier),
         nextIconSrc: next ? toolIconSrc(line.id, next.tier) : null,
-        effectLabel: current.resourceHarvestBonus > 0
-            ? `${line.resourceName} yield +${current.resourceHarvestBonus}`
-            : `${line.resourceName} baseline yield`,
+        effectLabel: toolEffectLabel(line, current),
         nextCostLabel: next?.cost ? formatToolCost(next.cost) : 'Max tier',
         nextRequiredLabel: next ? `Tool Rack ${next.requiredToolRackLevel}` : 'Max tier',
         canUpgrade: !!next
@@ -365,6 +368,20 @@ export function toolResourceYieldAmount(toolProgression, resourceId, baseAmount)
     if (!line) return base;
     const current = toolTierConfig(line.id, toolProgression?.getTier?.(line.id) ?? 1);
     return base + current.resourceHarvestBonus;
+}
+
+export function toolOreCapacityPerHit(toolProgression) {
+    const current = toolTierConfig('pickaxe', toolProgression?.getTier?.('pickaxe') ?? 1);
+    return Math.max(1, Number(current.oreCapacityPerHit) || 1);
+}
+
+function toolEffectLabel(line, current) {
+    const resource = current.resourceHarvestBonus > 0
+        ? `${line.resourceName} yield +${current.resourceHarvestBonus}`
+        : `${line.resourceName} baseline yield`;
+    if (line.id !== 'pickaxe') return resource;
+    const oreCapacity = Math.max(1, Number(current.oreCapacityPerHit) || 1);
+    return oreCapacity > 1 ? `${resource} · Ore x${oreCapacity}` : resource;
 }
 
 export function loadToolProgression(storage, ownerId = 'local') {

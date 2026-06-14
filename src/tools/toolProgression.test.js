@@ -9,6 +9,7 @@ import {
     loadToolProgression,
     saveToolProgression,
     toolIconSrc,
+    toolOreCapacityPerHit,
     toolProgressStorageKey,
     toolProgressSummary,
     toolResourceYieldAmount,
@@ -87,6 +88,20 @@ describe('tool progression', () => {
         expect(toolResourceYieldAmount(tools, 'wood', 3)).toBe(6);
         expect(toolResourceYieldAmount(tools, 'crop', 3)).toBe(4);
         expect(toolResourceYieldAmount(tools, 'gold', 3)).toBe(3);
+    });
+
+    it('lets upgraded pickaxes extract ore capacity faster without affecting other tools', () => {
+        expect(toolOreCapacityPerHit(new ToolProgression())).toBe(1);
+        expect(toolOreCapacityPerHit(new ToolProgression({ tiers: { pickaxe: 2 } }))).toBe(1);
+        expect(toolOreCapacityPerHit(new ToolProgression({ tiers: { pickaxe: 3 } }))).toBe(2);
+        expect(toolOreCapacityPerHit(new ToolProgression({ tiers: { pickaxe: 6 } }))).toBe(3);
+
+        const summary = toolProgressSummary({
+            toolProgression: new ToolProgression({ tiers: { pickaxe: 3 } }),
+            buildingProgression: new BuildingProgression(),
+        });
+        expect(summary.lines[0].effectLabel).toBe('Stone yield +2 · Ore x2');
+        expect(summary.lines[1].effectLabel).toBe('Wood baseline yield');
     });
 
     it('gates diamond upgrades behind Tool Rack level 5', () => {
