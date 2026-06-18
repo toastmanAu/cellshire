@@ -2,6 +2,7 @@ import {
     TOWNSHIP_BUILDING_ROLES,
     townshipBuildingLabel,
 } from '../township/townshipZone.js';
+import { ASSET_INDEX } from '../assets/assetManifest.js';
 import { formatCurrencyAmount } from '../mining/cryptoEconomy.js';
 
 export const INTERIOR_BACKDROPS = Object.freeze({
@@ -94,7 +95,7 @@ export function buildingInteriorDefinition(role) {
             backdrop: INTERIOR_BACKDROPS.gallery,
             npc: INTERIOR_NPCS.gallery,
             actions: [
-                { id: 'gallery', label: 'View wall', toast: 'Gallery opens soon' },
+                { id: 'gallery', label: 'View wall', gallery: true },
             ],
         };
     }
@@ -106,7 +107,7 @@ export function buildingInteriorDefinition(role) {
             backdrop: INTERIOR_BACKDROPS.hall,
             npc: INTERIOR_NPCS.hall,
             actions: [
-                { id: 'hall', label: 'Notice board', toast: 'Community hall opens soon' },
+                { id: 'hall', label: 'Notice board', notices: true },
             ],
         };
     }
@@ -208,15 +209,40 @@ export function installBuildingInteriorHUD(game) {
             renderLoans();
             return;
         }
+        if (action.gallery) {
+            renderGalleryWall();
+            return;
+        }
+        if (action.notices) {
+            renderNoticeBoard();
+            return;
+        }
         game.ui?.showToast?.(action.toast || 'Coming soon', 1800);
     }
 
     function renderStatus(status) {
-        if (!current || current.role !== TOWNSHIP_BUILDING_ROLES.bank) return;
-        const summary = game.houseTreasurySummary?.();
-        status.textContent = summary
-            ? `House treasury ${summary.totalLabel} · ${summary.feeCount} fee records`
-            : 'House treasury unavailable';
+        if (!current) return;
+        if (current.role === TOWNSHIP_BUILDING_ROLES.bank) {
+            const summary = game.houseTreasurySummary?.();
+            status.textContent = summary
+                ? `House treasury ${summary.totalLabel} · ${summary.feeCount} fee records`
+                : 'House treasury unavailable';
+            return;
+        }
+        if (current.role === TOWNSHIP_BUILDING_ROLES.gallery) {
+            const entries = game.propInventory?.entries?.() ?? [];
+            const count = entries.reduce((sum, [, amount]) => sum + Math.max(0, Math.floor(Number(amount) || 0)), 0);
+            status.textContent = count > 0
+                ? `Collection wall · ${count} prop${count === 1 ? '' : 's'} held`
+                : 'Collection wall · no props held';
+            return;
+        }
+        if (current.role === TOWNSHIP_BUILDING_ROLES.communityHall) {
+            const farm = game.farmExpansionState?.();
+            status.textContent = farm
+                ? `${farm.label} · ${farm.ready}/${farm.planted} crops ready`
+                : 'Notice board ready';
+        }
     }
 
     function renderTreasury() {
@@ -287,6 +313,67 @@ export function installBuildingInteriorHUD(game) {
             row.appendChild(borrow);
             loans.appendChild(row);
         }
+    }
+
+    function renderGalleryWall() {
+        const board = renderBoard('building-window__gallery', 'Collection Wall');
+        const entries = game.propInventory?.entries?.() ?? [];
+        if (entries.length === 0) {
+            board.appendChild(div('building-window__board-row', 'No collected props yet'));
+            return;
+        }
+        for (const [assetId, amount] of entries) {
+            const name = game.assetName?.(assetId) ?? ASSET_INDEX[assetId]?.name ?? assetId;
+            board.appendChild(div('building-window__board-row', `${name} x${Math.floor(amount)}`));
+        }
+    }
+
+    function renderNoticeBoard() {
+        const board = renderBoard('building-window__notices', 'Community Notices');
+        const rows = communityNoticeRows();
+        for (const row of rows) {
+            board.appendChild(div('building-window__board-row', row));
+        }
+    }
+
+    function renderBoard(className, title) {
+        let board = panel.querySelector(`.${className}`);
+        if (!board) {
+            board = div(`building-window__board ${className}`);
+            panel.appendChild(board);
+        }
+        clear(board);
+        board.appendChild(div('building-window__board-title', title));
+        return board;
+    }
+
+    function communityNoticeRows() {
+        const rows = [];
+        const property = game.propertyExpansionState?.();
+        if (property) {
+            rows.push(`${property.label} · ${property.next ? `Next ${property.nextCostLabel}` : 'Max claim'}`);
+        }
+        const farm = game.farmExpansionState?.();
+        if (farm) {
+            rows.push(`${farm.label} · ${farm.ready}/${farm.planted} crops ready · ${farm.next ? `Next ${farm.nextCostLabel}` : 'Max farm'}`);
+        }
+        const buildings = game.buildingProgressionState?.()?.buildings ?? [];
+        if (buildings.length > 0) {
+            const unlocked = buildings.filter(entry => entry.unlocked).length;
+            const active = buildings.filter(entry => entry.active).length;
+            rows.push(`Home buildings · ${unlocked}/${buildings.length} unlocked · ${active} active`);
+        }
+        const treasury = game.houseTreasurySummary?.();
+        if (treasury) {
+            rows.push(`House treasury · ${treasury.totalLabel} · ${treasury.feeCount} fee records`);
+        }
+        const loans = game.bankLoanSummary?.();
+        if (loans?.active) {
+            rows.push(`Loan office · ${loans.active.name} active`);
+        } else if (loans?.reserveLabel) {
+            rows.push(`Loan office · reserve ${loans.reserveLabel}`);
+        }
+        return rows.length > 0 ? rows : ['No notices yet'];
     }
 
     function onKeydown(ev) {

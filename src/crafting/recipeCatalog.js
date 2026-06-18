@@ -34,6 +34,16 @@ export const WORKBENCH_RECIPES = Object.freeze([
         output: Object.freeze({ assetId: 'crate', amount: 1 }),
     }),
     Object.freeze({
+        id: 'herbal_garden_kit',
+        name: 'Herbal Garden Kit',
+        workbenchLevel: 1,
+        cost: Object.freeze({
+            resources: Object.freeze({ wood: 4, stone: 4, crop: 6, herb: 2 }),
+            ckb: 1000,
+        }),
+        output: Object.freeze({ assetId: 'garden_bed', amount: 1 }),
+    }),
+    Object.freeze({
         id: 'prospecting_pan',
         name: 'Prospecting Pan',
         workbenchLevel: 2,
@@ -53,6 +63,16 @@ export const WORKBENCH_RECIPES = Object.freeze([
         }),
         output: Object.freeze({ assetId: 'stone_basin', amount: 1 }),
     }),
+    Object.freeze({
+        id: 'gold_lantern_kit',
+        name: 'Gold Lantern Kit',
+        workbenchLevel: 2,
+        cost: Object.freeze({
+            resources: Object.freeze({ wood: 6, stone: 14, crop: 6, herb: 3, gold: 1 }),
+            ckb: 2800,
+        }),
+        output: Object.freeze({ assetId: 'hanging_lantern', amount: 1 }),
+    }),
 ]);
 
 const RECIPE_INDEX = new Map(WORKBENCH_RECIPES.map(recipe => [recipe.id, recipe]));
@@ -66,9 +86,10 @@ export function availableRecipes(workbenchLevel = 0) {
     return WORKBENCH_RECIPES.filter(recipe => recipe.workbenchLevel <= level);
 }
 
-export function recipeSummary({ recipe, buildingProgression, resourceInventory, currencyInventory } = {}) {
+export function recipeSummary({ recipe, buildingProgression, resourceInventory, currencyInventory, activeBuildingProgression = null } = {}) {
     if (!recipe) return null;
-    const workbenchLevel = buildingProgression?.getLevel?.('workbench') ?? 0;
+    const progression = activeBuildingProgression ?? buildingProgression;
+    const workbenchLevel = progression?.getLevel?.('workbench') ?? 0;
     const unlocked = workbenchLevel >= recipe.workbenchLevel;
     return {
         ...recipe,
@@ -80,12 +101,13 @@ export function recipeSummary({ recipe, buildingProgression, resourceInventory, 
     };
 }
 
-export function recipeSummaries({ buildingProgression, resourceInventory, currencyInventory } = {}) {
+export function recipeSummaries({ buildingProgression, resourceInventory, currencyInventory, activeBuildingProgression = null } = {}) {
     return WORKBENCH_RECIPES.map(recipe => recipeSummary({
         recipe,
         buildingProgression,
         resourceInventory,
         currencyInventory,
+        activeBuildingProgression,
     }));
 }
 
@@ -113,10 +135,11 @@ export function canAffordRecipe({ recipe, resourceInventory, currencyInventory }
     return resourcesOk && ckbOk;
 }
 
-export function craftRecipe({ recipeId, buildingProgression, resourceInventory, currencyInventory, propInventory } = {}) {
+export function craftRecipe({ recipeId, buildingProgression, activeBuildingProgression = null, resourceInventory, currencyInventory, propInventory } = {}) {
     const recipe = recipeById(recipeId);
     if (!recipe) return { ok: false, reason: 'missing-recipe' };
-    const workbenchLevel = buildingProgression?.getLevel?.('workbench') ?? 0;
+    const progression = activeBuildingProgression ?? buildingProgression;
+    const workbenchLevel = progression?.getLevel?.('workbench') ?? 0;
     if (workbenchLevel < recipe.workbenchLevel) {
         return { ok: false, reason: 'locked', recipe, requiredLevel: recipe.workbenchLevel };
     }

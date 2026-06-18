@@ -1,4 +1,8 @@
-import { BuildingProgression } from '../buildings/buildingProgression.js';
+import {
+    BuildingProgression,
+    activeBuildingIdsFromAssetIds,
+    activeBuildingProgression,
+} from '../buildings/buildingProgression.js';
 import { Inventory } from '../core/Inventory.js';
 import { ResourceInventory } from '../resources/resourceInventory.js';
 import {
@@ -47,6 +51,8 @@ describe('tool progression', () => {
             expect(line.tiers[5].cost.resources.wood > 0).toBe(true);
             expect(line.tiers[5].cost.resources.stone > 0).toBe(true);
             expect(line.tiers[5].cost.resources.crop > 0).toBe(true);
+            expect(line.tiers[5].cost.resources.herb > 0).toBe(true);
+            expect(line.tiers[5].cost.resources.gold > 0).toBe(true);
             expect(line.tiers[5].cost.ckb > 0).toBe(true);
         }
     });
@@ -77,6 +83,36 @@ describe('tool progression', () => {
         expect(resources.get('stone')).toBe(0);
         expect(resources.get('crop')).toBe(0);
         expect(currencies.get('ckb')).toBe(0);
+    });
+
+    it('requires a placed Tool Rack when active progression is provided', () => {
+        const progression = new BuildingProgression({ tool_rack: 1 });
+        const inactive = activeBuildingProgression(progression, activeBuildingIdsFromAssetIds(['house']));
+        const active = activeBuildingProgression(progression, activeBuildingIdsFromAssetIds(['house', 'tool_rack']));
+        const resources = new ResourceInventory([
+            ['wood', 6],
+            ['stone', 7],
+            ['crop', 3],
+        ]);
+        const currencies = new Inventory();
+        currencies.add('ckb', 1100);
+
+        const locked = upgradeTool({
+            toolProgression: new ToolProgression(),
+            buildingProgression: progression,
+            activeBuildingProgression: inactive,
+            resourceInventory: resources,
+            currencyInventory: currencies,
+            toolId: 'pickaxe',
+        });
+        expect(locked.reason).toBe('locked');
+        expect(toolProgressSummary({
+            toolProgression: new ToolProgression(),
+            buildingProgression: progression,
+            activeBuildingProgression: active,
+            resourceInventory: resources,
+            currencyInventory: currencies,
+        }).lines[0].canUpgrade).toBe(true);
     });
 
     it('applies each tool bonus only to its corresponding resource', () => {
@@ -110,6 +146,8 @@ describe('tool progression', () => {
             ['wood', 210],
             ['stone', 280],
             ['crop', 95],
+            ['herb', 35],
+            ['gold', 4],
         ]);
         const currencies = new Inventory();
         currencies.add('ckb', 95000);
@@ -137,6 +175,8 @@ describe('tool progression', () => {
         expect(resources.get('wood')).toBe(0);
         expect(resources.get('stone')).toBe(0);
         expect(resources.get('crop')).toBe(0);
+        expect(resources.get('herb')).toBe(0);
+        expect(resources.get('gold')).toBe(0);
         expect(currencies.get('ckb')).toBe(0);
     });
 

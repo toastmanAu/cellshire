@@ -1,6 +1,7 @@
 export const HARVEST_RESOURCE_ROLES = Object.freeze({
     wood: 'wood_resource',
     stone: 'stone_resource',
+    gold: 'gold_resource',
 });
 
 export const HARVEST_RESOURCE_CATALOG = Object.freeze({
@@ -19,6 +20,14 @@ export const HARVEST_RESOURCE_CATALOG = Object.freeze({
         yieldAmount: 3,
         dustColor: '#8c8f8e',
         textColor: '#6a7882',
+    }),
+    [HARVEST_RESOURCE_ROLES.gold]: Object.freeze({
+        role: HARVEST_RESOURCE_ROLES.gold,
+        resourceId: 'gold',
+        displayName: 'Gold',
+        yieldAmount: 1,
+        dustColor: '#d3a747',
+        textColor: '#b97a13',
     }),
 });
 

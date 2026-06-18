@@ -30,9 +30,8 @@ Target behavior:
 - Trees are procgen scatter on suitable terrain and refresh every epoch.
 - Tree harvesting grants `wood`.
 - Stone outcrops grant `stone`.
-- Gold material can either piggyback on `gold_ore` hits or become a separate
-  rare `gold_nugget` node. This needs a decision because `gold_ore` already
-  maps to BTC in the current crypto economy.
+- Gold material uses a separate rare `gold_nugget_node` harvest resource so
+  `gold_ore` can keep mapping to BTC in the crypto economy.
 
 ### Home Farm Zone
 
@@ -146,7 +145,9 @@ Acceptance:
 1. **Expandable Farm Zone MVP**
    - Add home farm bounds and tiered expansion.
    - Add placeable farm plots.
-   - Add simple plant/harvest flow with local timers.
+   - Add simple plant/harvest flow with elapsed timers by default.
+   - Persist planted/ready epoch metadata and support opt-in
+     `?farmTiming=epoch` readiness for deterministic shift-bucket smoke tests.
 
 2. **Crafting Building Unlocks**
    - Add recipe model.
@@ -163,12 +164,33 @@ Acceptance:
    - Keep all generated assets aligned with the existing voxel/isometric
      style and transparent PNG processing pipeline.
 
+5. **Farm Variety + Local Gold Materials**
+   - Add tier-based herb and timber farm plots using the farm crop catalog.
+   - Add separate public-map gold nugget nodes as local material resources.
+   - Keep the interactions local, epoch-refreshing, and covered by the
+     browser harness.
+
+6. **Material Sinks + Mixed Farm Expansion Costs**
+   - Farm expansion uses both local materials and a modest CKB spend so trading,
+     mining, and bank credit remain relevant to home progression.
+   - Add workbench recipes that consume `herb` and `gold` into placeable home
+     props.
+   - Add `herb` and `gold` requirements to higher tool tiers without changing
+     the conservative harvest/ore effects.
+
 ## Decisions Needed
 
-- Does `gold` remain only a crypto-mapped deposit reward, or become a separate
-  local crafting material?
-- Are home farm timers real elapsed time, epoch-bucketed, or action-count based?
-- Should farm expansion use CKB, local resources, or both?
+- ~~Does `gold` remain only a crypto-mapped deposit reward, or become a separate
+  local crafting material?~~ Resolved 2026-06-16: local `gold` comes from rare
+  `gold_resource` / `gold_nugget_node` harvest nodes; `gold_ore` remains a
+  crypto ore.
+- ~~Are home farm timers real elapsed time, epoch-bucketed, or action-count based?~~
+  Resolved 2026-06-15: elapsed timers remain the player-facing default for
+  early-game pacing; plots also carry epoch metadata and can use epoch-bucket
+  readiness behind `?farmTiming=epoch`.
+- ~~Should farm expansion use CKB, local resources, or both?~~ Resolved
+  2026-06-17: farm expansion uses both local materials and CKB. Tier 3 also
+  requires `herb`, tying the expanded farm loop back into progression.
 - Do crafted capability buildings need to be physically placed, merely owned,
   or both?
 - Which pickaxe effects are safe before the economy pricing pass?

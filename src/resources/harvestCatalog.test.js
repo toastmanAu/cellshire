@@ -13,11 +13,14 @@ describe('harvest resource catalog', () => {
         expect(wood.yieldAmount).toBe(4);
         expect(harvestResourceConfig(HARVEST_RESOURCE_ROLES.stone).resourceId).toBe('stone');
         expect(harvestResourceConfig(HARVEST_RESOURCE_ROLES.stone).yieldAmount).toBe(3);
+        expect(harvestResourceConfig(HARVEST_RESOURCE_ROLES.gold).resourceId).toBe('gold');
+        expect(harvestResourceConfig(HARVEST_RESOURCE_ROLES.gold).yieldAmount).toBe(1);
     });
 
     it('identifies harvestable objects by role', () => {
         expect(isHarvestResourceRole('wood_resource')).toBe(true);
         expect(isHarvestResourceObject({ role: 'stone_resource' })).toBe(true);
+        expect(isHarvestResourceObject({ role: 'gold_resource' })).toBe(true);
         expect(isHarvestResourceObject({ assetId: 'cypress' })).toBe(false);
     });
 });

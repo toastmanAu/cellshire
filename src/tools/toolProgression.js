@@ -40,7 +40,7 @@ export const TOOL_LINES = Object.freeze([
                 resourceHarvestBonus: 3,
                 oreCapacityPerHit: 2,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 55, stone: 78, crop: 24 }),
+                    resources: Object.freeze({ wood: 55, stone: 78, crop: 24, herb: 8 }),
                     ckb: 18000,
                 }),
             }),
@@ -51,7 +51,7 @@ export const TOOL_LINES = Object.freeze([
                 resourceHarvestBonus: 4,
                 oreCapacityPerHit: 3,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 110, stone: 150, crop: 50 }),
+                    resources: Object.freeze({ wood: 110, stone: 150, crop: 50, herb: 18, gold: 2 }),
                     ckb: 42000,
                 }),
             }),
@@ -62,7 +62,7 @@ export const TOOL_LINES = Object.freeze([
                 resourceHarvestBonus: 6,
                 oreCapacityPerHit: 3,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 210, stone: 280, crop: 95 }),
+                    resources: Object.freeze({ wood: 210, stone: 280, crop: 95, herb: 35, gold: 4 }),
                     ckb: 95000,
                 }),
             }),
@@ -101,7 +101,7 @@ export const TOOL_LINES = Object.freeze([
                 requiredToolRackLevel: 3,
                 resourceHarvestBonus: 3,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 78, stone: 55, crop: 24 }),
+                    resources: Object.freeze({ wood: 78, stone: 55, crop: 24, herb: 8 }),
                     ckb: 17500,
                 }),
             }),
@@ -111,7 +111,7 @@ export const TOOL_LINES = Object.freeze([
                 requiredToolRackLevel: 4,
                 resourceHarvestBonus: 4,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 150, stone: 110, crop: 50 }),
+                    resources: Object.freeze({ wood: 150, stone: 110, crop: 50, herb: 18, gold: 1 }),
                     ckb: 40000,
                 }),
             }),
@@ -121,7 +121,7 @@ export const TOOL_LINES = Object.freeze([
                 requiredToolRackLevel: 5,
                 resourceHarvestBonus: 6,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 280, stone: 210, crop: 95 }),
+                    resources: Object.freeze({ wood: 280, stone: 210, crop: 95, herb: 35, gold: 3 }),
                     ckb: 90000,
                 }),
             }),
@@ -160,7 +160,7 @@ export const TOOL_LINES = Object.freeze([
                 requiredToolRackLevel: 3,
                 resourceHarvestBonus: 3,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 45, stone: 42, crop: 78 }),
+                    resources: Object.freeze({ wood: 45, stone: 42, crop: 78, herb: 10 }),
                     ckb: 16500,
                 }),
             }),
@@ -170,7 +170,7 @@ export const TOOL_LINES = Object.freeze([
                 requiredToolRackLevel: 4,
                 resourceHarvestBonus: 4,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 90, stone: 85, crop: 150 }),
+                    resources: Object.freeze({ wood: 90, stone: 85, crop: 150, herb: 24, gold: 1 }),
                     ckb: 38000,
                 }),
             }),
@@ -180,7 +180,7 @@ export const TOOL_LINES = Object.freeze([
                 requiredToolRackLevel: 5,
                 resourceHarvestBonus: 6,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 175, stone: 165, crop: 280 }),
+                    resources: Object.freeze({ wood: 175, stone: 165, crop: 280, herb: 48, gold: 3 }),
                     ckb: 85000,
                 }),
             }),
@@ -290,8 +290,9 @@ export class ToolProgression {
     }
 }
 
-export function toolProgressSummary({ toolProgression, buildingProgression, resourceInventory, currencyInventory } = {}) {
-    const toolRackLevel = buildingProgression?.getLevel?.('tool_rack') ?? 0;
+export function toolProgressSummary({ toolProgression, buildingProgression, activeBuildingProgression = null, resourceInventory, currencyInventory } = {}) {
+    const progression = activeBuildingProgression ?? buildingProgression;
+    const toolRackLevel = progression?.getLevel?.('tool_rack') ?? 0;
     const lines = TOOL_LINES.map(line => toolLineSummary({
         line,
         toolProgression,
@@ -342,12 +343,13 @@ export function canAffordToolUpgrade({ next, resourceInventory, currencyInventor
     return resourcesOk && ckbOk;
 }
 
-export function upgradeTool({ toolProgression, buildingProgression, resourceInventory, currencyInventory, toolId = 'pickaxe' } = {}) {
+export function upgradeTool({ toolProgression, buildingProgression, activeBuildingProgression = null, resourceInventory, currencyInventory, toolId = 'pickaxe' } = {}) {
     const line = toolLineConfig(toolId);
     const current = toolTierConfig(line.id, toolProgression?.getTier?.(line.id) ?? 1);
     const next = nextToolTier(line.id, current.tier);
     if (!next) return { ok: false, reason: 'max-tier', toolId: line.id, current };
-    const toolRackLevel = buildingProgression?.getLevel?.('tool_rack') ?? 0;
+    const progression = activeBuildingProgression ?? buildingProgression;
+    const toolRackLevel = progression?.getLevel?.('tool_rack') ?? 0;
     if (toolRackLevel < next.requiredToolRackLevel) {
         return { ok: false, reason: 'locked', toolId: line.id, current, next, requiredToolRackLevel: next.requiredToolRackLevel };
     }

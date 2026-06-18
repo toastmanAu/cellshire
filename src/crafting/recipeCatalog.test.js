@@ -1,4 +1,8 @@
-import { BuildingProgression } from '../buildings/buildingProgression.js';
+import {
+    BuildingProgression,
+    activeBuildingIdsFromAssetIds,
+    activeBuildingProgression,
+} from '../buildings/buildingProgression.js';
 import { Inventory } from '../core/Inventory.js';
 import { PropInventory } from '../property/propInventory.js';
 import { ResourceInventory } from '../resources/resourceInventory.js';
@@ -13,14 +17,16 @@ describe('workbench recipes', () => {
     it('gates recipes by workbench level', () => {
         expect(availableRecipes(0).length).toBe(0);
         expect(availableRecipes(1).map(recipe => recipe.id))
-            .toEqual(['herb_planter', 'stone_lantern_kit', 'storage_crate_kit']);
+            .toEqual(['herb_planter', 'stone_lantern_kit', 'storage_crate_kit', 'herbal_garden_kit']);
         expect(availableRecipes(2).map(recipe => recipe.id))
             .toEqual([
                 'herb_planter',
                 'stone_lantern_kit',
                 'storage_crate_kit',
+                'herbal_garden_kit',
                 'prospecting_pan',
                 'stone_basin_kit',
+                'gold_lantern_kit',
             ]);
     });
 
@@ -42,7 +48,28 @@ describe('workbench recipes', () => {
         expect(summaries[0].outputLabel).toBe('2 Herb');
         expect(summaries[1].unlocked).toBe(true);
         expect(summaries[2].unlocked).toBe(true);
-        expect(summaries[3].unlocked).toBe(false);
+        expect(summaries[3].unlocked).toBe(true);
+        expect(summaries[4].unlocked).toBe(false);
+    });
+
+    it('requires a placed workbench when active progression is provided', () => {
+        const progression = new BuildingProgression({ workbench: 1 });
+        const inactive = activeBuildingProgression(progression, activeBuildingIdsFromAssetIds(['house']));
+        const active = activeBuildingProgression(progression, activeBuildingIdsFromAssetIds(['house', 'workbench']));
+
+        expect(recipeSummaries({
+            buildingProgression: progression,
+            activeBuildingProgression: inactive,
+        })[0].unlocked).toBe(false);
+        expect(craftRecipe({
+            recipeId: 'herb_planter',
+            buildingProgression: progression,
+            activeBuildingProgression: inactive,
+        }).reason).toBe('locked');
+        expect(recipeSummaries({
+            buildingProgression: progression,
+            activeBuildingProgression: active,
+        })[0].unlocked).toBe(true);
     });
 
     it('crafts a resource output by spending materials and CKB', () => {
@@ -114,6 +141,33 @@ describe('workbench recipes', () => {
         expect(result.ok).toBe(true);
         expect(props.get('stone_basin')).toBe(1);
         expect(resources.get('wood')).toBe(0);
+        expect(currencies.get('ckb')).toBe(0);
+    });
+
+    it('crafts herb and gold material recipes into placeable props', () => {
+        const resources = new ResourceInventory([
+            ['wood', 6],
+            ['stone', 14],
+            ['crop', 6],
+            ['herb', 3],
+            ['gold', 1],
+        ]);
+        const currencies = new Inventory();
+        const props = new PropInventory();
+        currencies.add('ckb', 2800);
+
+        const result = craftRecipe({
+            recipeId: 'gold_lantern_kit',
+            buildingProgression: new BuildingProgression({ workbench: 2 }),
+            resourceInventory: resources,
+            currencyInventory: currencies,
+            propInventory: props,
+        });
+
+        expect(result.ok).toBe(true);
+        expect(props.get('hanging_lantern')).toBe(1);
+        expect(resources.get('herb')).toBe(0);
+        expect(resources.get('gold')).toBe(0);
         expect(currencies.get('ckb')).toBe(0);
     });
 

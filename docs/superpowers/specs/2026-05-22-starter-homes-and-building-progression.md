@@ -29,6 +29,9 @@ base game dependent on market availability.
   and treasury-generating fee loops relevant to home-base progression.
 - Each building has a functional level independent of its visual skin.
 - Levels improve efficiency, capacity, recipe access, cooldowns, or automation.
+- Owner-level unlocks grant placement rights and preserve progression. A
+  utility building's capability is active only while that standard building is
+  placed on the owner's home plot. The baseline home remains active by default.
 - Building levels follow a builder-game tier gate: a building can advance to
   level `N` only after every standard building that supports level `N-1` has
   reached level `N-1`. Practically, level 2 upgrades require all standard
@@ -60,8 +63,10 @@ base game dependent on market availability.
 
 ## Open Questions
 
-- Should building levels be stored per owner globally, per placed building, or
-  derived from owned cells/assets?
+- ~~Should building levels be stored per owner globally, per placed building, or
+  derived from owned cells/assets?~~ Resolved 2026-06-15: levels are stored per
+  owner globally, while utility capabilities require the matching standard
+  building to be placed on the home plot.
 - Should market assets affect only visuals at first, or also add minor
   functional modifiers?
 - Should home `house` upgrades gate property size, farm size, or purely home

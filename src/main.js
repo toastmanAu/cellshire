@@ -88,6 +88,7 @@ async function main() {
     // property-zone / asset-pack work.
     const params = new URLSearchParams(location.search);
     const devMode = params.get('dev') === '1';
+    game.farmTimingMode = params.get('farmTiming') === 'epoch' ? 'epoch' : 'elapsed';
     const visitOwner = propertyVisitOwnerFromParams(params);
     const chainCurrencyEnabled = params.get('chainCurrency') === '1'
         || params.get('chainTrader') === '1'

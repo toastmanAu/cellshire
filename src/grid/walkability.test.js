@@ -33,6 +33,7 @@ describe('walkability interactions', () => {
     it('treats harvest resource roles as interactable', () => {
         expect(isInteractable(mapWithObject({ assetId: 'cypress', role: 'wood_resource' }), 0, 0)).toBe(true);
         expect(isInteractable(mapWithObject({ assetId: 'boulder', role: 'stone_resource' }), 0, 0)).toBe(true);
+        expect(isInteractable(mapWithObject({ assetId: 'gold_nugget_node', role: 'gold_resource' }), 0, 0)).toBe(true);
     });
 
     it('treats planted farm crops as interactable', () => {

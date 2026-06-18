@@ -6,6 +6,7 @@ import {
     BANK_LOANS_STORAGE_KEY,
     BankLoanBook,
     availableBankLoanOffers,
+    bankReserveState,
     bankLoanSummary,
     borrowBankLoan,
     loadBankLoanBook,
@@ -86,6 +87,35 @@ describe('bank loans', () => {
         expect(paid.ok).toBe(true);
         expect(paid.paid).toBe(true);
         expect(loanBook.activeLoan()).toBeNull();
+    });
+
+    it('counts paid loan fees as bank reserve liquidity when recorded in treasury', () => {
+        const loanBook = new BankLoanBook();
+        const inventory = new Inventory();
+        const treasury = new HouseTreasury();
+        borrowBankLoan({
+            offerId: 'starter-float',
+            loanBook,
+            inventory,
+            treasury,
+            priceSnapshot: fixedPriceSnapshot(),
+            now: () => 1000,
+        });
+        inventory.add('ckb', 1000);
+        const paid = repayBankLoan({ loanBook, inventory, amount: 'max' });
+        expect(paid.paid).toBe(true);
+        treasury.recordBankLoanFee({
+            loan: paid.loan,
+            payment: paid.payment,
+            priceSnapshot: fixedPriceSnapshot(),
+        });
+        const reserve = bankReserveState({
+            treasury,
+            loanBook,
+            priceSnapshot: fixedPriceSnapshot(),
+        });
+        expect(Number(reserve.totalUsd.toFixed(6))).toBe(100.269169);
+        expect(Number(reserve.availableUsd.toFixed(6))).toBe(100.269169);
     });
 
     it('rejects repayment when CKB balance is short', () => {

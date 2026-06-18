@@ -4,6 +4,8 @@ import {
     BuildingProgression,
     STANDARD_BUILDINGS,
     STANDARD_BUILDING_ASSET_IDS,
+    activeBuildingIdsFromAssetIds,
+    activeBuildingProgression,
     buildingCapabilityEffects,
     buildingTierGate,
     buildingProgressStorageKey,
@@ -159,6 +161,35 @@ describe('building progression', () => {
         expect(effects.resourceYieldAmount('crop', 2)).toBe(4);
         expect(effects.resourceYieldAmount('gold', 1)).toBe(1);
         expect(effects.buildingEffects.sawmill).toBe('Wood harvest +2');
+    });
+
+    it('requires utility buildings to be placed before their capabilities are active', () => {
+        const progression = new BuildingProgression({
+            workbench: 1,
+            tool_rack: 1,
+            sawmill: 2,
+        });
+        const inactive = activeBuildingProgression(progression, activeBuildingIdsFromAssetIds(['house']));
+        const active = activeBuildingProgression(progression, activeBuildingIdsFromAssetIds(['house', 'sawmill']));
+
+        expect(inactive.getLevel('home')).toBe(1);
+        expect(inactive.getLevel('workbench')).toBe(0);
+        expect(inactive.getLevel('sawmill')).toBe(0);
+        expect(active.getLevel('sawmill')).toBe(2);
+        expect(buildingCapabilityEffects(inactive).resourceYieldAmount('wood', 3)).toBe(3);
+        expect(buildingCapabilityEffects(active).resourceYieldAmount('wood', 3)).toBe(5);
+    });
+
+    it('surfaces unlocked but unplaced utility buildings as inactive in summaries', () => {
+        const progression = new BuildingProgression({ workbench: 1 });
+        const summary = buildingProgressSummary(progression, {
+            activeBuildingIds: activeBuildingIdsFromAssetIds(['house']),
+        });
+        const workbench = summary.find(entry => entry.id === 'workbench');
+
+        expect(workbench.unlocked).toBe(true);
+        expect(workbench.active).toBe(false);
+        expect(workbench.effectLabel).toBe('Place on property to activate');
     });
 
     it('persists owner-keyed building levels', () => {

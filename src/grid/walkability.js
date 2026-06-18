@@ -44,6 +44,7 @@ const INTERACTABLE_ROLES = new Set([
     'township_community_hall',
     'wood_resource',
     'stone_resource',
+    'gold_resource',
     'farm_crop',
 ]);
 

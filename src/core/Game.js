@@ -56,9 +56,9 @@ import {
     FARM_CROP_ROLE,
     FARM_CROPS,
     FARM_EMPTY_PLOT_ASSET_ID,
-    FARM_STARTER_CROP_ID,
     canAffordFarmExpansion,
     farmCropAssetId,
+    farmCropIdForCell,
     farmBoundsForTier,
     farmExpansionPreview,
     farmTierSummary,
@@ -86,6 +86,7 @@ import {
 } from '../property/propertyZone.js';
 import {
     clearPropertyZone,
+    loadPropertyZone,
 } from '../property/propertyStore.js';
 import { LocalPropertySnapshotAdapter } from '../property/propertySnapshotAdapter.js';
 import {
@@ -136,6 +137,8 @@ import {
     saveHouseTreasury,
 } from '../treasury/houseTreasury.js';
 import {
+    activeBuildingIdsFromAssetIds,
+    activeBuildingProgression,
     buildingCapabilityEffects,
     buildingProgressSummary,
     clearBuildingProgression,
@@ -264,6 +267,7 @@ export class Game {
         this.currentEpoch = null;
         this.epochYieldModifier = 1;
         this.priceSnapshot = null;
+        this.farmTimingMode = 'elapsed';
 
         this.miningAdapter = new LocalMiningAdapter();
         this._pendingChainMines = new Set();
@@ -655,6 +659,7 @@ export class Game {
                 }
                 this.renderer.markDirty();
                 playPlacementFor(targetId);
+                if (objHere && isStandardBuildingAsset(objHere.assetId)) this._refreshBuildingActivation();
                 this._autosaveProperty();
             }
             return;
@@ -680,6 +685,7 @@ export class Game {
                 d: o.footprint?.d ?? 1,
             });
             playPlacementFor(o.assetId);
+            if (isStandardBuildingAsset(o.assetId)) this._refreshBuildingActivation();
             this._autosaveProperty();
         } else if (result?.kind === 'terrain') {
             this.renderer.spawnAnim(`t-${result.gx},${result.gy}`, {
@@ -720,7 +726,10 @@ export class Game {
     }
 
     _plantFarmCrop(gx, gy) {
-        const planted = this.farmState.plant(gx, gy, { cropId: FARM_STARTER_CROP_ID });
+        const planted = this.farmState.plant(gx, gy, {
+            cropId: farmCropIdForCell(gx, gy, this.farmState.tier),
+            ...this._farmClock(),
+        });
         if (!planted.ok) return false;
         const crop = FARM_CROPS[planted.plot.cropId];
         this.tileMap.setTerrain(gx, gy, FARM_EMPTY_PLOT_ASSET_ID);
@@ -1066,10 +1075,10 @@ export class Game {
     }
 
     _harvestFarmCrop(obj) {
-        const result = this.farmState.harvest(obj.gx, obj.gy);
+        const result = this.farmState.harvest(obj.gx, obj.gy, this._farmClock());
         if (!result.ok) {
             if (result.reason === 'not-ready') {
-                this.ui?.showToast?.(`Crop ready in ${formatFarmRemaining(result.remainingMs)}`, 1600);
+                this.ui?.showToast?.(formatFarmNotReady(result), 1600);
             }
             return;
         }
@@ -1104,7 +1113,7 @@ export class Game {
     }
 
     _resourceYieldAmount(resourceId, baseAmount) {
-        const buildingAmount = buildingCapabilityEffects(this.buildingProgression)
+        const buildingAmount = buildingCapabilityEffects(this._activeBuildingProgression())
             .resourceYieldAmount(resourceId, baseAmount);
         return toolResourceYieldAmount(this.toolProgression, resourceId, buildingAmount);
     }
@@ -1404,6 +1413,35 @@ export class Game {
         return isStandardBuildingAssetUnlocked(this.buildingProgression, assetId);
     }
 
+    _activeBuildingProgression() {
+        return activeBuildingProgression(this.buildingProgression, this._activeBuildingIds());
+    }
+
+    _activeBuildingIds() {
+        const objects = this._homePropertyObjectsForCapabilities();
+        return activeBuildingIdsFromAssetIds(objects.map(obj => obj.assetId));
+    }
+
+    _homePropertyObjectsForCapabilities() {
+        if (this.mapKind === 'property' && !this.propertyReadOnly) {
+            return this.tileMap.objects ?? [];
+        }
+
+        const propertyMapId = mapByKind(this.mapRegistry, 'property')?.id;
+        const runtimeObjects = propertyMapId
+            ? this._mapRuntime.get(propertyMapId)?.tileMap?.objects
+            : null;
+        if (Array.isArray(runtimeObjects)) return runtimeObjects;
+
+        const saved = loadPropertyZone(safeStorage, { ownerId: this.propertyOwner });
+        return saved?.tileMap?.objects ?? [];
+    }
+
+    _refreshBuildingActivation() {
+        this.ui?.update();
+        this._emitMapChange();
+    }
+
     assetName(assetId) {
         return assetDefinitionFor(assetId)?.name ?? assetId;
     }
@@ -1429,34 +1467,44 @@ export class Game {
         const summary = farmTierSummary(this.farmState.tier);
         const next = nextFarmTier(this.farmState.tier);
         const now = Date.now();
+        const farmClock = this._farmClock({ now });
         return {
             ...summary,
             ownerId: this.propertyOwner,
             readOnly: this.propertyReadOnly,
             planted: this.farmState.entries().length,
-            ready: this.farmState.readyCount(now),
+            ready: this.farmState.readyCount(farmClock),
             next: this.propertyReadOnly ? null : next,
-            canAffordNext: !this.propertyReadOnly && canAffordFarmExpansion(this.resourceInventory, this.farmState.tier),
+            canAffordNext: !this.propertyReadOnly && canAffordFarmExpansion(
+                this.resourceInventory,
+                this.farmState.tier,
+                this.player?.inventory,
+            ),
             nextCostLabel: next?.cost ? formatFarmExpansionCost(next.cost) : 'Max tier',
         };
     }
 
     buildingProgressionState() {
+        const activeBuildings = this._activeBuildingIds();
+        const activeProgression = activeBuildingProgression(this.buildingProgression, activeBuildings);
         return {
             ownerId: this.propertyOwner,
             readOnly: this.propertyReadOnly,
             buildings: buildingProgressSummary(this.buildingProgression, {
                 resourceInventory: this.resourceInventory,
                 currencyInventory: this.player?.inventory,
+                activeBuildingIds: activeBuildings,
             }),
             recipes: recipeSummaries({
                 buildingProgression: this.buildingProgression,
+                activeBuildingProgression: activeProgression,
                 resourceInventory: this.resourceInventory,
                 currencyInventory: this.player?.inventory,
             }),
             tools: toolProgressSummary({
                 toolProgression: this.toolProgression,
                 buildingProgression: this.buildingProgression,
+                activeBuildingProgression: activeProgression,
                 resourceInventory: this.resourceInventory,
                 currencyInventory: this.player?.inventory,
             }),
@@ -1504,7 +1552,7 @@ export class Game {
             this.ui?.showToast?.('Visited properties are read-only', 2200);
             return { ok: false, reason: 'read-only' };
         }
-        const result = spendFarmExpansionCost(this.resourceInventory, this.farmState.tier);
+        const result = spendFarmExpansionCost(this.resourceInventory, this.farmState.tier, this.player?.inventory);
         if (!result.ok) {
             const next = result.next ?? nextFarmTier(this.farmState.tier);
             const cost = next?.cost ? formatFarmExpansionCost(next.cost) : 'Max tier';
@@ -1566,6 +1614,7 @@ export class Game {
         const result = craftWorkbenchRecipe({
             recipeId,
             buildingProgression: this.buildingProgression,
+            activeBuildingProgression: this._activeBuildingProgression(),
             resourceInventory: this.resourceInventory,
             currencyInventory: this.player?.inventory,
             propInventory: this.propInventory,
@@ -1595,6 +1644,7 @@ export class Game {
         const result = advanceToolProgression({
             toolProgression: this.toolProgression,
             buildingProgression: this.buildingProgression,
+            activeBuildingProgression: this._activeBuildingProgression(),
             resourceInventory: this.resourceInventory,
             currencyInventory: this.player?.inventory,
             toolId,
@@ -1657,6 +1707,20 @@ export class Game {
         return entry;
     }
 
+    recordBankLoanFee({ loan, payment, mode, txHash } = {}) {
+        const entry = this.houseTreasury?.recordBankLoanFee?.({
+            loan,
+            payment,
+            mode,
+            txHash,
+            priceSnapshot: this.priceSnapshot,
+        });
+        if (entry) {
+            saveHouseTreasury(safeStorage, this.houseTreasury);
+        }
+        return entry;
+    }
+
     houseTreasurySummary() {
         return houseTreasurySummary(this.houseTreasury);
     }
@@ -1704,6 +1768,14 @@ export class Game {
             return result;
         }
         saveBankLoanBook(safeStorage, this.bankLoanBook);
+        if (result.paid) {
+            this.recordBankLoanFee({
+                loan: result.loan,
+                payment: result.payment,
+                mode: result.mode ?? 'local',
+                txHash: result.txHash,
+            });
+        }
         this.ui?.showToast?.(
             result.paid ? 'Loan repaid' : `Paid ${formatCurrencyAmount(result.loan.currency, result.payment)}`,
             2200,
@@ -2015,17 +2087,18 @@ export class Game {
         for (const plot of this.farmState.entries()) {
             if (!isFarmCell(plot.gx, plot.gy, this.farmState.tier)) continue;
             if (this.tileMap.objectAt(plot.gx, plot.gy)) continue;
-            this.placement.place(farmCropAssetId(plot), plot.gx, plot.gy, { role: FARM_CROP_ROLE });
+            this.placement.place(farmCropAssetId(plot, this._farmClock()), plot.gx, plot.gy, { role: FARM_CROP_ROLE });
         }
     }
 
     _refreshFarmCropVisuals(now = Date.now()) {
         if (this.mapKind !== 'property') return false;
+        const farmClock = this._farmClock({ now });
         let changed = false;
         for (const plot of this.farmState.entries()) {
             const obj = this.tileMap.objectAt(plot.gx, plot.gy);
             if (obj?.role !== FARM_CROP_ROLE) continue;
-            const assetId = farmCropAssetId(plot, now);
+            const assetId = farmCropAssetId(plot, farmClock);
             changed = this.tileMap.setObjectAsset(obj, assetId) || changed;
         }
         if (changed) {
@@ -2033,6 +2106,14 @@ export class Game {
             this._emitMapChange();
         }
         return changed;
+    }
+
+    _farmClock({ now = Date.now() } = {}) {
+        return {
+            now,
+            epoch: this.currentEpoch,
+            timing: this.farmTimingMode,
+        };
     }
 
     _emitMapChange() {
@@ -2140,4 +2221,13 @@ function formatFarmRemaining(ms) {
     const seconds = Math.max(1, Math.ceil(Number(ms) / 1000));
     if (seconds < 60) return `${seconds}s`;
     return `${Math.ceil(seconds / 60)}m`;
+}
+
+function formatFarmNotReady(result) {
+    if (Number.isFinite(result?.remainingEpochs) && result.remainingEpochs > 0) {
+        return result.remainingEpochs === 1
+            ? 'Crop ready next shift'
+            : `Crop ready in ${result.remainingEpochs} shifts`;
+    }
+    return `Crop ready in ${formatFarmRemaining(result?.remainingMs ?? 0)}`;
 }

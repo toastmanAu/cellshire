@@ -111,6 +111,36 @@ export function isStandardBuildingAssetUnlocked(progression, assetId) {
     return (progression?.getLevel?.(buildingId) ?? 0) > 0;
 }
 
+export function activeBuildingProgression(progression, activeBuildingIds = []) {
+    const active = activeBuildingIdSet(activeBuildingIds);
+    return {
+        getLevel(buildingId) {
+            const def = buildingDefinition(buildingId);
+            if (!def) return 0;
+            const level = progression?.getLevel?.(buildingId) ?? def.starterLevel;
+            if (buildingId === 'home') return level;
+            return active.has(buildingId) ? level : 0;
+        },
+    };
+}
+
+export function activeBuildingIdsFromAssetIds(assetIds = []) {
+    const active = new Set();
+    for (const assetId of assetIds) {
+        const buildingId = standardBuildingIdForAsset(assetId);
+        if (buildingId) active.add(buildingId);
+    }
+    return activeBuildingIdSet(active);
+}
+
+function activeBuildingIdSet(values = []) {
+    const out = new Set(['home']);
+    for (const value of values) {
+        if (buildingDefinition(value)) out.add(value);
+    }
+    return out;
+}
+
 export class BuildingProgression {
     constructor(levels = {}) {
         this.levels = new Map();
@@ -212,13 +242,22 @@ export function formatBuildingTierGate(gate) {
     return `Need all buildings Level ${gate.requiredLevel}: ${names}${more}`;
 }
 
-export function buildingProgressSummary(progression, { resourceInventory, currencyInventory } = {}) {
-    const effects = buildingCapabilityEffects(progression);
+export function buildingProgressSummary(progression, { resourceInventory, currencyInventory, activeBuildingIds = null } = {}) {
+    const activeProgression = activeBuildingIds === null
+        ? progression
+        : activeBuildingProgression(progression, activeBuildingIds);
+    const effects = buildingCapabilityEffects(activeProgression);
     return STANDARD_BUILDINGS.map(def => {
         const state = buildingStateFor(progression, def.id);
+        const activeLevel = activeProgression?.getLevel?.(def.id) ?? state.level;
+        const inactiveUnlocked = state.unlocked && activeLevel <= 0 && def.id !== 'home';
         return {
             ...state,
-            effectLabel: effects.buildingEffects[def.id] ?? null,
+            active: state.unlocked && !inactiveUnlocked,
+            activeLevel,
+            effectLabel: inactiveUnlocked
+                ? 'Place on property to activate'
+                : effects.buildingEffects[def.id] ?? null,
             canAffordNext: !!state.nextCost && state.tierGate.ok && canAffordBuildingCost({
                 resourceInventory,
                 currencyInventory,

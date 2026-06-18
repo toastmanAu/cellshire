@@ -64,6 +64,15 @@ Started May 23, 2026.
 - Higher tool tiers and higher building tiers remain intentionally chunky until
   playtesting shows whether the level-gate alone is enough pacing.
 
+## Bank Fee Treasury Slice
+
+- Paid bank loans now record their fee into the house treasury once per loan.
+- The fee is converted from CKB to USD using the active price snapshot, matching
+  the treasury's USD-denominated reserve view.
+- Bank reserve already includes house treasury totals, so repaid loan fees now
+  become visible future liquidity without removing the `$100` prototype base
+  reserve.
+
 ## Next Review
 
 - Measure how many wood/stone/crop nodes a new player naturally harvests before
@@ -75,6 +84,6 @@ Started May 23, 2026.
 
 ## Verification
 
-- Browser test harness: `291 passed, 0 failed`.
+- Browser test harness: `412 passed, 0 failed`.
 - `node netlify-build.mjs`.
 - `git diff --check`.

@@ -44,8 +44,10 @@ listing, or swap logic.
 - General Store opens the existing Store panel.
 - Market opens the existing Player Marketplace panel.
 - Bank opens the existing Trader panel through an exchange-desk action.
-- Bank loan office, Gallery wall, and Community Hall notice board remain
-  future-only actions and show scoped toasts.
+- Bank loan office renders current loan offers and active-loan repayment.
+- Gallery wall renders the player's local prop collection from prop inventory.
+- Community Hall notice board renders current home claim, farm, building,
+  treasury, and loan summaries from existing game state.
 
 ## Visual Treatment
 
@@ -60,9 +62,13 @@ when available.
 
 - Data-driven definitions for all township landmarks.
 - Store/Market/Bank routing into existing HUD handles.
-- Future-only actions staying in the interior window and surfacing a toast.
+- Bank treasury and loan office detail views.
+- Gallery collection wall details from prop inventory.
+- Community Hall notice board details from progression summaries.
 
 ## Next Slice
 
-Route trader fees into an explicit game/house treasury so economy fees become
-visible liquidity for future bank, community, and reward loops.
+Use the visible house treasury in the economy pricing pass: decide whether
+bank loan reserve should depend on accumulated Trader fees, and tune early
+store, expansion, farming, crafting, and tool upgrade costs against that
+liquidity.

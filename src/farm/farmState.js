@@ -1,6 +1,9 @@
 import {
     FARM_CROPS,
     FARM_STARTER_CROP_ID,
+    isFarmPlotReady,
+    normalizeFarmClock,
+    normalizeFarmEpoch,
     normalizeFarmTier,
 } from './farmZone.js';
 
@@ -25,10 +28,21 @@ export class FarmState {
             const cropId = FARM_CROPS[plot?.cropId] ? plot.cropId : FARM_STARTER_CROP_ID;
             const crop = FARM_CROPS[cropId];
             if (!Number.isInteger(gx) || !Number.isInteger(gy) || !Number.isFinite(plantedAt)) continue;
+            const plantedEpoch = normalizeFarmEpoch(plot?.plantedEpoch);
+            const readyEpoch = normalizeFarmEpoch(plot?.readyEpoch)
+                ?? (plantedEpoch === null ? null : plantedEpoch + (crop.growEpochs ?? 1));
             const readyAt = Number.isFinite(Number(plot?.readyAt))
                 ? Number(plot.readyAt)
                 : plantedAt + crop.growMs;
-            this.plots.set(farmPlotKey(gx, gy), { gx, gy, cropId, plantedAt, readyAt });
+            this.plots.set(farmPlotKey(gx, gy), {
+                gx,
+                gy,
+                cropId,
+                plantedAt,
+                readyAt,
+                plantedEpoch,
+                readyEpoch,
+            });
         }
     }
 
@@ -43,29 +57,42 @@ export class FarmState {
         return this.plots.get(farmPlotKey(gx, gy)) ?? null;
     }
 
-    plant(gx, gy, { cropId = FARM_STARTER_CROP_ID, now = Date.now() } = {}) {
+    plant(gx, gy, { cropId = FARM_STARTER_CROP_ID, now = Date.now(), epoch = null } = {}) {
         if (this.plotAt(gx, gy)) return { ok: false, reason: 'occupied' };
         const crop = FARM_CROPS[cropId];
         if (!crop) return { ok: false, reason: 'unknown-crop' };
         const plantedAt = Number(now);
+        const plantedEpoch = normalizeFarmEpoch(epoch);
         const plot = {
             gx,
             gy,
             cropId,
             plantedAt,
             readyAt: plantedAt + crop.growMs,
+            plantedEpoch,
+            readyEpoch: plantedEpoch === null ? null : plantedEpoch + (crop.growEpochs ?? 1),
         };
         this.plots.set(farmPlotKey(gx, gy), plot);
         return { ok: true, plot, crop };
     }
 
-    harvest(gx, gy, { now = Date.now() } = {}) {
+    harvest(gx, gy, clockOptions = {}) {
         const plot = this.plotAt(gx, gy);
         if (!plot) return { ok: false, reason: 'missing' };
         const crop = FARM_CROPS[plot.cropId];
         if (!crop) return { ok: false, reason: 'unknown-crop' };
-        if (Number(now) < plot.readyAt) {
-            return { ok: false, reason: 'not-ready', plot, crop, remainingMs: plot.readyAt - Number(now) };
+        const clock = normalizeFarmClock(clockOptions);
+        if (!isFarmPlotReady(plot, clock)) {
+            return {
+                ok: false,
+                reason: 'not-ready',
+                plot,
+                crop,
+                remainingMs: Math.max(0, plot.readyAt - clock.now),
+                remainingEpochs: clock.epoch === null || !Number.isInteger(plot.readyEpoch)
+                    ? null
+                    : Math.max(0, plot.readyEpoch - clock.epoch),
+            };
         }
         this.plots.delete(farmPlotKey(gx, gy));
         return { ok: true, plot, crop, output: crop.output };
@@ -76,8 +103,9 @@ export class FarmState {
             .sort((a, b) => (a.gy - b.gy) || (a.gx - b.gx));
     }
 
-    readyCount(now = Date.now()) {
-        return this.entries().filter(plot => Number(now) >= plot.readyAt).length;
+    readyCount(nowOrClock = Date.now()) {
+        const clock = normalizeFarmClock(nowOrClock);
+        return this.entries().filter(plot => isFarmPlotReady(plot, clock)).length;
     }
 
     serialize() {

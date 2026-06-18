@@ -1,4 +1,4 @@
-import { formatUsd } from '../mining/cryptoEconomy.js';
+import { formatUsd, priceUsdForCurrency } from '../mining/cryptoEconomy.js';
 
 export const HOUSE_TREASURY_STORAGE_KEY = 'cellshire:house-treasury:v1';
 
@@ -30,6 +30,33 @@ export class HouseTreasury {
                 toAmount: quote.toAmount,
                 feeBps: quote.feeBps,
                 mode: swap?.mode ?? 'local',
+            },
+        });
+    }
+
+    recordBankLoanFee({ loan, payment, priceSnapshot = null, mode = 'local', txHash = null, at = Date.now() } = {}) {
+        if (!loan || loan.status !== 'paid') return null;
+        if (this.entriesList.some(entry => entry.source === 'bank-loan' && entry.detail?.loanId === loan.id)) {
+            return null;
+        }
+        const feeAmount = Number(loan.feeAmount);
+        if (!Number.isFinite(feeAmount) || feeAmount <= 0) return null;
+        const price = priceUsdForCurrency(loan.currency, priceSnapshot);
+        const amountUsd = Number((feeAmount * price).toFixed(8));
+        if (!Number.isFinite(amountUsd) || amountUsd <= 0) return null;
+        return this.record({
+            id: `treasury:bank-loan:${loan.id}`,
+            source: 'bank-loan',
+            amountUsd,
+            at,
+            detail: {
+                loanId: loan.id,
+                offerId: loan.offerId,
+                currency: loan.currency,
+                feeAmount,
+                payment,
+                mode,
+                txHash,
             },
         });
     }
@@ -97,7 +124,9 @@ export function houseTreasurySummary(treasury) {
 
 export function formatTreasuryEntry(entry) {
     if (!entry) return '';
-    const source = entry.source === 'trader' ? 'Trader fee' : entry.source;
+    const source = entry.source === 'trader'
+        ? 'Trader fee'
+        : entry.source === 'bank-loan' ? 'Bank fee' : entry.source;
     return `${source} · ${formatUsd(entry.amountUsd)}`;
 }
 

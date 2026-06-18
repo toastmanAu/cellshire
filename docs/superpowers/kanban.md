@@ -6,7 +6,7 @@ cards needed to turn the current prototype into the game described in
 
 ## Session Update 2026-05-31
 
-**Latest completed card:** `Cloudflare Custom-Domain Cache Mitigation`.
+**Latest completed card:** `Township Interior Wrap Sprint`.
 
 **What landed since the last board save:**
 - Verified public DNS now uses Cloudflare nameservers:
@@ -42,8 +42,9 @@ cards needed to turn the current prototype into the game described in
   warning.
 - `git diff --check` passed.
 
-**Current Next card:** `Wire Township + Interior + NPC + Audio Assets` —
-integrate the finished generated asset sets into the playable build.
+**Current Next card:** `Economy Pricing Pass` — tune early-game costs,
+treasury fee liquidity, loans, farming outputs, crafting costs, and tool
+upgrade costs together.
 
 **Known Cloudflare follow-up:** `Cloudflare Custom-Domain Cache Policy` remains
 unfixed at the zone-header level, but it is no longer release-blocking. Change
@@ -104,6 +105,87 @@ production HTML. Deployed this mitigation to Cloudflare Pages production at
 - Headless Chrome loaded `https://cellshire.com/` without module load failures
   or uncaught JavaScript errors.
 - `git diff --check` passed after the runbook/board update.
+
+**Farm timing policy addendum:** Completed the farm timer decision slice on
+2026-06-15. Default farming remains elapsed-time based so first-session crop
+progression stays playable, but planted plots now persist `plantedEpoch` and
+`readyEpoch` metadata when the current chain epoch is known. `?farmTiming=epoch`
+switches crop readiness, visuals, HUD ready counts, and harvest to the saved
+epoch bucket for deterministic shift-boundary smoke tests. Legacy farm saves
+that only contain `readyAt` still mature through the elapsed-time fallback.
+
+**Farm timing verification saved on board:**
+- Focused farm module run: `9 passed, 0 failed`.
+- Full browser harness: `400 passed, 0 failed`.
+- `node netlify-build.mjs` passed.
+- `git diff --check` passed.
+
+**Placed utility building activation addendum:** Completed the building
+capability placement slice on 2026-06-15. Owner-level building progression
+still grants palette placement rights and preserves upgrade state, but
+Workbench recipes, Tool Rack upgrades, and Sawmill/Stone Yard/Farm Storage
+resource bonuses now use an active building view. The baseline home remains
+active by default; other utility capabilities require the matching standard
+building to be placed on the owner's home plot. The Home Buildings panel now
+labels unlocked-but-unplaced utilities as `Place on property to activate`.
+
+**Placed utility verification saved on board:**
+- Focused building/recipe/tool module run: `28 passed, 0 failed`.
+- Full browser harness: `404 passed, 0 failed`.
+- `node netlify-build.mjs` passed.
+- `git diff --check` passed.
+
+**Farm variety + local gold material addendum:** Completed three small
+progression slices on 2026-06-16. Expanded farms now choose crop type from the
+farm catalog by tier/cell: starter crops remain the baseline, tier 2 introduces
+fast herb plots that harvest into local `herb`, and tier 3 introduces slower
+timber plots that harvest into local `wood`. Public mine maps now place rare
+`gold_nugget_node` objects with a distinct `gold_resource` role, keeping local
+crafting `gold` separate from crypto `gold_ore` / BTC payout logic. Resource
+interaction, walkability, procgen stats, crop visuals, crop persistence, and
+crop-specific elapsed/epoch timing are covered by the browser harness.
+
+**Farm variety verification saved on board:**
+- Full browser harness: `407 passed, 0 failed`.
+
+**Material sinks + mixed farm expansion addendum:** Completed the next three
+progression slices on 2026-06-17. Farm expansion now spends both local
+materials and CKB, with the final tier also requiring Herb so expanded farms
+feed back into progression. Workbench recipes now include Herb and Gold sinks:
+`Herbal Garden Kit` crafts a placeable garden bed and `Gold Lantern Kit` crafts
+a placeable hanging lantern. Higher tool tiers now consume Herb and Gold while
+preserving the existing conservative harvest and ore-capacity effects.
+
+**Material sink verification saved on board:**
+- Full browser harness: `409 passed, 0 failed`.
+
+**Township interior wrap sprint addendum:** Completed the final three
+township-interior slices on 2026-06-17. Gallery wall is now a real collection
+view backed by local prop inventory. Community Hall notice board now reports
+home claim, farm, building, treasury, and loan summaries from existing game
+state. The shared interior window gained a compact scrollable board panel for
+these in-room detail views, replacing the remaining gallery/hall coming-soon
+toasts.
+
+**Township interior wrap verification saved on board:**
+- Full browser harness: `410 passed, 0 failed`.
+
+**Cleanup verification 2026-06-18:**
+- Full browser harness: `410 passed, 0 failed`.
+- `node netlify-build.mjs` passed.
+- `git diff --check` passed.
+
+**Bank fee treasury loop addendum:** Completed the first Economy Pricing Pass
+follow-up on 2026-06-18. Paid bank loan fees now record into the same house
+treasury ledger as Trader fees, using the active CKB price snapshot to convert
+the CKB fee into treasury USD liquidity. Entries are keyed by loan id so a paid
+loan cannot double-count its fee. Bank reserve availability already includes
+house treasury totals, so repaid loan fees now visibly increase future bank
+liquidity in the Bank and Community Hall summaries.
+
+**Bank fee loop verification saved on board:**
+- Full browser harness: `412 passed, 0 failed`.
+- `git diff --check` passed.
 
 ## Session Wrap 2026-05-30
 

@@ -208,5 +208,28 @@ export function generateWorld(tileMap, seed = 1337) {
         stoneResourcesPlaced++;
     }
 
-    return { ...counts, oresPlaced, treesPlaced, stoneResourcesPlaced, total: W * H };
+    const goldRand = mulberry32(seed ^ 0x601D);
+    const goldNoise = makeNoise2D(seed ^ 0xA117, 14);
+    let goldResourcesPlaced = 0;
+    for (let gy = 0; gy < H; gy++)
+    for (let gx = 0; gx < W; gx++) {
+        if (tileMap.getTerrain(gx, gy) !== 'dark_stone') continue;
+        const density = 0.003 + goldNoise(gx, gy) * 0.012;
+        if (goldRand() > density) continue;
+        if (!tileMap.isFreeFor(gx, gy, 1, 1)) continue;
+        const assetId = 'gold_nugget_node';
+        const asset = ASSET_INDEX[assetId];
+        if (!asset) continue;
+        const obj = new PlacedObject({
+            id: tileMap.nextId(),
+            assetId,
+            gx, gy,
+            footprint: asset.footprint,
+            role: HARVEST_RESOURCE_ROLES.gold,
+        });
+        tileMap.addObject(obj);
+        goldResourcesPlaced++;
+    }
+
+    return { ...counts, oresPlaced, treesPlaced, stoneResourcesPlaced, goldResourcesPlaced, total: W * H };
 }

@@ -214,6 +214,10 @@ export function playHarvestResource(resourceId, volume = 0.62) {
         play('herb_pluck', volume);
         return;
     }
+    if (resourceId === 'gold') {
+        play('coin_chime', volume);
+        return;
+    }
     playPlacement(volume);
 }
 

@@ -13,14 +13,19 @@ economy without inflating crypto ore rewards before the pricing pass.
 - `workbench` level 1 unlocks `Herb Planter`.
 - `workbench` level 1 unlocks `Stone Lantern Kit`.
 - `workbench` level 1 unlocks `Storage Crate Kit`.
+- `workbench` level 1 unlocks `Herbal Garden Kit`, consuming harvested Herb
+  into a placeable garden bed.
 - `workbench` level 2 unlocks `Prospecting Pan`.
 - `workbench` level 2 unlocks `Stone Basin Kit`.
-- Recipe costs spend Wood, Stone, Crop, and CKB.
+- `workbench` level 2 unlocks `Gold Lantern Kit`, consuming local Gold and
+  Herb into a placeable hanging lantern.
+- Recipe costs spend Wood, Stone, Crop, Herb, Gold, and CKB as tiers require.
 - Recipe outputs can land in the existing local resource inventory or the prop
   inventory for placeable crafted items.
 - `tool_rack` level 1 unlocks `Reinforced Pickaxe`.
 - `tool_rack` level 2 unlocks `Steel Pickaxe`.
-- Tool upgrades spend Wood, Stone, Crop, and CKB.
+- Tool upgrades spend Wood, Stone, Crop, and CKB early, then add Herb and Gold
+  requirements to higher tiers.
 - Tool effects add conservative local Wood/Stone/Crop harvest bonuses only.
 
 ## Economy Notes

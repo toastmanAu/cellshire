@@ -24,6 +24,10 @@ function fakeGame() {
         ui: {
             showToast: message => toasts.push(message),
         },
+        assetName: assetId => ({
+            crate: 'Crate',
+            hanging_lantern: 'Hanging Lantern',
+        })[assetId] ?? assetId,
         opened,
         toasts,
     };
@@ -110,13 +114,61 @@ describe('BuildingInteriorHUD', () => {
         cleanup();
     });
 
-    it('keeps future-only non-bank actions in the interior window and surfaces a toast', () => {
+    it('renders the gallery collection wall from prop inventory', () => {
         cleanup();
         const game = fakeGame();
+        game.propInventory = {
+            entries: () => [['crate', 2], ['hanging_lantern', 1]],
+        };
         const hud = installBuildingInteriorHUD(game);
         hud.open(TOWNSHIP_BUILDING_ROLES.gallery);
+        expect(document.querySelector('.building-window__status').textContent)
+            .toBe('Collection wall · 3 props held');
         document.querySelector('[data-action="gallery"]').click();
-        expect(game.toasts[0]).toBe('Gallery opens soon');
+        expect(document.querySelector('.building-window__board-title').textContent)
+            .toBe('Collection Wall');
+        expect(document.querySelector('.building-window__board-row').textContent)
+            .toBe('Crate x2');
+        expect(hud.root.dataset.open).toBe('1');
+        hud.dismiss();
+        cleanup();
+    });
+
+    it('renders community hall notices from home progression summaries', () => {
+        cleanup();
+        const game = fakeGame();
+        game.propertyExpansionState = () => ({
+            label: 'Claim 2 · 8x8',
+            next: true,
+            nextCostLabel: '5,000.00 CKB',
+        });
+        game.farmExpansionState = () => ({
+            label: 'Farm 2 · 4x4',
+            planted: 4,
+            ready: 1,
+            next: true,
+            nextCostLabel: '28 Wood + 18 Stone + 4 Herb + 2,200.00 CKB',
+        });
+        game.buildingProgressionState = () => ({
+            buildings: [
+                { unlocked: true, active: true },
+                { unlocked: true, active: false },
+                { unlocked: false, active: false },
+            ],
+        });
+        game.houseTreasurySummary = () => ({
+            totalLabel: '$4.25',
+            feeCount: 3,
+        });
+        const hud = installBuildingInteriorHUD(game);
+        hud.open(TOWNSHIP_BUILDING_ROLES.communityHall);
+        expect(document.querySelector('.building-window__status').textContent)
+            .toBe('Farm 2 · 4x4 · 1/4 crops ready');
+        document.querySelector('[data-action="hall"]').click();
+        expect(document.querySelector('.building-window__board-title').textContent)
+            .toBe('Community Notices');
+        expect(document.querySelector('.building-window__board-row').textContent)
+            .toBe('Claim 2 · 8x8 · Next 5,000.00 CKB');
         expect(hud.root.dataset.open).toBe('1');
         hud.dismiss();
         cleanup();
