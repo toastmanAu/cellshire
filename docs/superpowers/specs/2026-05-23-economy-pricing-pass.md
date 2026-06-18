@@ -73,17 +73,30 @@ Started May 23, 2026.
   become visible future liquidity without removing the `$100` prototype base
   reserve.
 
+## Early Resource Measurement Slice
+
+- The runtime mine spawn picker now lives in `src/worldgen/spawnCell.js` so
+  tests can measure from the same first-spawn rule as the playable build.
+- `summarizeNearbyHarvestResources()` counts harvestable nodes adjacent to
+  reachable walk cells within a step budget.
+- Representative seeds within 36 steps currently provide:
+  - `1337`: 12 Wood nodes, 3 Stone nodes, 2 Gold nodes.
+  - `20260523`: 30 Wood nodes, 1 Stone node.
+  - `0xC011`: 36 Wood nodes, 20 Stone nodes, 6 Gold nodes.
+- Decision for the next tuning slice: nearby Wood is safe, but Stone can be the
+  first-session limiter unless procgen adds a small near-spawn stone guarantee.
+
 ## Next Review
 
-- Measure how many wood/stone/crop nodes a new player naturally harvests before
-  returning home.
 - Decide whether crop timers should be the primary first-tier limiter or
   whether starter farm output needs a small boost.
 - Review whether a 2% trader fee creates enough house treasury visibility
   without making swaps feel punitive.
+- Decide whether to raise near-spawn stone support or keep Stone as the early
+  material bottleneck.
 
 ## Verification
 
-- Browser test harness: `412 passed, 0 failed`.
+- Browser test harness: `413 passed, 0 failed`.
 - `node netlify-build.mjs`.
 - `git diff --check`.

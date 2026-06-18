@@ -10,6 +10,7 @@ import { Game } from './core/Game.js';
 import { UIManager } from './ui/UIManager.js';
 import { loadUiAudio } from './ui/Audio.js?v=audio-wiring-3';
 import { generateWorld } from './worldgen/procgen.js';
+import { findSpawnCell } from './worldgen/spawnCell.js';
 import { installPerfHUD } from './ui/PerfHUD.js';
 import { installEpochHUD } from './ui/EpochHUD.js';
 import { installWalletHUD } from './ui/WalletHUD.js';
@@ -28,7 +29,6 @@ import {
     ReadOnlyChainCurrencyAdapter,
 } from './economy/currencyAdapter.js';
 import { PendingCurrencyDeltaStore } from './economy/pendingCurrencyDeltas.js';
-import { isWalkable } from './grid/walkability.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
 import { safeStorage } from './lib/safeStorage.js';
 import { installCharacterPicker } from './ui/CharacterPicker.js';
@@ -496,69 +496,6 @@ function seedExampleVillage(game) {
     placeO('lantern_post', 9, 6);
     placeO('small_bridge', 5, H - 2);
 }
-
-/**
- * Pick a spawn cell on the **largest connected walkable region**. A naive
- * spiral-from-centre fails on water-heavy seeds: the closest walkable cell
- * to centre might be a tiny sand island with no land bridge to any ore.
- *
- * We flood-fill all walkable components, then return the cell of the
- * largest one that's closest to the map centre — biggest reachable area,
- * still framed nicely by the initial camera.
- */
-function findSpawnCell(tileMap) {
-    const W = tileMap.width;
-    const H = tileMap.height;
-    const cx = Math.floor(W / 2);
-    const cy = Math.floor(H / 2);
-    const visited = new Uint8Array(W * H);
-
-    let bestSize = 0;
-    let bestCell = null;
-    let bestCenterDist = Infinity;
-
-    for (let gy0 = 0; gy0 < H; gy0++)
-    for (let gx0 = 0; gx0 < W; gx0++) {
-        if (visited[gy0 * W + gx0]) continue;
-        if (!isWalkable(tileMap, gx0, gy0)) {
-            visited[gy0 * W + gx0] = 1;
-            continue;
-        }
-        const queue = [[gx0, gy0]];
-        visited[gy0 * W + gx0] = 1;
-        const region = [];
-        while (queue.length) {
-            const [gx, gy] = queue.pop();
-            region.push([gx, gy]);
-            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-                const nx = gx + dx;
-                const ny = gy + dy;
-                if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-                if (visited[ny * W + nx]) continue;
-                visited[ny * W + nx] = 1;
-                if (!isWalkable(tileMap, nx, ny)) continue;
-                queue.push([nx, ny]);
-            }
-        }
-        if (region.length < bestSize) continue;
-        // For this region, find the walkable cell closest to map centre.
-        let closest = null;
-        let closestDist = Infinity;
-        for (const [gx, gy] of region) {
-            const d = (gx - cx) * (gx - cx) + (gy - cy) * (gy - cy);
-            if (d < closestDist) { closestDist = d; closest = [gx, gy]; }
-        }
-        if (region.length > bestSize
-            || (region.length === bestSize && closestDist < bestCenterDist)) {
-            bestSize = region.length;
-            bestCell = closest;
-            bestCenterDist = closestDist;
-        }
-    }
-    if (!bestCell) return null;
-    return { gx: bestCell[0], gy: bestCell[1] };
-}
-
 
 /** Seeded RNG (mulberry32) — matches the one in procgen for parity. */
 function makeSeededRand(seed) {

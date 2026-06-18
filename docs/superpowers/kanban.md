@@ -187,6 +187,18 @@ liquidity in the Bank and Community Hall summaries.
 - Full browser harness: `412 passed, 0 failed`.
 - `git diff --check` passed.
 
+**Early resource measurement addendum:** Completed the first resource pacing
+measurement slice on 2026-06-18. The runtime mine spawn picker is now shared
+from `src/worldgen/spawnCell.js`, and `summarizeNearbyHarvestResources()` walks
+the reachable area around representative first mine spawns to count adjacent
+harvest nodes and expected yields. Current representative seeds show abundant
+nearby Wood, but nearby Stone can bottom out at one node within 36 steps, so
+the next pricing pass should decide whether to raise near-spawn stone support
+or keep Stone as the intended early limiter.
+
+**Early resource measurement verification saved on board:**
+- Full browser harness: `413 passed, 0 failed`.
+
 ## Session Wrap 2026-05-30
 
 **Latest completed card:** `Cloudflare Pages Custom Domain Binding`.
