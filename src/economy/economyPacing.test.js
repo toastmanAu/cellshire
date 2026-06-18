@@ -6,6 +6,11 @@ import { ResourceInventory } from '../resources/resourceInventory.js';
 import { buyStoreItem } from '../store/generalStoreCatalog.js';
 import { ToolProgression, upgradeTool } from '../tools/toolProgression.js';
 import { spendExpansionCost } from '../property/propertyExpansion.js';
+import { FarmState } from '../farm/farmState.js';
+import {
+    FARM_STARTER_CROP_GROW_MS,
+    farmBoundsForTier,
+} from '../farm/farmZone.js';
 import { describe, expect, it } from '../test/harness.js';
 import { generateWorld } from '../worldgen/procgen.js';
 import { findSpawnCell } from '../worldgen/spawnCell.js';
@@ -50,6 +55,32 @@ describe('early economy pacing', () => {
         expect(resources.get('stone')).toBe(0);
         expect(resources.get('crop')).toBe(1);
         expect(props.get('blue_railing')).toBe(1);
+    });
+
+    it('lets starter farm beds supply first-session crop without a long idle gate', () => {
+        const farm = new FarmState();
+        const bounds = farmBoundsForTier(1);
+        let planted = 0;
+        for (let gy = bounds.minGy; gy <= bounds.maxGy; gy++)
+        for (let gx = bounds.minGx; gx <= bounds.maxGx; gx++) {
+            const result = farm.plant(gx, gy, { now: 1000 });
+            if (result.ok) planted++;
+        }
+
+        expect(planted).toBe(4);
+        expect(farm.readyCount({ now: 1000 + FARM_STARTER_CROP_GROW_MS - 1 })).toBe(0);
+        expect(farm.readyCount({ now: 1000 + FARM_STARTER_CROP_GROW_MS })).toBe(4);
+
+        let crop = 0;
+        for (const plot of farm.entries()) {
+            const harvested = farm.harvest(plot.gx, plot.gy, { now: 1000 + FARM_STARTER_CROP_GROW_MS });
+            if (harvested.ok && harvested.output.resourceId === 'crop') {
+                crop += harvested.output.amount;
+            }
+        }
+        expect(crop).toBe(12);
+        expect(crop >= 6).toBe(true);
+        expect(FARM_STARTER_CROP_GROW_MS <= 12_000).toBe(true);
     });
 
     it('measures harvest resources reachable from representative first mine spawns', () => {

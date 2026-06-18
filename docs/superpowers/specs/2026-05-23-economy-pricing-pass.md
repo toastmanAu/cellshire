@@ -88,10 +88,18 @@ Started May 23, 2026.
   first mine spawn. The sparse seed `20260523` receives 1 guaranteed Stone
   top-up, yielding 6 Stone within the early resource budget.
 
+## Starter Farm Crop Timer Slice
+
+- No tuning change was needed for starter crop pacing.
+- Tier 1 has four starter beds.
+- Starter crops mature after `12s`.
+- Each starter crop yields `3 Crop`, so a full starter harvest produces
+  `12 Crop`.
+- The current first-session pacing target needs `6 Crop`, so starter farm
+  output covers that target after one short harvest cycle.
+
 ## Next Review
 
-- Decide whether crop timers should be the primary first-tier limiter or
-  whether starter farm output needs a small boost.
 - Review whether a 2% trader fee creates enough house treasury visibility
   without making swaps feel punitive.
 - Recheck first-session Stone spending after playtesting the new two-node
@@ -99,6 +107,6 @@ Started May 23, 2026.
 
 ## Verification
 
-- Browser test harness: `414 passed, 0 failed`.
+- Browser test harness: `415 passed, 0 failed`.
 - `node netlify-build.mjs`.
 - `git diff --check`.

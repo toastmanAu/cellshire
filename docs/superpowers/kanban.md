@@ -210,6 +210,16 @@ yield from `3` to `6`.
 **Near-spawn stone verification saved on board:**
 - Full browser harness: `414 passed, 0 failed`.
 
+**Starter farm crop pacing addendum:** Completed the crop timer review slice on
+2026-06-18. No tuning change was needed: tier 1 already has four starter beds,
+starter crops mature in `12s`, and a full starter harvest yields `12 Crop`.
+That covers the current first-session `6 Crop` pacing target with one short
+harvest cycle, so crop timers are not the intended first-tier bottleneck at
+the current numbers.
+
+**Starter farm crop verification saved on board:**
+- Full browser harness: `415 passed, 0 failed`.
+
 ## Session Wrap 2026-05-30
 
 **Latest completed card:** `Cloudflare Pages Custom Domain Binding`.
