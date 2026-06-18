@@ -6,7 +6,7 @@ cards needed to turn the current prototype into the game described in
 
 ## Session Update 2026-05-31
 
-**Latest completed card:** `Township Interior Wrap Sprint`.
+**Latest completed card:** `Economy Pricing Pass`.
 
 **What landed since the last board save:**
 - Verified public DNS now uses Cloudflare nameservers:
@@ -42,9 +42,9 @@ cards needed to turn the current prototype into the game described in
   warning.
 - `git diff --check` passed.
 
-**Current Next card:** `Economy Pricing Pass` — tune early-game costs,
-treasury fee liquidity, loans, farming outputs, crafting costs, and tool
-upgrade costs together.
+**Current Next card:** `Progression Playtest Sweep` — run the guarded
+first-session path in-game, capture actual friction notes, and only then tune
+costs beyond the deterministic Economy Pricing Pass guards.
 
 **Known Cloudflare follow-up:** `Cloudflare Custom-Domain Cache Policy` remains
 unfixed at the zone-header level, but it is no longer release-blocking. Change
@@ -1455,7 +1455,7 @@ Verified with the browser test harness (`288 passed, 0 failed`),
 
 ### Economy Pricing Pass
 
-**Status:** second tuning slice shipped.
+**Status:** completed 2026-06-18.
 
 **Spec:** [`2026-05-23-economy-pricing-pass.md`](specs/2026-05-23-economy-pricing-pass.md)
 
@@ -1463,14 +1463,7 @@ Verified with the browser test harness (`288 passed, 0 failed`),
 bank loan offers, farming outputs, crafting costs, and tool upgrade costs into
 a coherent early-game economy.
 
-**Acceptance:**
-- Capture target time-to-first-purchase, time-to-first-expansion, and loan
-  usefulness assumptions.
-- Review CKB-denominated store, expansion, and loan constants together.
-- Decide whether loan reserve should keep the prototype base reserve or rely
-  only on accumulated house treasury fees.
-- Include local resource and farm/crafting progression targets.
-- Tests update only after pricing targets are recorded.
+**Acceptance:** completed.
 
 **Notes:**
 - Trader fee increased to `2%`.
@@ -1484,9 +1477,30 @@ a coherent early-game economy.
   one reinforced tool.
 - Wood/stone/crop intake and first expansion/store/loan prices were softened to
   support that target without changing the `$20-$100` epoch mine clear budget.
+- Bank loan and Trader fees now flow into visible house treasury entries. The
+  Bank reserve keeps its `$100` prototype base reserve until playtest notes show
+  treasury-only liquidity is viable.
+- Starter crop pacing, Trader fee visibility, near-spawn Stone, and the
+  first-session CKB/material spend are covered by deterministic browser tests.
 
-Verified with the browser test harness (`291 passed, 0 failed`),
+Verified with the browser test harness (`416 passed, 0 failed`),
 `node netlify-build.mjs`, and `git diff --check`.
+
+### Progression Playtest Sweep
+
+**Status:** next.
+
+**Goal:** use the newly guarded first-session path in the playable build before
+changing more prices.
+
+**Acceptance:**
+- Start from a fresh local save and representative mine seed.
+- Confirm the player can find at least two Stone nodes near the first mine
+  spawn, harvest starter crops, buy the first property expansion, buy one cheap
+  prop, unlock Tool Rack level 1, and upgrade Reinforced Woodaxe.
+- Capture whether the remaining friction is Stone, Wood, Crop timer, CKB,
+  travel/UI discoverability, or building placement activation.
+- Do not change higher-tier costs without a concrete playtest note.
 
 ## Backlog
 

@@ -1,5 +1,7 @@
 # Economy Pricing Pass
 
+Status: completed June 18, 2026.
+
 Started May 23, 2026.
 
 ## Goals

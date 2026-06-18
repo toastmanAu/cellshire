@@ -191,6 +191,10 @@ Acceptance:
 - ~~Should farm expansion use CKB, local resources, or both?~~ Resolved
   2026-06-17: farm expansion uses both local materials and CKB. Tier 3 also
   requires `herb`, tying the expanded farm loop back into progression.
-- Do crafted capability buildings need to be physically placed, merely owned,
-  or both?
-- Which pickaxe effects are safe before the economy pricing pass?
+- ~~Do crafted capability buildings need to be physically placed, merely owned,
+  or both?~~ Resolved 2026-06-15: owner-level unlocks grant placement rights
+  and preserve upgrade state, but utility capabilities require the matching
+  standard building to be placed on the owner's home plot.
+- ~~Which pickaxe effects are safe before the economy pricing pass?~~ Resolved
+  2026-06-18: pickaxes can increase ore capacity chunks extracted per hit
+  without increasing the ore cell's total USD value.

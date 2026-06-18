@@ -32,14 +32,15 @@ economy without inflating crypto ore rewards before the pricing pass.
 
 - Recipes intentionally include a CKB spend so players must mine/trade/borrow
   to progress beyond purely local materials.
-- Tool upgrades stack with building effects for local resources, but not with
-  crypto ore yield yet.
-- Crypto ore modifiers need a separate pricing decision because they affect
-  treasury fees, loan utility, and future mainnet/appchain sustainability.
+- Tool upgrades stack with building effects for local resources.
+- Pickaxe tiers now affect ore clear speed through capacity chunks per hit, but
+  do not inflate an ore cell's total USD value.
+- Crypto ore payout multipliers remain tied to epoch modifiers, not tool tiers,
+  so treasury fees, loan utility, and future mainnet/appchain sustainability are
+  not distorted by local tool progression.
 
 ## Open Questions
 
 - Should crafted resources like Herb and Gold become cell-backed assets later?
-- Should tool tiers affect action speed, node capacity, or only output amount?
 - Which crafted placeables should become building modules rather than normal
   prop inventory items?

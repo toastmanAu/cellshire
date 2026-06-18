@@ -33,7 +33,7 @@ resource it improves.
 | Pickaxe | 5 | Gold Pickaxe | 4 | +4 | 110 | 150 | 50 | 42,000 |
 | Pickaxe | 6 | Diamond Pickaxe | 5 | +6 | 210 | 280 | 95 | 95,000 |
 | Woodaxe | 1 | Rusted Woodaxe | 0 | +0 | - | - | - | - |
-| Woodaxe | 2 | Reinforced Woodaxe | 1 | +1 | 7 | 5 | 3 | 1,100 |
+| Woodaxe | 2 | Reinforced Woodaxe | 1 | +1 | 7 | 3 | 3 | 1,100 |
 | Woodaxe | 3 | Steel Woodaxe | 2 | +2 | 32 | 24 | 10 | 7,600 |
 | Woodaxe | 4 | Silver Woodaxe | 3 | +3 | 78 | 55 | 24 | 17,500 |
 | Woodaxe | 5 | Gold Woodaxe | 4 | +4 | 150 | 110 | 50 | 40,000 |
@@ -45,9 +45,15 @@ resource it improves.
 | Hoe / Scythe | 5 | Gold Scythe | 4 | +4 | 90 | 85 | 150 | 38,000 |
 | Hoe / Scythe | 6 | Diamond Scythe | 5 | +6 | 175 | 165 | 280 | 85,000 |
 
-Tool Rack now gates tool progression up to level 5. This is a tuning lever:
-later economy passes can raise building requirements, split rare-material costs,
-or flatten yield bonuses without changing save shape.
+Tool Rack now gates tool progression up to level 5. Reinforced Woodaxe was
+softened to `3 Stone` during the sparse-spawn Stone pricing pass so the first
+Tool Rack + Woodaxe path fits the guaranteed `6 Stone` floor. Higher tiers
+remain intentionally chunky until playtest notes show the level gate alone is
+not enough pacing.
+
+Current pickaxe effects are conservative: tiers 1-2 extract one ore capacity
+chunk per hit, tiers 3-4 extract two, and tiers 5-6 extract three. This clears
+ore cells faster without increasing the ore cell's total USD value.
 
 ## Asset Direction
 
@@ -76,6 +82,6 @@ Transparent installed preview sheet:
 
 ## Verification
 
-- Browser test harness: `288 passed, 0 failed`.
+- Browser test harness: `416 passed, 0 failed`.
 - `node netlify-build.mjs`.
 - `git diff --check`.
