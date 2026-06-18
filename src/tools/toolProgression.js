@@ -81,7 +81,7 @@ export const TOOL_LINES = Object.freeze([
                 requiredToolRackLevel: 1,
                 resourceHarvestBonus: 1,
                 cost: Object.freeze({
-                    resources: Object.freeze({ wood: 7, stone: 5, crop: 3 }),
+                    resources: Object.freeze({ wood: 7, stone: 3, crop: 3 }),
                     ckb: 1100,
                 }),
             }),

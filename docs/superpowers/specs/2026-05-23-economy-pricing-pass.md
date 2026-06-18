@@ -17,13 +17,13 @@ Started May 23, 2026.
 - First utility building unlock costs were reduced so the first tier is
   resource-gated, not mostly CKB-gated:
   - `workbench` level 1: `6 Wood + 3 Stone + 2 Crop + 900 CKB`.
-  - `tool_rack` level 1: `7 Wood + 4 Stone + 2 Crop + 1,000 CKB`.
+  - `tool_rack` level 1: `7 Wood + 3 Stone + 2 Crop + 1,000 CKB`.
   - `sawmill` level 1: `8 Wood + 4 Stone + 3 Crop + 1,200 CKB`.
   - `stone_yard` level 1: `5 Wood + 8 Stone + 3 Crop + 1,200 CKB`.
   - `farm_storage` level 1: `6 Wood + 4 Stone + 6 Crop + 1,100 CKB`.
 - First tool upgrades were reduced to fit the same early-session reward target:
   - Reinforced Pickaxe: `6 Wood + 7 Stone + 3 Crop + 1,100 CKB`.
-  - Reinforced Woodaxe: `7 Wood + 5 Stone + 3 Crop + 1,100 CKB`.
+  - Reinforced Woodaxe: `7 Wood + 3 Stone + 3 Crop + 1,100 CKB`.
   - Reinforced Hoe: `5 Wood + 4 Stone + 7 Crop + 1,000 CKB`.
 - Higher building tiers now require broad progression first. A building can
   advance to level `N` only after every standard building that supports level
@@ -32,7 +32,7 @@ Started May 23, 2026.
 ## Second Tuning Slice
 
 - First-session pacing target: a focused player with `10,000 CKB`, `16 Wood`,
-  `9 Stone`, and `6 Crop` can buy the first property expansion, one cheap store
+  `6 Stone`, and `6 Crop` can buy the first property expansion, one cheap store
   prop, unlock Tool Rack level 1, and upgrade one reinforced tool. This is now
   covered by `src/economy/economyPacing.test.js`.
 - Local resource harvests increased to reduce early material stalls:
@@ -108,10 +108,23 @@ Started May 23, 2026.
   fee is visible in the same HUD/bank/community-hall reserve path without
   making the swap punitive.
 
+## Stone Price Review Slice
+
+- The near-spawn Stone guarantee sets the sparse-spawn floor at two reachable
+  Stone nodes, or `6 Stone`, within the first 36 steps.
+- Tool Rack level 1 moved from `4 Stone` to `3 Stone`.
+- Reinforced Woodaxe moved from `5 Stone` to `3 Stone`.
+- The focused first-session path now fits the guaranteed sparse-spawn Stone
+  floor: property expansion, one cheap prop, Tool Rack level 1, and Reinforced
+  Woodaxe spend exactly `6 Stone`.
+- Higher-tier building and tool prices were left unchanged so Stone remains a
+  meaningful medium-term limiter after the first visible upgrade path.
+
 ## Next Review
 
-- Recheck first-session Stone spending after playtesting the new two-node
-  near-spawn floor.
+- Economy Pricing Pass now has deterministic guards for CKB, starter crops,
+  Trader fee visibility, and sparse-spawn Stone. Further balance changes should
+  come from playtest notes.
 
 ## Verification
 

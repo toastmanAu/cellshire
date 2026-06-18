@@ -61,7 +61,7 @@ describe('tool progression', () => {
         const tools = new ToolProgression();
         const resources = new ResourceInventory([
             ['wood', 7],
-            ['stone', 5],
+            ['stone', 3],
             ['crop', 3],
         ]);
         const currencies = new Inventory();

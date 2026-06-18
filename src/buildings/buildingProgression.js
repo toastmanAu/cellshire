@@ -36,7 +36,7 @@ export const STANDARD_BUILDINGS = Object.freeze([
         starterLevel: 0,
         maxLevel: 5,
         levels: Object.freeze({
-            1: Object.freeze({ resources: Object.freeze({ wood: 7, stone: 4, crop: 2 }), ckb: 1000 }),
+            1: Object.freeze({ resources: Object.freeze({ wood: 7, stone: 3, crop: 2 }), ckb: 1000 }),
             2: Object.freeze({ resources: Object.freeze({ wood: 24, stone: 18, crop: 8 }), ckb: 5500 }),
             3: Object.freeze({ resources: Object.freeze({ wood: 56, stone: 42, crop: 18 }), ckb: 15000 }),
             4: Object.freeze({ resources: Object.freeze({ wood: 105, stone: 80, crop: 36 }), ckb: 36000 }),

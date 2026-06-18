@@ -26,7 +26,7 @@ describe('early economy pacing', () => {
         const tools = new ToolProgression();
         const resources = new ResourceInventory([
             ['wood', 16],
-            ['stone', 9],
+            ['stone', 6],
             ['crop', 6],
         ]);
         const currencies = new Inventory();

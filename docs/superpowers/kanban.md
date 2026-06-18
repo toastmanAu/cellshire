@@ -230,6 +230,17 @@ loop stays visible without becoming the first-session limiter.
 **Trader fee visibility verification saved on board:**
 - Full browser harness: `416 passed, 0 failed`.
 
+**Stone price review addendum:** Completed the sparse-spawn Stone pricing pass
+on 2026-06-18. The two-node near-spawn guarantee gives the sparse path
+`6 Stone`, so Tool Rack level 1 moved from `4 Stone` to `3 Stone` and
+Reinforced Woodaxe moved from `5 Stone` to `3 Stone`. The focused first-session
+guard now starts from `10,000 CKB + 16 Wood + 6 Stone + 6 Crop` and still funds
+first property expansion, one cheap store prop, Tool Rack level 1, and a
+Reinforced Woodaxe. Higher-tier Stone prices remain unchanged.
+
+**Stone price review verification saved on board:**
+- Full browser harness: `416 passed, 0 failed`.
+
 ## Session Wrap 2026-05-30
 
 **Latest completed card:** `Cloudflare Pages Custom Domain Binding`.
@@ -1468,7 +1479,7 @@ a coherent early-game economy.
   paired with starter resource/farm harvesting.
 - Building upgrades now follow a builder-game tier gate: level `N` requires all
   relevant standard buildings at level `N-1`.
-- First-session guardrail added: `10,000 CKB + 16 Wood + 9 Stone + 6 Crop`
+- First-session guardrail added: `10,000 CKB + 16 Wood + 6 Stone + 6 Crop`
   funds first property expansion, one cheap store prop, Tool Rack level 1, and
   one reinforced tool.
 - Wood/stone/crop intake and first expansion/store/loan prices were softened to
