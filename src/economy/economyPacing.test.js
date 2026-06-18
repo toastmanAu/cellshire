@@ -61,9 +61,9 @@ describe('early economy pacing', () => {
 
             expect(summary.reachableCells > 300).toBe(true);
             expect((summary.counts.wood ?? 0) >= 2).toBe(true);
-            expect((summary.counts.stone ?? 0) >= 1).toBe(true);
+            expect((summary.counts.stone ?? 0) >= 2).toBe(true);
             expect((summary.yields.wood ?? 0) >= 8).toBe(true);
-            expect((summary.yields.stone ?? 0) >= 3).toBe(true);
+            expect((summary.yields.stone ?? 0) >= 6).toBe(true);
         }
     });
 });

@@ -199,6 +199,17 @@ or keep Stone as the intended early limiter.
 **Early resource measurement verification saved on board:**
 - Full browser harness: `413 passed, 0 failed`.
 
+**Near-spawn stone guarantee addendum:** Completed the near-spawn resource
+support slice on 2026-06-18. Procgen now keeps normal Stone scatter intact,
+then computes the runtime first mine spawn and deterministically adds only the
+missing `stone_outcrop` nodes needed to guarantee at least two reachable Stone
+nodes within the 36-step early resource budget. The sparse representative seed
+`20260523` now receives one guaranteed Stone top-up, bringing its nearby Stone
+yield from `3` to `6`.
+
+**Near-spawn stone verification saved on board:**
+- Full browser harness: `414 passed, 0 failed`.
+
 ## Session Wrap 2026-05-30
 
 **Latest completed card:** `Cloudflare Pages Custom Domain Binding`.

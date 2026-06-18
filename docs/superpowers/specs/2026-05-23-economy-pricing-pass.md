@@ -81,10 +81,12 @@ Started May 23, 2026.
   reachable walk cells within a step budget.
 - Representative seeds within 36 steps currently provide:
   - `1337`: 12 Wood nodes, 3 Stone nodes, 2 Gold nodes.
-  - `20260523`: 30 Wood nodes, 1 Stone node.
+  - `20260523`: 30 Wood nodes, 1 Stone node before guarantee.
   - `0xC011`: 36 Wood nodes, 20 Stone nodes, 6 Gold nodes.
-- Decision for the next tuning slice: nearby Wood is safe, but Stone can be the
-  first-session limiter unless procgen adds a small near-spawn stone guarantee.
+- Procgen now adds missing `stone_outcrop` nodes after normal scatter to
+  guarantee at least 2 reachable Stone nodes within 36 steps of the runtime
+  first mine spawn. The sparse seed `20260523` receives 1 guaranteed Stone
+  top-up, yielding 6 Stone within the early resource budget.
 
 ## Next Review
 
@@ -92,11 +94,11 @@ Started May 23, 2026.
   whether starter farm output needs a small boost.
 - Review whether a 2% trader fee creates enough house treasury visibility
   without making swaps feel punitive.
-- Decide whether to raise near-spawn stone support or keep Stone as the early
-  material bottleneck.
+- Recheck first-session Stone spending after playtesting the new two-node
+  near-spawn floor.
 
 ## Verification
 
-- Browser test harness: `413 passed, 0 failed`.
+- Browser test harness: `414 passed, 0 failed`.
 - `node netlify-build.mjs`.
 - `git diff --check`.

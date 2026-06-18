@@ -17,7 +17,12 @@
 
 import { PlacedObject } from '../building/PlacedObject.js';
 import { ASSET_INDEX } from '../assets/assetManifest.js';
+import { isWalkable } from '../grid/walkability.js';
 import { HARVEST_RESOURCE_ROLES } from '../resources/harvestCatalog.js';
+import { findSpawnCell } from './spawnCell.js';
+
+const EARLY_RESOURCE_MAX_STEPS = 36;
+const EARLY_STONE_NODE_FLOOR = 2;
 
 /* ── Seeded RNG (mulberry32) ────────────────────────────────────── */
 
@@ -231,5 +236,149 @@ export function generateWorld(tileMap, seed = 1337) {
         goldResourcesPlaced++;
     }
 
-    return { ...counts, oresPlaced, treesPlaced, stoneResourcesPlaced, goldResourcesPlaced, total: W * H };
+    const stoneGuarantee = ensureNearbyStoneFloor(tileMap, {
+        minNodes: EARLY_STONE_NODE_FLOOR,
+        maxSteps: EARLY_RESOURCE_MAX_STEPS,
+    });
+    stoneResourcesPlaced += stoneGuarantee.added;
+
+    return {
+        ...counts,
+        oresPlaced,
+        treesPlaced,
+        stoneResourcesPlaced,
+        stoneResourcesGuaranteed: stoneGuarantee.added,
+        goldResourcesPlaced,
+        total: W * H,
+    };
+}
+
+function ensureNearbyStoneFloor(tileMap, { minNodes, maxSteps }) {
+    const spawn = findSpawnCell(tileMap);
+    if (!spawn) return { added: 0, spawn: null };
+
+    let nearby = nearbyHarvestResourceCounts(tileMap, { spawn, maxSteps });
+    let needed = Math.max(0, minNodes - (nearby.counts.stone ?? 0));
+    if (needed <= 0) return { added: 0, spawn };
+
+    let added = 0;
+    const candidates = nearbyStoneCandidates(tileMap, { spawn, maxSteps });
+    const asset = ASSET_INDEX.stone_outcrop;
+    if (!asset) return { added: 0, spawn };
+
+    for (const candidate of candidates) {
+        if (needed <= 0) break;
+        if (!tileMap.isFreeFor(candidate.gx, candidate.gy, 1, 1)) continue;
+        const obj = new PlacedObject({
+            id: tileMap.nextId(),
+            assetId: 'stone_outcrop',
+            gx: candidate.gx,
+            gy: candidate.gy,
+            footprint: asset.footprint,
+            role: HARVEST_RESOURCE_ROLES.stone,
+        });
+        tileMap.addObject(obj);
+        added++;
+        needed--;
+    }
+
+    nearby = nearbyHarvestResourceCounts(tileMap, { spawn, maxSteps });
+    return {
+        added,
+        spawn,
+        stoneNodes: nearby.counts.stone ?? 0,
+    };
+}
+
+function nearbyStoneCandidates(tileMap, { spawn, maxSteps }) {
+    const visited = reachableWalkCells(tileMap, { spawn, maxSteps });
+    const seen = new Set();
+    const candidates = [];
+
+    for (const cell of visited.values()) {
+        for (const { dx, dy } of CARDINALS) {
+            const gx = cell.gx + dx;
+            const gy = cell.gy + dy;
+            const key = cellKey(gx, gy);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            if (!tileMap.inBounds(gx, gy)) continue;
+            if (gx === spawn.gx && gy === spawn.gy) continue;
+            if (!tileMap.isFreeFor(gx, gy, 1, 1)) continue;
+            const terrain = tileMap.getTerrain(gx, gy);
+            if (terrain !== 'dark_stone' && terrain !== 'dirt') continue;
+            const dist = Math.abs(gx - spawn.gx) + Math.abs(gy - spawn.gy);
+            if (dist < 4) continue;
+            candidates.push({
+                gx,
+                gy,
+                terrain,
+                dist,
+                terrainRank: terrain === 'dark_stone' ? 0 : 1,
+            });
+        }
+    }
+
+    return candidates.sort((a, b) => (
+        a.terrainRank - b.terrainRank
+        || a.dist - b.dist
+        || a.gy - b.gy
+        || a.gx - b.gx
+    ));
+}
+
+function nearbyHarvestResourceCounts(tileMap, { spawn, maxSteps }) {
+    const visited = reachableWalkCells(tileMap, { spawn, maxSteps });
+    const resources = new Set();
+    const counts = {};
+
+    for (const cell of visited.values()) {
+        for (const { dx, dy } of CARDINALS) {
+            const obj = tileMap.objectAt(cell.gx + dx, cell.gy + dy);
+            if (!obj?.role || resources.has(obj.id)) continue;
+            resources.add(obj.id);
+            if (obj.role === HARVEST_RESOURCE_ROLES.wood) {
+                counts.wood = (counts.wood ?? 0) + 1;
+            } else if (obj.role === HARVEST_RESOURCE_ROLES.stone) {
+                counts.stone = (counts.stone ?? 0) + 1;
+            } else if (obj.role === HARVEST_RESOURCE_ROLES.gold) {
+                counts.gold = (counts.gold ?? 0) + 1;
+            }
+        }
+    }
+
+    return { counts, reachableCells: visited.size };
+}
+
+function reachableWalkCells(tileMap, { spawn, maxSteps }) {
+    const queue = [{ gx: spawn.gx, gy: spawn.gy, steps: 0 }];
+    const visited = new Map([[cellKey(spawn.gx, spawn.gy), queue[0]]]);
+
+    for (let i = 0; i < queue.length; i++) {
+        const cell = queue[i];
+        if (cell.steps >= maxSteps) continue;
+        for (const { dx, dy } of CARDINALS) {
+            const gx = cell.gx + dx;
+            const gy = cell.gy + dy;
+            const key = cellKey(gx, gy);
+            if (visited.has(key)) continue;
+            if (!isWalkable(tileMap, gx, gy)) continue;
+            const next = { gx, gy, steps: cell.steps + 1 };
+            visited.set(key, next);
+            queue.push(next);
+        }
+    }
+
+    return visited;
+}
+
+const CARDINALS = Object.freeze([
+    Object.freeze({ dx: 1, dy: 0 }),
+    Object.freeze({ dx: -1, dy: 0 }),
+    Object.freeze({ dx: 0, dy: 1 }),
+    Object.freeze({ dx: 0, dy: -1 }),
+]);
+
+function cellKey(gx, gy) {
+    return `${gx},${gy}`;
 }
