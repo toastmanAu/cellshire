@@ -67,7 +67,9 @@ export function installPerfHUD(game, genStats) {
             ? `epoch ${genStats.epoch} (live)`
             : genStats.source === 'cached'
                 ? `epoch ${genStats.epoch} (cached — node unreachable)`
-                : 'random — no chain';
+                : genStats.source === 'url'
+                    ? 'fixed smoke seed'
+                    : 'random — no chain';
         const price = genStats.priceSnapshot;
         const priceLine = price
             ? `prices ${price.mode || price.source} ${price.capturedAt || 'unknown'}`

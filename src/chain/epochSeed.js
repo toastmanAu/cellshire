@@ -11,6 +11,7 @@
 const NODE_KEY = 'cellshire:node';
 const LAST_EPOCH_KEY = 'cellshire:lastEpoch';
 const DEFAULT_RPC_TIMEOUT_MS = 3000;
+const MAX_UINT32 = 0xffffffff;
 
 function parseHexNumber(hex) {
     if (typeof hex !== 'string') return null;
@@ -63,6 +64,15 @@ export function seedFromHash(hash) {
         throw new Error(`seedFromHash: invalid hex chunk "${chunk}" from "${hash}"`);
     }
     return n >>> 0;
+}
+
+export function seedOverrideFromUrl(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const raw = String(value).trim();
+    if (!/^\d+$/.test(raw)) return null;
+    const seed = Number(raw);
+    if (!Number.isInteger(seed) || seed < 0 || seed > MAX_UINT32) return null;
+    return seed >>> 0;
 }
 
 /**
@@ -133,10 +143,21 @@ async function rpc(endpoint, fetch, method, params, { timeoutMs }) {
 }
 
 /**
- * Top-level coordinator. Tries live → cached → random. Always succeeds.
- * Returns { seed, source: 'live'|'cached'|'random', epoch: string|null, hash, epochInfo }.
+ * Top-level coordinator. Tries URL override → live → cached → random. Always succeeds.
+ * Returns { seed, source: 'url'|'live'|'cached'|'random', epoch: string|null, hash, epochInfo }.
  */
-export async function getProcgenSeed({ url, storage, fetch, defaultUrl }) {
+export async function getProcgenSeed({ url, seedOverride = null, storage, fetch, defaultUrl }) {
+    const forcedSeed = seedOverrideFromUrl(seedOverride);
+    if (forcedSeed !== null) {
+        return {
+            seed: forcedSeed,
+            source: 'url',
+            epoch: null,
+            hash: null,
+            epochInfo: null,
+        };
+    }
+
     const endpoint = resolveNodeEndpoint({ url, storage, defaultUrl });
 
     try {

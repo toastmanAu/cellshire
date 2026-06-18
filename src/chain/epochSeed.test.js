@@ -3,6 +3,7 @@ import {
     resolveNodeEndpoint,
     getCurrentEpochHash,
     seedFromHash,
+    seedOverrideFromUrl,
     getProcgenSeed,
 } from './epochSeed.js';
 
@@ -68,6 +69,22 @@ describe('seedFromHash', () => {
         try { seedFromHash(''); } catch { threw++; }
         try { seedFromHash('0xZZZZZZZZ'); } catch { threw++; }
         expect(threw).toBe(3);
+    });
+});
+
+describe('seedOverrideFromUrl', () => {
+    it('normalizes decimal uint32 URL seed overrides', () => {
+        expect(seedOverrideFromUrl('20260523')).toBe(20260523);
+        expect(seedOverrideFromUrl('0')).toBe(0);
+        expect(seedOverrideFromUrl('4294967295')).toBe(0xffffffff);
+    });
+
+    it('rejects missing, non-decimal, and out-of-range overrides', () => {
+        expect(seedOverrideFromUrl(null)).toBeNull();
+        expect(seedOverrideFromUrl('')).toBeNull();
+        expect(seedOverrideFromUrl('0x1337')).toBeNull();
+        expect(seedOverrideFromUrl('1.5')).toBeNull();
+        expect(seedOverrideFromUrl('4294967296')).toBeNull();
     });
 });
 
@@ -147,6 +164,28 @@ describe('getCurrentEpochHash', () => {
 });
 
 describe('getProcgenSeed', () => {
+    it('uses an explicit URL seed override without touching the node or cache', async () => {
+        const storage = fakeStorage();
+        let fetchCalls = 0;
+        const fetch = async () => {
+            fetchCalls++;
+            throw new Error('should not fetch');
+        };
+        const out = await getProcgenSeed({
+            url: null,
+            seedOverride: '20260523',
+            storage,
+            fetch,
+            defaultUrl: DEFAULT,
+        });
+        expect(out.source).toBe('url');
+        expect(out.seed).toBe(20260523);
+        expect(out.epoch).toBeNull();
+        expect(out.hash).toBeNull();
+        expect(fetchCalls).toBe(0);
+        expect(storage.get('cellshire:lastEpoch')).toBeNull();
+    });
+
     it('happy path: source=live, seed derived from hash, caches result', async () => {
         const storage = fakeStorage();
         const fetch = makeFakeFetch([

@@ -42,9 +42,10 @@ cards needed to turn the current prototype into the game described in
   warning.
 - `git diff --check` passed.
 
-**Current Next card:** `Progression Playtest Sweep` — run the guarded
-first-session path in-game, capture actual friction notes, and only then tune
-costs beyond the deterministic Economy Pricing Pass guards.
+**Current Next card:** `First-Session Playability Proof` — run the guarded
+first-session path in-game on pinned seed `20260523`, capture actual friction
+notes, and only then tune costs beyond the deterministic Economy Pricing Pass
+guards.
 
 **Known Cloudflare follow-up:** `Cloudflare Custom-Domain Cache Policy` remains
 unfixed at the zone-header level, but it is no longer release-blocking. Change
@@ -1514,6 +1515,35 @@ module-level smoke cannot see.
 
 **Progression playtest sweep verification saved on board:**
 - Full browser harness: `417 passed, 0 failed`.
+
+### First-Session Playability Proof
+
+**Status:** target set.
+
+**Runbook:**
+[`2026-06-19-first-session-playability-proof.md`](runbooks/2026-06-19-first-session-playability-proof.md)
+
+**Goal:** prove the same guarded sparse-seed path in the playable UI, including
+travel, discoverability, placement activation, and in-room/store/HUD flows that
+module tests do not cover.
+
+**Launch target:**
+
+```txt
+http://127.0.0.1:8767/?seed=20260523&character=miner&firstSessionGrant=1
+```
+
+**Acceptance:**
+- Fresh local save or fresh browser profile.
+- Guarded `10,000 CKB` smoke budget granted by explicit URL flag.
+- Harvest enough nearby Wood and at least two Stone nodes.
+- Harvest starter crops after one short grow cycle.
+- Buy first property expansion and one cheap store prop.
+- Unlock Tool Rack level 1.
+- Place or confirm Tool Rack activation if required.
+- Upgrade Reinforced Woodaxe.
+- Classify any friction as `resource`, `timer`, `CKB`, `travel`,
+  `discoverability`, or `placement activation`.
 
 ## Backlog
 

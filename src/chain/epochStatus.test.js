@@ -99,4 +99,12 @@ describe('buildEpochStatus', () => {
         expect(random.title).toBe('Chain offline');
         expect(random.detail).toBe('random local map');
     });
+
+    it('labels explicit URL seed overrides as fixed smoke maps', () => {
+        const out = buildEpochStatus({ source: 'url', epoch: null, epochInfo: null });
+        expect(out.tone).toBe('cached');
+        expect(out.title).toBe('Fixed seed');
+        expect(out.detail).toBe('manual smoke map');
+        expect(out.canReloadForNewShift).toBe(false);
+    });
 });

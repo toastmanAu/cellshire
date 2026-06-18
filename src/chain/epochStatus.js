@@ -41,6 +41,18 @@ export function buildEpochStatus({
     nowMs = Date.now(),
     blockMs = DEFAULT_BLOCK_MS,
 }) {
+    if (source === 'url') {
+        return {
+            tone: 'cached',
+            title: 'Fixed seed',
+            detail: 'manual smoke map',
+            remainingMs: null,
+            canReloadForNewShift: false,
+            isHighValueEpoch: false,
+            epochModifier: epochModifier ?? null,
+        };
+    }
+
     if (source === 'random' || epoch === null || epoch === undefined) {
         return {
             tone: 'warning',

@@ -28,6 +28,7 @@ import {
     LocalCurrencyAdapter,
     ReadOnlyChainCurrencyAdapter,
 } from './economy/currencyAdapter.js';
+import { applyFirstSessionGrant } from './economy/firstSessionGrant.js';
 import { PendingCurrencyDeltaStore } from './economy/pendingCurrencyDeltas.js';
 import { getAvailableCharacters, resolveCharacterChoice } from './characters/catalog.js';
 import { safeStorage } from './lib/safeStorage.js';
@@ -149,6 +150,7 @@ async function main() {
     // visible during the fetch (~200ms on a healthy RPC).
     const { seed, source: seedSource, epoch, hash: epochHash, epochInfo } = await getProcgenSeed({
         url: params.get('node'),
+        seedOverride: params.get('seed'),
         storage: safeStorage,
         fetch: window.fetch.bind(window),
         defaultUrl: 'https://testnet.ckb.dev',
@@ -228,6 +230,7 @@ async function main() {
                 catalog,
             });
             game.spawnPlayer(spawn.gx, spawn.gy, { assetId: chosen });
+            applyFirstSessionGrant({ params, inventory: game.player.inventory });
             game.configureMapRegistry({
                 epoch,
                 mineSpawn: spawn,
