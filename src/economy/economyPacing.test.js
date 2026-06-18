@@ -61,6 +61,72 @@ describe('early economy pacing', () => {
         expect(props.get('blue_railing')).toBe(1);
     });
 
+    it('runs the sparse-seed first-session progression sweep', () => {
+        const map = new TileMap(80, 80);
+        generateWorld(map, 20260523);
+        const summary = summarizeNearbyHarvestResources(map, {
+            spawn: findSpawnCell(map),
+            maxSteps: 36,
+        });
+        const farm = new FarmState();
+        const bounds = farmBoundsForTier(1);
+        for (let gy = bounds.minGy; gy <= bounds.maxGy; gy++)
+        for (let gx = bounds.minGx; gx <= bounds.maxGx; gx++) {
+            farm.plant(gx, gy, { now: 1000 });
+        }
+        let crop = 0;
+        for (const plot of farm.entries()) {
+            const harvested = farm.harvest(plot.gx, plot.gy, { now: 1000 + FARM_STARTER_CROP_GROW_MS });
+            if (harvested.ok && harvested.output.resourceId === 'crop') {
+                crop += harvested.output.amount;
+            }
+        }
+
+        expect((summary.counts.stone ?? 0) >= 2).toBe(true);
+        expect((summary.yields.wood ?? 0) >= 16).toBe(true);
+        expect((summary.yields.stone ?? 0) >= 6).toBe(true);
+        expect(crop >= 6).toBe(true);
+
+        const buildings = new BuildingProgression();
+        const tools = new ToolProgression();
+        const resources = new ResourceInventory([
+            ['wood', 16],
+            ['stone', 6],
+            ['crop', crop],
+        ]);
+        const currencies = new Inventory();
+        const props = new PropInventory();
+        currencies.add('ckb', 10000);
+
+        expect(spendExpansionCost(currencies, 1).ok).toBe(true);
+        expect(buyStoreItem({
+            assetId: 'blue_railing',
+            inventory: currencies,
+            propInventory: props,
+            propertyTier: 2,
+        }).ok).toBe(true);
+        expect(unlockOrUpgradeBuilding({
+            progression: buildings,
+            buildingId: 'tool_rack',
+            resourceInventory: resources,
+            currencyInventory: currencies,
+        }).ok).toBe(true);
+        expect(upgradeTool({
+            toolProgression: tools,
+            buildingProgression: buildings,
+            resourceInventory: resources,
+            currencyInventory: currencies,
+            toolId: 'woodaxe',
+        }).ok).toBe(true);
+
+        expect(currencies.get('ckb')).toBe(50);
+        expect(resources.get('wood')).toBe(2);
+        expect(resources.get('stone')).toBe(0);
+        expect(resources.get('crop')).toBe(crop - 5);
+        expect(props.get('blue_railing')).toBe(1);
+        expect(tools.getTier('woodaxe')).toBe(2);
+    });
+
     it('lets starter farm beds supply first-session crop without a long idle gate', () => {
         const farm = new FarmState();
         const bounds = farmBoundsForTier(1);

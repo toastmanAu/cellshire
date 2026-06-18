@@ -1488,7 +1488,7 @@ Verified with the browser test harness (`416 passed, 0 failed`),
 
 ### Progression Playtest Sweep
 
-**Status:** next.
+**Status:** deterministic sparse-seed smoke shipped.
 
 **Goal:** use the newly guarded first-session path in the playable build before
 changing more prices.
@@ -1501,6 +1501,19 @@ changing more prices.
 - Capture whether the remaining friction is Stone, Wood, Crop timer, CKB,
   travel/UI discoverability, or building placement activation.
 - Do not change higher-tier costs without a concrete playtest note.
+
+**Automated baseline:** added a sparse-seed first-session sweep over seed
+`20260523`. It checks the runtime first-spawn resource summary, starter farm
+harvest, first property expansion, one cheap store prop, Tool Rack level 1, and
+Reinforced Woodaxe using the guarded `10,000 CKB + 16 Wood + 6 Stone + starter
+crop` path.
+
+**Remaining manual sweep:** run the same path in the playable UI to capture
+travel, discoverability, placement activation, and interaction friction that a
+module-level smoke cannot see.
+
+**Progression playtest sweep verification saved on board:**
+- Full browser harness: `417 passed, 0 failed`.
 
 ## Backlog
 
