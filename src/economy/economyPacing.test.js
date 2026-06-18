@@ -1,9 +1,13 @@
 import { BuildingProgression, unlockOrUpgradeBuilding } from '../buildings/buildingProgression.js';
 import { Inventory } from '../core/Inventory.js';
 import { TileMap } from '../grid/TileMap.js';
+import { fixedPriceSnapshot } from '../mining/cryptoEconomy.js';
 import { PropInventory } from '../property/propInventory.js';
 import { ResourceInventory } from '../resources/resourceInventory.js';
 import { buyStoreItem } from '../store/generalStoreCatalog.js';
+import { HouseTreasury, houseTreasurySummary } from '../treasury/houseTreasury.js';
+import { LocalTraderAdapter } from '../trader/traderAdapter.js';
+import { buildTraderRateTable, quoteTrade } from '../trader/traderRates.js';
 import { ToolProgression, upgradeTool } from '../tools/toolProgression.js';
 import { spendExpansionCost } from '../property/propertyExpansion.js';
 import { FarmState } from '../farm/farmState.js';
@@ -81,6 +85,32 @@ describe('early economy pacing', () => {
         expect(crop).toBe(12);
         expect(crop >= 6).toBe(true);
         expect(FARM_STARTER_CROP_GROW_MS <= 12_000).toBe(true);
+    });
+
+    it('keeps the live Trader fee visible without making early swaps punitive', async () => {
+        const currencies = new Inventory();
+        const treasury = new HouseTreasury();
+        currencies.add('ckb', 10000);
+        const quote = quoteTrade({
+            fromCurrency: 'ckb',
+            toCurrency: 'doge',
+            fromAmount: 10000,
+            rateTable: buildTraderRateTable(fixedPriceSnapshot()),
+        });
+
+        const swap = await new LocalTraderAdapter().swap({ inventory: currencies, quote });
+        const entry = treasury.recordTraderFee({ quote, swap, at: 1000 });
+        const summary = houseTreasurySummary(treasury);
+
+        expect(swap.ok).toBe(true);
+        expect(quote.feeBps).toBe(200);
+        expect(Number((quote.netUsd / quote.grossUsd).toFixed(2))).toBe(0.98);
+        expect(Number(quote.feeUsd.toFixed(4))).toBe(0.2871);
+        expect(entry.source).toBe('trader');
+        expect(summary.totalLabel).toBe('$0.2871');
+        expect(summary.recent[0]).toBe('Trader fee · $0.2871');
+        expect(currencies.get('ckb')).toBe(0);
+        expect(currencies.get('doge')).toBe(134.2255827);
     });
 
     it('measures harvest resources reachable from representative first mine spawns', () => {

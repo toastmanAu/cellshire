@@ -98,15 +98,23 @@ Started May 23, 2026.
 - The current first-session pacing target needs `6 Crop`, so starter farm
   output covers that target after one short harvest cycle.
 
+## Trader Fee Visibility Slice
+
+- No tuning change was needed for the Trader fee.
+- The live Trader fee remains `2%`.
+- A representative early `10,000 CKB` swap retains `98%` of USD value for the
+  player while recording `$0.2871` into the house treasury.
+- The treasury summary surfaces that entry as `Trader fee · $0.2871`, so the
+  fee is visible in the same HUD/bank/community-hall reserve path without
+  making the swap punitive.
+
 ## Next Review
 
-- Review whether a 2% trader fee creates enough house treasury visibility
-  without making swaps feel punitive.
 - Recheck first-session Stone spending after playtesting the new two-node
   near-spawn floor.
 
 ## Verification
 
-- Browser test harness: `415 passed, 0 failed`.
+- Browser test harness: `416 passed, 0 failed`.
 - `node netlify-build.mjs`.
 - `git diff --check`.

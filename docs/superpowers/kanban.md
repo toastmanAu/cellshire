@@ -220,6 +220,16 @@ the current numbers.
 **Starter farm crop verification saved on board:**
 - Full browser harness: `415 passed, 0 failed`.
 
+**Trader fee visibility addendum:** Completed the Trader fee review slice on
+2026-06-18. No tuning change was needed: the live Trader fee remains `2%`,
+which keeps a representative early `10,000 CKB` swap at `98%` retained USD
+value while recording `$0.2871` into the house treasury. The pacing guard
+checks the local swap path and the HUD-ready treasury summary entry, so the fee
+loop stays visible without becoming the first-session limiter.
+
+**Trader fee visibility verification saved on board:**
+- Full browser harness: `416 passed, 0 failed`.
+
 ## Session Wrap 2026-05-30
 
 **Latest completed card:** `Cloudflare Pages Custom Domain Binding`.
