@@ -1,8 +1,58 @@
 # Cellshire Kanban
 
-Status captured 2026-05-31. This board tracks the next implementation
+Status captured 2026-06-23. This board tracks the next implementation
 cards needed to turn the current prototype into the game described in
 `docs/DESIGN.md`.
+
+## Session Update 2026-06-23
+
+**Latest completed card:** `First-Session Playability Proof`.
+
+**What landed since the last board save:**
+- Completed the guarded sparse-seed first-session proof on seed `20260523` and
+  recorded the pass in
+  [`2026-06-19-first-session-playability-proof.md`](runbooks/2026-06-19-first-session-playability-proof.md).
+- Committed and pushed the proof docs to `main` as
+  `ebf0377 Record first-session playability proof`.
+- Rechecked the live Cloudflare Pages deployment and custom domains after the
+  push.
+
+**Production/demo smoke verification saved on board:**
+- `git status --short --branch` returned `## main...origin/main` with no
+  worktree changes before this board refresh.
+- `curl -I --max-time 20 https://cellshire.com/` returned `HTTP/2 200` with
+  `Cache-Control: public, max-age=0, must-revalidate`.
+- `curl -I --max-time 20 https://www.cellshire.com/` returned `HTTP/2 200`
+  with the same root HTML cache policy.
+- `curl -s --max-time 20 https://cellshire.com/` and
+  `curl -s --max-time 20 https://cellshire.pages.dev/` both served the same
+  hashed production module graph:
+  `src-73cba931c538/main.js?v=73cba931c538`.
+- `curl -I --max-time 20 https://cellshire.com/src-73cba931c538/main.js`
+  returned `HTTP/2 200`; the custom-domain JavaScript response still showed
+  the known zone-level `Cache-Control: public, max-age=14400, must-revalidate`
+  override.
+- The same module URL on `cellshire.pages.dev` returned `HTTP/2 200` with the
+  repo `_headers` policy, `Cache-Control: public, max-age=0, must-revalidate`.
+- Headless Chrome booted
+  `https://cellshire.com/?seed=20260523&character=miner&firstSessionGrant=1`
+  to `body data-cellshire-boot="ready"` with the app visible and the
+  `src-73cba931c538` module graph loaded. No uncaught JavaScript exceptions or
+  module-load failures were reported. Console output was limited to the known
+  Canvas2D readback performance warning, the existing deprecated Apple mobile
+  web app meta tag warning, and Chrome/browser-service noise outside the app.
+
+**Current Next card:** `Production/Demo Smoke Harness` — turn the manual live
+custom-domain smoke into a repeatable repo script or browser-harness entry that
+checks the deployed root HTML revalidates, the expected hashed module graph
+loads, `data-cellshire-boot="ready"` is reached on the guarded first-session
+URL, and module-load failures or uncaught app exceptions fail the run.
+
+**Why this next:** the production deploy path is currently healthy, but the
+verification is still manual and easy to lose between pushes. Bank production
+settlement, lazy-mint real ore scripts, and Cloudflare zone-header cleanup
+remain larger external-dependency tracks; the next local implementation slice
+should make deploy confidence repeatable before reopening those tracks.
 
 ## Session Update 2026-05-31
 
