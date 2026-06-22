@@ -1518,7 +1518,7 @@ module-level smoke cannot see.
 
 ### First-Session Playability Proof
 
-**Status:** target set.
+**Status:** completed 2026-06-23.
 
 **Runbook:**
 [`2026-06-19-first-session-playability-proof.md`](runbooks/2026-06-19-first-session-playability-proof.md)
@@ -1544,6 +1544,20 @@ http://127.0.0.1:8767/?seed=20260523&character=miner&firstSessionGrant=1
 - Upgrade Reinforced Woodaxe.
 - Classify any friction as `resource`, `timer`, `CKB`, `travel`,
   `discoverability`, or `placement activation`.
+
+**Proof result:** passed with no friction notes. Headless Chrome drove the
+playable UI on the guarded seed from a fresh profile. It booted into the public
+mine, confirmed the `10,000 CKB` grant, harvested `16 Wood` and `6 Stone`,
+traveled home, planted starter crops, harvested `6 Crop`, bought the first
+property expansion and `Blue Railing`, unlocked and placed `Tool Rack` level 1,
+and upgraded `Rusted Woodaxe` to `Reinforced Woodaxe`. Final state was
+`50 CKB`, `2 Wood`, `0 Stone`, `1 Crop`, property tier `2`, one `Blue Railing`,
+active `Tool Rack` level `1`, and Woodaxe tier `2`.
+
+**Proof evidence:** `tmp/first-session-playability-proof.json` from
+`tmp/first-session-playtest-runner.mjs` recorded the run locally. The only
+browser warning was the existing Canvas2D `getImageData` readback performance
+warning during asset loading; no uncaught exceptions were recorded.
 
 ## Backlog
 
