@@ -1,6 +1,11 @@
 import { describe, it, expect } from '../test/harness.js';
 import { Inventory } from '../core/Inventory.js';
+import { assetDefinitionFor, clearOpenAssetDefinitions } from '../assets/assetRegistry.js';
+import { openAssetIdForCell } from '../assets/openAssetStandard.js';
+import { buildStorePurchaseTransaction } from '../chain/storePurchaseTx.js';
+import { FixtureCurrencyIndexer, ReadOnlyChainCurrencyAdapter } from '../economy/currencyAdapter.js';
 import { PropInventory } from '../property/propInventory.js';
+import { generalStoreItem } from '../store/generalStoreCatalog.js';
 import {
     buyMarketplaceListing,
     cancelMarketplaceListing,
@@ -40,6 +45,45 @@ describe('playerMarketplace', () => {
         expect(out.ok).toBe(true);
         expect(props.get('blue_railing')).toBe(1);
         expect(marketplaceListings(state)[0].seller).toBe('ckt1seller');
+    });
+
+    it('lists a readback Open Asset prop after chain wallet hydration', async () => {
+        clearOpenAssetDefinitions();
+        const indexer = new FixtureCurrencyIndexer({
+            balances: { ckb: { amount: 1000, stale: false } },
+        });
+        const tx = buildStorePurchaseTransaction({
+            walletAccount: { provider: 'joyid', address: 'ckt1owner', network: 'testnet' },
+            item: generalStoreItem('blue_railing'),
+            txNonce: 'marketplace-readback-1',
+        });
+        const settlement = indexer.applyStorePurchaseTx(tx, { txHash: '0xstore' });
+        expect(settlement.ok).toBe(true);
+
+        const props = new PropInventory();
+        const chainInventory = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            props,
+            owner: 'ckt1owner',
+            chainCurrencyIds: ['ckb'],
+            indexer,
+        });
+        await chainInventory.read();
+
+        const openAssetId = openAssetIdForCell('store:ckt1owner:blue_railing:marketplace-readback-1');
+        const state = loadMarketplaceState({ get: () => null });
+        const out = createMarketplaceListing({
+            assetId: openAssetId,
+            price: { currency: 'ckb', amount: 1500 },
+            seller: wallet('ckt1seller').account,
+            propInventory: props,
+            state,
+            now: () => 123,
+        });
+        expect(out.ok).toBe(true);
+        expect(props.get(openAssetId)).toBe(0);
+        expect(assetDefinitionFor(openAssetId).renderSourceAssetId).toBe('blue_railing');
+        expect(marketplaceListings(state)[0].assetId).toBe(openAssetId);
     });
 
     it('rejects raw materials before marketplace asset lookup', () => {

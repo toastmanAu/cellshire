@@ -61,6 +61,9 @@ export function installMarketplaceHUD(game, { storage = safeStorage } = {}) {
     }
 
     async function refreshBalances() {
+        await game.readInventory?.().catch?.(err => {
+            console.warn('[cellshire] marketplace inventory refresh failed', err);
+        });
         if (!game.marketplaceBalanceAdapter?.read) {
             balanceInventory = game.player?.inventory ?? null;
             return balanceInventory;
@@ -102,14 +105,19 @@ export function installMarketplaceHUD(game, { storage = safeStorage } = {}) {
         form.appendChild(select);
         form.appendChild(price);
         form.appendChild(submit);
-        form.addEventListener('submit', (ev) => {
+        form.addEventListener('submit', async (ev) => {
             ev.preventDefault();
-            game.listMarketplaceItem({
-                assetId: select.value,
-                price: { currency: 'ckb', amount: Number(price.value) },
-                account: currentWallet().account,
-            });
-            render();
+            try {
+                await game.listMarketplaceItem({
+                    assetId: select.value,
+                    price: { currency: 'ckb', amount: Number(price.value) },
+                    account: currentWallet().account,
+                });
+            } catch (err) {
+                console.warn('[cellshire] marketplace listing failed', err);
+            } finally {
+                render();
+            }
         });
         return form;
     }

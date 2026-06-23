@@ -6,7 +6,7 @@ cards needed to turn the current prototype into the game described in
 
 ## Session Update 2026-06-23
 
-**Latest completed card:** `Wallet Open Asset Inventory Readback`.
+**Latest completed card:** `Marketplace Open Asset Listing Eligibility`.
 
 **What landed since the last board save:**
 - Completed the guarded sparse-seed first-session proof on seed `20260523` and
@@ -32,6 +32,11 @@ cards needed to turn the current prototype into the game described in
   index fixture Store-minted Open Asset prop cells, register their runtime asset
   definitions, surface durable `open:<cell_id>` counts, and hydrate the runtime
   prop inventory idempotently without changing local prop behavior.
+- Implemented `Marketplace Open Asset Listing Eligibility`: marketplace listing
+  refreshes now hydrate the wallet prop surface before listing, the owned-item
+  picker can see wallet-readback `open:<cell_id>` props, and listing creation
+  accepts them through the registry-backed Open Asset path while keeping raw
+  resource rejection and local prop listings unchanged.
 
 **Production/demo smoke verification saved on board:**
 - `git status --short --branch` returned `## main...origin/main` with no
@@ -76,17 +81,19 @@ cards needed to turn the current prototype into the game described in
 - Wallet Open Asset readback verification: focused currency/store/tx module
   run `18 passed, 0 failed`; full browser harness `429 passed, 0 failed`;
   `node netlify-build.mjs`; `git diff --check`.
+- Marketplace Open Asset listing verification: focused marketplace/currency/
+  store module run `30 passed, 0 failed`; full browser harness `430 passed,
+  0 failed`; `node netlify-build.mjs`; `git diff --check`.
 
-**Current Next card:** `Marketplace Open Asset Listing Eligibility` — let the
-marketplace listing flow recognize wallet-readback `open:<cell_id>` props as
-owned listing candidates, validate them through the asset registry/Open Asset
-Standard path, preserve raw-resource rejection, and keep local catalog prop
-listings unchanged.
+**Current Next card:** `Marketplace Open Asset Transfer Settlement` — carry
+the registry-backed `open:<cell_id>` listing path through buy/settlement so the
+marketplace can transfer Open Asset props without falling back to the local
+listing-only grant path.
 
-**Why this next:** Store purchases now create cell-shaped props and wallet
-readback makes those cells durable across reloads. Marketplace hardening can
-now start from a real owned asset source before settlement and transfer
-semantics are wired.
+**Why this next:** Store purchases now create cell-shaped props, wallet
+readback makes those cells durable across reloads, and listing eligibility now
+sees them. The remaining gap is marketplace transfer/settlement so buyers move
+those Open Asset props through the same registry-backed path.
 
 ## Session Update 2026-05-31
 

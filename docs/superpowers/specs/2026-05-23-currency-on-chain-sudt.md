@@ -488,6 +488,38 @@ Verification: focused currency/store/tx module run `18 passed, 0 failed`;
 full browser harness `429 passed, 0 failed`; `node netlify-build.mjs`;
 `git diff --check`.
 
+### Marketplace Open Asset Listing Eligibility
+
+**Goal:** teach the marketplace listing flow to recognize wallet-readback
+`open:<cell_id>` props as owned listing candidates, validate them through the
+asset registry/Open Asset Standard path, preserve raw-resource rejection, and
+keep local catalog prop listings unchanged.
+
+**Acceptance:**
+
+- Marketplace listing refreshes hydrate the wallet prop surface before listing.
+- The owned-item picker can see wallet-readback `open:<cell_id>` props.
+- Listing creation accepts Open Asset props through the registry-backed path.
+- Raw-resource rejection remains unchanged.
+- Local prop listings continue to behave as before.
+
+Implemented 2026-06-23:
+
+- `Game.listMarketplaceItem()` now refreshes the active inventory snapshot
+  before attempting to list, so the chain wallet prop surface is visible to
+  listing creation.
+- The Marketplace HUD refresh path now hydrates the wallet inventory before
+  rendering owned listing candidates, which exposes wallet-readback
+  `open:<cell_id>` props in the picker.
+- `createMarketplaceListing()` already validates Open Asset props through the
+  asset registry/Open Asset Standard path, so listing a hydrated readback prop
+  consumes the `open:<cell_id>` id while raw resources still fail fast.
+- Local prop listing behavior remains unchanged.
+
+Verification: focused marketplace/currency/store module run `30 passed, 0
+failed`; full browser harness `430 passed, 0 failed`; `node netlify-build.mjs`;
+`git diff --check`.
+
 ## Open Questions
 
 1. **Mint policy v2.** When the admin-mint reserve becomes uncomfortable,

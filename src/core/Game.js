@@ -1785,7 +1785,10 @@ export class Game {
         return result;
     }
 
-    listMarketplaceItem({ assetId, price, account }) {
+    async listMarketplaceItem({ assetId, price, account }) {
+        await this.readInventory?.().catch?.(err => {
+            console.warn('[cellshire] marketplace inventory refresh failed', err);
+        });
         const result = createMarketplaceListing({
             assetId,
             price,
