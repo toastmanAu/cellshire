@@ -1,5 +1,7 @@
 import { Inventory } from '../core/Inventory.js';
+import { registerOpenAssetCell, openAssetIdForCell } from '../assets/openAssetStandard.js';
 import { CURRENCY_CATALOG } from '../mining/cryptoEconomy.js';
+import { PropInventory } from '../property/propInventory.js';
 import {
     settleBankBorrowFixture,
     settleBankRepayFixture,
@@ -81,6 +83,7 @@ export class ReadOnlyChainCurrencyAdapter {
             if (!CURRENCY_CATALOG[currencyId]) continue;
             currencies.add(currencyId, amount);
         }
+        const props = await this._readOpenAssetProps();
         return {
             source: 'chain',
             stale: staleCurrencies.length > 0,
@@ -88,9 +91,29 @@ export class ReadOnlyChainCurrencyAdapter {
             staleCurrencies,
             pendingDeltas: pendingAfterReconcile,
             currencies,
-            props: this.props,
+            props,
             skins: this.skins,
         };
+    }
+
+    async _readOpenAssetProps() {
+        const cells = await this.indexer?.getOpenAssetCells?.({ owner: this.owner });
+        if (!Array.isArray(cells)) return this.props;
+        const props = new PropInventory(this.props?.entries?.() ?? []);
+        const indexedCounts = new Map();
+        for (const cell of cells) {
+            const registered = registerOpenAssetCell(cell);
+            if (!registered.ok) continue;
+            const assetId = registered.definition.id;
+            indexedCounts.set(assetId, (indexedCounts.get(assetId) ?? 0) + 1);
+        }
+        for (const [assetId, count] of indexedCounts) {
+            const current = props.get(assetId);
+            if (current < count) props.add(assetId, count - current);
+            const runtimeCurrent = this.props?.get?.(assetId) ?? 0;
+            if (runtimeCurrent < count) this.props?.add?.(assetId, count - runtimeCurrent);
+        }
+        return props;
     }
 
     addPendingDelta({ currency, amount, txHash, source = 'unknown' } = {}) {
@@ -137,8 +160,9 @@ export class ReadOnlyChainCurrencyAdapter {
 }
 
 export class FixtureCurrencyIndexer {
-    constructor({ balances = {}, offline = false, bankState = null } = {}) {
+    constructor({ balances = {}, offline = false, bankState = null, openAssetCells = [] } = {}) {
         this.balances = balances;
+        this.openAssetCells = openAssetCells;
         this.offline = offline;
         this.bankState = bankState ?? {
             debtCells: {},
@@ -161,6 +185,11 @@ export class FixtureCurrencyIndexer {
             currencyId,
             this.balances[currencyId] ?? { amount: 0, stale: false },
         ]));
+    }
+
+    async getOpenAssetCells({ owner } = {}) {
+        if (this.offline) return [];
+        return this.openAssetCells.filter(cell => !owner || cell.owner === owner);
     }
 
     applyTraderSwapTx(tx, { txHash = null } = {}) {
@@ -218,6 +247,7 @@ export class FixtureCurrencyIndexer {
                 };
             }
         }
+        this._upsertOpenAssetCell(settlement.outputs?.open_asset_cell);
         return settlement;
     }
 
@@ -301,5 +331,13 @@ export class FixtureCurrencyIndexer {
                 };
             }
         }
+    }
+
+    _upsertOpenAssetCell(cell) {
+        if (!cell?.cellId) return;
+        const id = openAssetIdForCell(cell.cellId);
+        const next = this.openAssetCells.filter(existing => openAssetIdForCell(existing.cellId) !== id);
+        next.push(cell);
+        this.openAssetCells = next;
     }
 }

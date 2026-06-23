@@ -6,7 +6,7 @@ cards needed to turn the current prototype into the game described in
 
 ## Session Update 2026-06-23
 
-**Latest completed card:** `General Store Open Asset Mint Intent`.
+**Latest completed card:** `Wallet Open Asset Inventory Readback`.
 
 **What landed since the last board save:**
 - Completed the guarded sparse-seed first-session proof on seed `20260523` and
@@ -28,6 +28,10 @@ cards needed to turn the current prototype into the game described in
   emit deterministic Open Asset mint payloads, fixture settlement validates and
   returns the minted cell, and successful chain Store purchases register/grant
   the resulting `open:<cell_id>` prop.
+- Implemented `Wallet Open Asset Inventory Readback`: chain wallet reads now
+  index fixture Store-minted Open Asset prop cells, register their runtime asset
+  definitions, surface durable `open:<cell_id>` counts, and hydrate the runtime
+  prop inventory idempotently without changing local prop behavior.
 
 **Production/demo smoke verification saved on board:**
 - `git status --short --branch` returned `## main...origin/main` with no
@@ -69,17 +73,20 @@ cards needed to turn the current prototype into the game described in
 - General Store Open Asset verification: focused Store/CCC module run
   `49 passed, 0 failed`; full browser harness `427 passed, 0 failed`;
   `node netlify-build.mjs`; `git diff --check`.
+- Wallet Open Asset readback verification: focused currency/store/tx module
+  run `18 passed, 0 failed`; full browser harness `429 passed, 0 failed`;
+  `node netlify-build.mjs`; `git diff --check`.
 
-**Current Next card:** `Wallet Open Asset Inventory Readback` — teach the
-chain wallet inventory surface to read fixture Open Asset prop cells created by
-Store mint intents, register them at boot/read time, and surface their
-`open:<cell_id>` counts without relying on the one-session Store purchase
-grant.
+**Current Next card:** `Marketplace Open Asset Listing Eligibility` — let the
+marketplace listing flow recognize wallet-readback `open:<cell_id>` props as
+owned listing candidates, validate them through the asset registry/Open Asset
+Standard path, preserve raw-resource rejection, and keep local catalog prop
+listings unchanged.
 
-**Why this next:** Store purchases now create cell-shaped props, but the dynamic
-Open Asset registration is still driven by the purchase result. Wallet
-inventory readback is the next bridge needed to make those cells durable across
-reloads and to give Marketplace hardening a real owned asset source.
+**Why this next:** Store purchases now create cell-shaped props and wallet
+readback makes those cells durable across reloads. Marketplace hardening can
+now start from a real owned asset source before settlement and transfer
+semantics are wired.
 
 ## Session Update 2026-05-31
 

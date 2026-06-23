@@ -451,6 +451,43 @@ Verification: focused Store/CCC module run `49 passed, 0 failed`;
 full browser harness `427 passed, 0 failed`; `node netlify-build.mjs`;
 `git diff --check`.
 
+### Wallet Open Asset Inventory Readback
+
+**Goal:** teach the chain wallet inventory surface to read fixture Open Asset
+prop cells created by Store mint intents, register them at boot/read time, and
+surface their `open:<cell_id>` counts through prop inventory without relying on
+the one-session Store purchase grant.
+
+**Acceptance:**
+
+- Fixture Store settlement retains minted Open Asset prop cells in an indexed
+  owner-readable surface.
+- `ReadOnlyChainCurrencyAdapter.read()` registers indexed Open Asset prop
+  cells through the existing Open Asset Standard adapter and returns a
+  `PropInventory` snapshot containing their `open:<cell_id>` counts.
+- Runtime prop inventory hydration is idempotent across repeated reads and
+  reload-shaped adapter construction.
+- Local prop inventory behavior is preserved when an indexer has no Open Asset
+  cell surface.
+- Tests cover fixture readback registration, durable count surfacing,
+  idempotent hydration, and local fallback behavior.
+
+Implemented 2026-06-23:
+
+- `FixtureCurrencyIndexer` now retains successful Store settlement
+  `outputs.open_asset_cell` values and exposes them through
+  `getOpenAssetCells({ owner })`.
+- `ReadOnlyChainCurrencyAdapter` now registers indexed Open Asset cells at
+  read time, returns a cloned prop inventory snapshot with durable
+  `open:<cell_id>` counts, and hydrates the supplied runtime prop inventory
+  only for missing deltas.
+- The read path falls back to the existing local prop inventory behavior when
+  the indexer does not expose Open Asset cells.
+
+Verification: focused currency/store/tx module run `18 passed, 0 failed`;
+full browser harness `429 passed, 0 failed`; `node netlify-build.mjs`;
+`git diff --check`.
+
 ## Open Questions
 
 1. **Mint policy v2.** When the admin-mint reserve becomes uncomfortable,

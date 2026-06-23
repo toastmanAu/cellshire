@@ -1,5 +1,11 @@
 import { describe, expect, it } from '../test/harness.js';
+import {
+    assetDefinitionFor,
+    clearOpenAssetDefinitions,
+} from '../assets/assetRegistry.js';
+import { openAssetIdForCell } from '../assets/openAssetStandard.js';
 import { Inventory } from '../core/Inventory.js';
+import { PropInventory } from '../property/propInventory.js';
 import {
     FixtureCurrencyIndexer,
     LocalCurrencyAdapter,
@@ -11,6 +17,8 @@ import {
     buildBankBorrowTransaction,
     buildBankRepayTransaction,
 } from '../chain/bankTx.js';
+import { buildStorePurchaseTransaction } from '../chain/storePurchaseTx.js';
+import { generalStoreItem } from '../store/generalStoreCatalog.js';
 
 function fakeStorage() {
     const m = new Map();
@@ -177,5 +185,54 @@ describe('currency adapters', () => {
         expect(repaySettlement.ok).toBe(true);
         expect((await adapter.read()).currencies.get('ckb')).toBe(19812.5);
         expect(Object.keys(indexer.bankState.debtCells).length).toBe(0);
+    });
+
+    it('reads fixture Open Asset prop cells from the chain indexer and registers them', async () => {
+        clearOpenAssetDefinitions();
+        const indexer = new FixtureCurrencyIndexer({
+            balances: { ckb: { amount: 1000, stale: false } },
+        });
+        const tx = buildStorePurchaseTransaction({
+            walletAccount: { provider: 'joyid', address: 'ckt1owner', network: 'testnet' },
+            item: generalStoreItem('blue_railing'),
+            txNonce: 'store-readback-1',
+        });
+        const settlement = indexer.applyStorePurchaseTx(tx, { txHash: '0xstore' });
+        expect(settlement.ok).toBe(true);
+
+        const runtimeProps = new PropInventory();
+        const freshAdapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            props: runtimeProps,
+            owner: 'ckt1owner',
+            chainCurrencyIds: ['ckb'],
+            indexer,
+        });
+        const snapshot = await freshAdapter.read();
+        const openAssetId = openAssetIdForCell('store:ckt1owner:blue_railing:store-readback-1');
+        expect(snapshot.props.get(openAssetId)).toBe(1);
+        expect(snapshot.props.get('blue_railing')).toBe(0);
+        expect(runtimeProps.get(openAssetId)).toBe(1);
+        expect(assetDefinitionFor(openAssetId).renderSourceAssetId).toBe('blue_railing');
+        expect(snapshot.currencies.get('ckb')).toBe(650);
+        const second = await freshAdapter.read();
+        expect(second.props.get(openAssetId)).toBe(1);
+        expect(runtimeProps.get(openAssetId)).toBe(1);
+    });
+
+    it('preserves local prop inventory behavior when chain indexer has no Open Asset cell surface', async () => {
+        const localProps = new PropInventory([['blue_railing', 2]]);
+        const snapshot = await new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            props: localProps,
+            owner: 'ckt1owner',
+            chainCurrencyIds: ['ckb'],
+            indexer: {
+                async getCurrencyBalances() {
+                    return { ckb: { amount: 1000, stale: false } };
+                },
+            },
+        }).read();
+        expect(snapshot.props.get('blue_railing')).toBe(2);
     });
 });
