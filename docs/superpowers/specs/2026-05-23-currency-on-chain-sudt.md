@@ -381,6 +381,55 @@ Chain Marketplace fixture buy addendum verification: focused
 marketplace/store/trader/currency module tests `30 passed, 0 failed`;
 `node netlify-build.mjs`; `git diff --check`.
 
+## Store Integration Order Decision
+
+Resolved 2026-06-23: harden **General Store first**, then wallet inventory
+readback, then Trader, then Marketplace.
+
+Reasons:
+
+- General Store is the narrowest chain-facing store path already in the app:
+  one buyer, one fixed catalog item, one CKB payment, one prop output, no seller
+  state, no order matching, and no multi-currency liquidity.
+- `?chainStore=1` already has fixture settlement, pending CKB reconciliation,
+  and `?chainStoreSubmit=ccc` receipt submit coverage. The next missing piece
+  is not price math; it is turning the bought prop into a durable Open Asset
+  cell-shaped output.
+- Trader should wait until the treasury-liquidity, slippage, and Cellswap reuse
+  questions are resolved. The current Trader fixture is useful, but it touches
+  every currency and can easily force a larger settlement design than the next
+  slice needs.
+- Marketplace should wait until at least one store/crafting path can mint or
+  register durable Open Asset props. Marketplace hardening needs seller listing,
+  transfer/cancel semantics, and buyer/seller state, so it is the wrong first
+  real asset settlement path.
+- Wallet inventory readback should follow the Store mint bridge, not precede
+  it. A readback-only inventory slice is less valuable until there is a
+  repeatable in-game purchase path that creates a cell-shaped prop to read.
+
+Next implementation card:
+
+### General Store Open Asset Mint Intent
+
+**Goal:** make chain General Store purchases emit a deterministic Open Asset
+prop payload for the bought catalog item, register that fixture cell in the
+runtime asset registry, and grant the resulting `open:<cell_id>` prop through
+the existing prop inventory path while keeping local Store behavior unchanged.
+
+**Acceptance:**
+
+- Local General Store purchases still grant the catalog asset id unchanged.
+- `cellshire_store_purchase_tx` includes an Open Asset prop payload or mint
+  intent derived from the purchased catalog item, buyer owner, and tx nonce.
+- Fixture chain Store settlement validates and returns that Open Asset payload.
+- Successful `?chainStore=1` fixture purchases register the Open Asset cell and
+  grant the corresponding `open:<cell_id>` prop id, so placement and rendering
+  use the existing Open Asset Standard adapter.
+- `?chainStoreSubmit=ccc` keeps receipt-only behavior but includes the same
+  mint-intent payload for the backend/minter handoff.
+- Tests cover the tx payload shape, fixture settlement, dynamic open-asset
+  registration, prop inventory grant, and unchanged local path.
+
 ## Open Questions
 
 1. **Mint policy v2.** When the admin-mint reserve becomes uncomfortable,

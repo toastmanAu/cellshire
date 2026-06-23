@@ -6,7 +6,7 @@ cards needed to turn the current prototype into the game described in
 
 ## Session Update 2026-06-23
 
-**Latest completed card:** `Production/Demo Smoke Harness`.
+**Latest completed card:** `Store Integration Order Decision`.
 
 **What landed since the last board save:**
 - Completed the guarded sparse-seed first-session proof on seed `20260523` and
@@ -20,6 +20,10 @@ cards needed to turn the current prototype into the game described in
   runner for the custom domain plus Pages/demo hostname.
 - Updated the Cloudflare Pages runbook and README with the repeatable smoke
   command.
+- Resolved the store integration order in
+  [`2026-05-23-currency-on-chain-sudt.md`](specs/2026-05-23-currency-on-chain-sudt.md):
+  harden General Store first, then wallet inventory readback, then Trader, then
+  Marketplace.
 
 **Production/demo smoke verification saved on board:**
 - `git status --short --branch` returned `## main...origin/main` with no
@@ -51,17 +55,25 @@ cards needed to turn the current prototype into the game described in
   `200` responses, and guarded first-session boot readiness.
 - `node --check scripts/production_demo_smoke.mjs` passed.
 - `node scripts/production_demo_smoke.mjs --self-test` passed.
+- Store-order evidence pass reviewed the existing chain Store, Trader,
+  Marketplace, currency adapter, Open Asset Standard, and Prop Inventory code
+  plus their focused tests. General Store is the lowest-risk first hardening
+  target because it is a fixed-catalog CKB spend with one buyer and one prop
+  output; Trader still needs liquidity/slippage decisions, Marketplace still
+  needs seller/listing/transfer semantics, and wallet inventory readback is
+  more useful after a repeatable store mint path exists.
 
-**Current Next card:** `Store Integration Order Decision` — resolve whether the
-next chain-facing store work should harden Trader first, General Store first,
-or wallet inventory first, then turn that decision into a focused
-implementation card.
+**Current Next card:** `General Store Open Asset Mint Intent` — make chain
+General Store purchases emit a deterministic Open Asset prop payload for the
+bought catalog item, register the fixture cell in the runtime asset registry,
+and grant the resulting `open:<cell_id>` prop while keeping local Store
+behavior unchanged.
 
-**Why this next:** the production deploy path is now repeatably checked. Bank
-production settlement, lazy-mint real ore scripts, and Cloudflare zone-header
-cleanup remain larger external-dependency tracks; store integration order is a
-repo-local product decision that can unblock the next concrete chain-facing
-implementation slice.
+**Why this next:** it turns the already-tested `?chainStore=1` path from a
+receipt/local-prop bridge into the first durable asset-output bridge. That gives
+wallet inventory readback and Marketplace hardening a real in-game prop cell to
+consume, without taking on Trader liquidity/slippage or Marketplace seller
+state first.
 
 ## Session Update 2026-05-31
 
@@ -1923,7 +1935,10 @@ custom-domain browser smoke, Cloudflare Pages deployment verification, and
   deterministic per-currency type-args. CKB stays native capacity. See
   [`2026-05-23-currency-on-chain-sudt.md`](specs/2026-05-23-currency-on-chain-sudt.md).
 - Epoch modifier algorithm and high-value epoch frequency.
-- Store integration order: Trader first, General Store first, or wallet inventory first.
+- ~~Store integration order: Trader first, General Store first, or wallet inventory first.~~
+  Resolved 2026-06-23: General Store first, then wallet inventory readback,
+  then Trader, then Marketplace. See
+  [`2026-05-23-currency-on-chain-sudt.md`](specs/2026-05-23-currency-on-chain-sudt.md).
 - Save-state storage: CKBFS V3 vs custom minimum-capacity state cell.
 - Township topology: one communal plane for all players vs owner/epoch-sharded
   township instances.
