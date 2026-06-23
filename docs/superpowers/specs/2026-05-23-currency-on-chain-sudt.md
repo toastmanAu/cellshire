@@ -520,6 +520,44 @@ Verification: focused marketplace/currency/store module run `30 passed, 0
 failed`; full browser harness `430 passed, 0 failed`; `node netlify-build.mjs`;
 `git diff --check`.
 
+### Marketplace Open Asset Transfer Settlement
+
+**Goal:** carry the registry-backed `open:<cell_id>` listing path through
+buy/settlement so marketplace purchases transfer Open Asset props through the
+chain-shaped fixture path instead of only granting locally, while preserving
+existing local and receipt-only Marketplace behavior.
+
+**Acceptance:**
+
+- Open Asset marketplace listings retain the underlying Open Asset cell id.
+- Chain marketplace purchase txs include a transfer intent for Open Asset
+  listings and validate that intent against the listing input.
+- Fixture marketplace settlement transfers indexed Open Asset cell ownership
+  to the buyer before applying CKB balance updates.
+- Chain fixture buys grant from the transferred Open Asset settlement output
+  instead of blindly granting the listing asset id.
+- Local Marketplace buys and CCC/JoyID receipt-only Marketplace buys keep their
+  existing behavior.
+
+Implemented 2026-06-23:
+
+- `createMarketplaceListing()` now stores `asset.openAsset.cellId` as the
+  listing cell id for `open:<cell_id>` props, while local catalog props keep
+  their synthetic listing cells.
+- `cellshire_marketplace_purchase_tx` now carries
+  `outputs.open_asset_transfer` and `witness.marketplace_purchase.open_asset_cell_id`
+  for Open Asset listings.
+- Fixture settlement validates the transfer intent and `FixtureCurrencyIndexer`
+  moves the indexed Open Asset cell owner from seller to buyer before applying
+  the buyer CKB spend.
+- `ChainMarketplaceAdapter` registers/grants the transferred Open Asset cell
+  from `settlement.outputs.open_asset_cell`; non-transfer fixture buys and
+  CCC receipt-only buys still use the existing marketplace grant path.
+
+Verification: focused marketplace/CCC/currency/store module run `73 passed, 0
+failed`; full browser harness `432 passed, 0 failed`; `node netlify-build.mjs`;
+`git diff --check`.
+
 ## Open Questions
 
 1. **Mint policy v2.** When the admin-mint reserve becomes uncomfortable,

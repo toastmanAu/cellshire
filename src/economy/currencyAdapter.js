@@ -259,24 +259,13 @@ export class FixtureCurrencyIndexer {
             txHash,
         });
         if (!settlement.ok) return settlement;
-        for (const [currency, entry] of Object.entries(settlement.updates)) {
-            if (entry.spent || entry.amount === 0) {
-                this.balances[currency] = {
-                    amount: 0,
-                    stale: false,
-                    spent: true,
-                    outPoint: null,
-                    updatedByTxHash: txHash,
-                };
-            } else {
-                this.balances[currency] = {
-                    amount: entry.amount,
-                    stale: false,
-                    outPoint: entry.outPoint,
-                    updatedByTxHash: txHash,
-                };
-            }
+        const openAssetTransfer = settlement.outputs?.open_asset_transfer;
+        if (openAssetTransfer) {
+            const transferred = this._transferOpenAssetCell(openAssetTransfer);
+            if (!transferred.ok) return transferred;
+            settlement.outputs.open_asset_cell = transferred.cell;
         }
+        this._applyCurrencyUpdates(settlement.updates, txHash);
         return settlement;
     }
 
@@ -339,5 +328,21 @@ export class FixtureCurrencyIndexer {
         const next = this.openAssetCells.filter(existing => openAssetIdForCell(existing.cellId) !== id);
         next.push(cell);
         this.openAssetCells = next;
+    }
+
+    _transferOpenAssetCell({ cell_id: cellId, from, to } = {}) {
+        if (!cellId || !to) return { ok: false, reason: 'invalid-open-asset-transfer' };
+        const assetId = openAssetIdForCell(cellId);
+        const index = this.openAssetCells.findIndex(cell => openAssetIdForCell(cell.cellId) === assetId);
+        if (index < 0) return { ok: false, reason: 'missing-open-asset-cell' };
+        const current = this.openAssetCells[index];
+        if (from && current.owner !== from) return { ok: false, reason: 'open-asset-owner-mismatch' };
+        const cell = { ...current, owner: to };
+        this.openAssetCells = [
+            ...this.openAssetCells.slice(0, index),
+            cell,
+            ...this.openAssetCells.slice(index + 1),
+        ];
+        return { ok: true, cell };
     }
 }

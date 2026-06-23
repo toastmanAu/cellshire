@@ -1,6 +1,8 @@
+import { registerOpenAssetCell } from '../assets/openAssetStandard.js';
 import { buildMarketplacePurchaseTransaction } from '../chain/marketplacePurchaseTx.js';
 import { createCccJoyIdMarketplacePurchaseSubmitter } from '../chain/cccJoyId.js';
 import {
+    closeMarketplaceListing,
     buyMarketplaceListing,
     grantMarketplaceListing,
     marketplaceListings,
@@ -94,7 +96,9 @@ export class ChainMarketplaceAdapter {
             txHash: receipt.txHash,
             source: 'marketplace',
         });
-        const grant = grantMarketplaceListing({ listing, propInventory, state });
+        const grant = settlement?.outputs?.open_asset_cell
+            ? grantSettledOpenAssetListing({ listing, settlement, propInventory, state })
+            : grantMarketplaceListing({ listing, propInventory, state });
         if (!grant.ok) return grant;
         return {
             ok: true,
@@ -107,6 +111,21 @@ export class ChainMarketplaceAdapter {
             settlement,
         };
     }
+}
+
+function grantSettledOpenAssetListing({ listing, settlement, propInventory, state } = {}) {
+    const registered = registerOpenAssetCell(settlement?.outputs?.open_asset_cell);
+    if (!registered.ok) {
+        return {
+            ok: false,
+            reason: registered.reason || 'open-asset-registration-failed',
+            message: 'Marketplace Open Asset transfer registration failed',
+            listing,
+            settlement,
+        };
+    }
+    propInventory?.add?.(registered.definition.id, 1);
+    return closeMarketplaceListing({ listing, state });
 }
 
 export async function defaultSubmitPrototypeMarketplacePurchase(tx) {

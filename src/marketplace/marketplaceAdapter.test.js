@@ -1,4 +1,7 @@
 import { describe, expect, it } from '../test/harness.js';
+import { clearOpenAssetDefinitions } from '../assets/assetRegistry.js';
+import { openAssetIdForCell } from '../assets/openAssetStandard.js';
+import { buildStorePurchaseTransaction } from '../chain/storePurchaseTx.js';
 import { Inventory } from '../core/Inventory.js';
 import {
     FixtureCurrencyIndexer,
@@ -6,7 +9,9 @@ import {
 } from '../economy/currencyAdapter.js';
 import { PendingCurrencyDeltaStore } from '../economy/pendingCurrencyDeltas.js';
 import { PropInventory } from '../property/propInventory.js';
+import { generalStoreItem } from '../store/generalStoreCatalog.js';
 import {
+    createMarketplaceListing,
     loadMarketplaceState,
     marketplaceListings,
 } from './playerMarketplace.js';
@@ -78,6 +83,69 @@ describe('marketplace adapters', () => {
         expect(reconciled.pending).toBe(false);
         expect(reconciled.currencies.get('ckb')).toBe(2800);
         expect(marketplaceListings(state).some(item => item.id === listing.id)).toBe(false);
+    });
+
+    it('transfers fixture Open Asset listing cells to the chain buyer', async () => {
+        clearOpenAssetDefinitions();
+        const indexer = new FixtureCurrencyIndexer({
+            balances: { ckb: { amount: 5000, stale: false } },
+        });
+        const storeTx = buildStorePurchaseTransaction({
+            walletAccount: { provider: 'joyid', address: 'ckt1seller', network: 'testnet' },
+            item: generalStoreItem('blue_railing'),
+            txNonce: 'market-transfer-1',
+        });
+        const storeSettlement = indexer.applyStorePurchaseTx(storeTx, { txHash: '0xstore' });
+        expect(storeSettlement.ok).toBe(true);
+
+        const openAssetId = openAssetIdForCell('store:ckt1seller:blue_railing:market-transfer-1');
+        const sellerProps = new PropInventory();
+        const sellerAdapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            props: sellerProps,
+            owner: 'ckt1seller',
+            chainCurrencyIds: ['ckb'],
+            indexer,
+        });
+        await sellerAdapter.read();
+        const state = loadMarketplaceState({ get: () => null });
+        const listed = createMarketplaceListing({
+            assetId: openAssetId,
+            price: { currency: 'ckb', amount: 1500 },
+            seller: { address: 'ckt1seller', label: 'Seller' },
+            propInventory: sellerProps,
+            state,
+            now: () => 123,
+        });
+        expect(listed.ok).toBe(true);
+        expect(listed.listing.cellId).toBe('store:ckt1seller:blue_railing:market-transfer-1');
+
+        const buyerProps = new PropInventory();
+        const buyerAdapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            props: buyerProps,
+            owner: 'ckt1buyer',
+            chainCurrencyIds: ['ckb'],
+            indexer,
+        });
+        const out = await new ChainMarketplaceAdapter({
+            owner: 'ckt1buyer',
+            inventoryAdapter: buyerAdapter,
+        }).buy({
+            listingId: listed.listing.id,
+            buyer: { address: 'ckt1buyer', provider: 'joyid' },
+            propInventory: buyerProps,
+            state,
+        });
+
+        expect(out.ok).toBe(true);
+        expect(out.mode).toBe('chain-fixture-settled');
+        expect(out.settlement.outputs.open_asset_cell.owner).toBe('ckt1buyer');
+        expect(buyerProps.get(openAssetId)).toBe(1);
+        expect((await indexer.getOpenAssetCells({ owner: 'ckt1seller' })).length).toBe(0);
+        expect((await indexer.getOpenAssetCells({ owner: 'ckt1buyer' }))[0].cellId)
+            .toBe('store:ckt1seller:blue_railing:market-transfer-1');
+        expect(marketplaceListings(state).some(item => item.id === listed.listing.id)).toBe(false);
     });
 
     it('selects the chain marketplace adapter only behind the explicit flag', () => {

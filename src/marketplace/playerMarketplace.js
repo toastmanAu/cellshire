@@ -158,11 +158,12 @@ export function createMarketplaceListing({
         return { ok: false, reason: 'missing-owned-item' };
     }
 
+    const asset = assetDefinitionFor(assetId);
     const createdAt = now();
     const seq = (state.listings?.length ?? 0) + 1;
     const listing = normalizeStoredListing({
         id: `market:local:${createdAt}:${seq}`,
-        cellId: `spore:${itemType}:${seller.address.slice(-8)}:${createdAt}:${seq}`,
+        cellId: asset?.openAsset?.cellId ?? `spore:${itemType}:${seller.address.slice(-8)}:${createdAt}:${seq}`,
         itemType,
         assetId,
         seller: seller.address,
@@ -209,6 +210,12 @@ export function grantMarketplaceListing({ listing, propInventory, state } = {}) 
     } else if (listing.itemType === 'skin' && !state.ownedSkinIds.includes(listing.assetId)) {
         state.ownedSkinIds.push(listing.assetId);
     }
+    closeListing(state, listing);
+    return { ok: true, listing };
+}
+
+export function closeMarketplaceListing({ listing, state } = {}) {
+    if (!listing) return { ok: false, reason: 'missing-listing' };
     closeListing(state, listing);
     return { ok: true, listing };
 }
