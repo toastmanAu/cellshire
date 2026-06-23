@@ -1,5 +1,6 @@
 import { buildStorePurchaseTransaction } from '../chain/storePurchaseTx.js';
 import { createCccJoyIdStorePurchaseSubmitter } from '../chain/cccJoyId.js';
+import { registerOpenAssetCell } from '../assets/openAssetStandard.js';
 import { loadWalletIdentity } from '../wallet/walletIdentity.js';
 import {
     buyStoreItem,
@@ -95,13 +96,29 @@ export class ChainGeneralStoreAdapter {
             };
         }
 
+        const openAssetGrant = grantPurchasedOpenAsset({
+            tx,
+            settlement,
+            propInventory,
+        });
+        if (!openAssetGrant.ok) {
+            return {
+                ok: false,
+                mode: 'chain',
+                reason: openAssetGrant.reason,
+                message: openAssetGrant.message,
+                tx,
+                settlement,
+                item,
+            };
+        }
+
         this.inventoryAdapter?.addPendingDelta?.({
             currency: item.price.currency,
             amount: -item.price.amount,
             txHash: receipt.txHash,
             source: 'store',
         });
-        propInventory?.add?.(item.assetId, 1);
         return {
             ok: true,
             mode: receipt.mode === 'ccc-joyid'
@@ -111,10 +128,40 @@ export class ChainGeneralStoreAdapter {
             txHash: receipt.txHash,
             settlement,
             item,
-            assetId: item.assetId,
-            count: propInventory?.get?.(item.assetId) ?? 0,
+            assetId: openAssetGrant.assetId,
+            sourceAssetId: item.assetId,
+            openAssetCell: openAssetGrant.cell,
+            count: propInventory?.get?.(openAssetGrant.assetId) ?? 0,
         };
     }
+}
+
+function grantPurchasedOpenAsset({ tx, settlement, propInventory } = {}) {
+    const cell = settlement?.outputs?.open_asset_cell
+        ?? tx?.outputs?.open_asset_mint?.cell
+        ?? null;
+    if (!cell) {
+        return {
+            ok: false,
+            reason: 'missing-open-asset-mint',
+            message: 'Store purchase did not include an Open Asset mint intent',
+        };
+    }
+    const registered = registerOpenAssetCell(cell);
+    if (!registered.ok) {
+        return {
+            ok: false,
+            reason: registered.reason || 'open-asset-registration-failed',
+            message: 'Store Open Asset registration failed',
+        };
+    }
+    const assetId = registered.definition.id;
+    propInventory?.add?.(assetId, 1);
+    return {
+        ok: true,
+        assetId,
+        cell,
+    };
 }
 
 export async function defaultSubmitPrototypeStorePurchase(tx) {

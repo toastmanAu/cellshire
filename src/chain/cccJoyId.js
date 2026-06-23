@@ -322,6 +322,7 @@ export function storePurchaseReceiptPayload(storeTx) {
         quantity: prop?.quantity ?? 1,
         price_currency: purchase.price_currency,
         price_amount: purchase.price_amount,
+        open_asset_mint: storeTx.outputs?.open_asset_mint ?? null,
         treasury_currency: treasury?.currency ?? purchase.price_currency,
         treasury_amount: treasury?.amount ?? purchase.price_amount,
     };

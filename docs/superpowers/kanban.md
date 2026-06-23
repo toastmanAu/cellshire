@@ -6,7 +6,7 @@ cards needed to turn the current prototype into the game described in
 
 ## Session Update 2026-06-23
 
-**Latest completed card:** `Store Integration Order Decision`.
+**Latest completed card:** `General Store Open Asset Mint Intent`.
 
 **What landed since the last board save:**
 - Completed the guarded sparse-seed first-session proof on seed `20260523` and
@@ -24,6 +24,10 @@ cards needed to turn the current prototype into the game described in
   [`2026-05-23-currency-on-chain-sudt.md`](specs/2026-05-23-currency-on-chain-sudt.md):
   harden General Store first, then wallet inventory readback, then Trader, then
   Marketplace.
+- Implemented `General Store Open Asset Mint Intent`: chain Store purchases now
+  emit deterministic Open Asset mint payloads, fixture settlement validates and
+  returns the minted cell, and successful chain Store purchases register/grant
+  the resulting `open:<cell_id>` prop.
 
 **Production/demo smoke verification saved on board:**
 - `git status --short --branch` returned `## main...origin/main` with no
@@ -62,18 +66,20 @@ cards needed to turn the current prototype into the game described in
   output; Trader still needs liquidity/slippage decisions, Marketplace still
   needs seller/listing/transfer semantics, and wallet inventory readback is
   more useful after a repeatable store mint path exists.
+- General Store Open Asset verification: focused Store/CCC module run
+  `49 passed, 0 failed`; full browser harness `427 passed, 0 failed`;
+  `node netlify-build.mjs`; `git diff --check`.
 
-**Current Next card:** `General Store Open Asset Mint Intent` — make chain
-General Store purchases emit a deterministic Open Asset prop payload for the
-bought catalog item, register the fixture cell in the runtime asset registry,
-and grant the resulting `open:<cell_id>` prop while keeping local Store
-behavior unchanged.
+**Current Next card:** `Wallet Open Asset Inventory Readback` — teach the
+chain wallet inventory surface to read fixture Open Asset prop cells created by
+Store mint intents, register them at boot/read time, and surface their
+`open:<cell_id>` counts without relying on the one-session Store purchase
+grant.
 
-**Why this next:** it turns the already-tested `?chainStore=1` path from a
-receipt/local-prop bridge into the first durable asset-output bridge. That gives
-wallet inventory readback and Marketplace hardening a real in-game prop cell to
-consume, without taking on Trader liquidity/slippage or Marketplace seller
-state first.
+**Why this next:** Store purchases now create cell-shaped props, but the dynamic
+Open Asset registration is still driven by the purchase result. Wallet
+inventory readback is the next bridge needed to make those cells durable across
+reloads and to give Marketplace hardening a real owned asset source.
 
 ## Session Update 2026-05-31
 

@@ -1,4 +1,9 @@
 import { describe, expect, it } from '../test/harness.js';
+import {
+    assetDefinitionFor,
+    clearOpenAssetDefinitions,
+} from '../assets/assetRegistry.js';
+import { openAssetIdForCell } from '../assets/openAssetStandard.js';
 import { Inventory } from '../core/Inventory.js';
 import {
     FixtureCurrencyIndexer,
@@ -39,6 +44,7 @@ describe('general store adapters', () => {
     });
 
     it('settles chain fixture purchases and clears pending CKB after indexer catch-up', async () => {
+        clearOpenAssetDefinitions();
         const storage = fakeStorage();
         const pendingDeltas = new PendingCurrencyDeltaStore({ storage, owner: 'ckt1owner' });
         const indexer = new FixtureCurrencyIndexer({
@@ -61,9 +67,14 @@ describe('general store adapters', () => {
             propInventory: props,
             propertyTier: 1,
         });
+        const openAssetId = openAssetIdForCell('store:ckt1owner:blue_railing:' + out.tx.tx_nonce);
         expect(out.ok).toBe(true);
         expect(out.mode).toBe('chain-fixture-settled');
-        expect(props.get('blue_railing')).toBe(1);
+        expect(out.assetId).toBe(openAssetId);
+        expect(out.sourceAssetId).toBe('blue_railing');
+        expect(props.get('blue_railing')).toBe(0);
+        expect(props.get(openAssetId)).toBe(1);
+        expect(assetDefinitionFor(openAssetId).renderSourceAssetId).toBe('blue_railing');
         expect(pendingDeltas.list().length).toBe(1);
         const reconciled = await chainAdapter.read();
         expect(reconciled.pending).toBe(false);
@@ -104,5 +115,66 @@ describe('general store adapters', () => {
         });
         expect(out.ok).toBe(false);
         expect(out.reason).toBe('wallet-disconnected');
+    });
+
+    it('submits CCC receipt purchases with mint intent and grants the open prop without fixture settlement', async () => {
+        clearOpenAssetDefinitions();
+        const storage = fakeStorage();
+        const chainAdapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            owner: 'ckt1owner',
+            chainCurrencyIds: ['ckb'],
+            indexer: new FixtureCurrencyIndexer({
+                balances: { ckb: { amount: 1000, stale: false } },
+            }),
+        });
+        const props = new PropInventory();
+        let settled = false;
+        let submitted = null;
+        const out = await new ChainGeneralStoreAdapter({
+            storage,
+            owner: 'ckt1owner',
+            inventoryAdapter: {
+                async read() {
+                    return chainAdapter.read();
+                },
+                settleStorePurchaseTx() {
+                    settled = true;
+                    return { ok: true };
+                },
+                addPendingDelta(delta) {
+                    this.pending = delta;
+                },
+            },
+            requireWallet: true,
+            loadWallet: () => ({
+                status: 'connected',
+                account: { provider: 'joyid', address: 'ckt1owner', network: 'testnet' },
+            }),
+            submit: async tx => {
+                submitted = tx;
+                return {
+                    ok: true,
+                    mode: 'ccc-joyid',
+                    txHash: '0xstoreccc',
+                    payload: {
+                        protocol: 'cellshire.store.purchase',
+                        open_asset_mint: tx.outputs.open_asset_mint,
+                    },
+                };
+            },
+        }).buy({
+            assetId: 'blue_railing',
+            propInventory: props,
+            propertyTier: 1,
+        });
+        const openAssetId = openAssetIdForCell('store:ckt1owner:blue_railing:' + out.tx.tx_nonce);
+        expect(out.ok).toBe(true);
+        expect(out.mode).toBe('chain-ccc-receipt');
+        expect(settled).toBe(false);
+        expect(submitted.outputs.open_asset_mint.cell.render.source.assetId).toBe('blue_railing');
+        expect(out.assetId).toBe(openAssetId);
+        expect(props.get(openAssetId)).toBe(1);
+        expect(assetDefinitionFor(openAssetId).openAsset.cellId).toBe(submitted.outputs.open_asset_mint.cell.cellId);
     });
 });

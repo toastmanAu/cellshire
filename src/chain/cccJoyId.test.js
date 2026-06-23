@@ -906,6 +906,9 @@ describe('CCC store purchase submit', () => {
         expect(payload.asset_id).toBe('blue_railing');
         expect(payload.price_currency).toBe('ckb');
         expect(payload.price_amount).toBe(350);
+        expect(payload.open_asset_mint.schema).toBe('cellshire.store.open_asset_mint');
+        expect(payload.open_asset_mint.cell.cellId).toBe(`store:${address}:blue_railing:store-purchase-1`);
+        expect(payload.open_asset_mint.cell.render.source.assetId).toBe('blue_railing');
     });
 
     it('prepares a CCC transaction with a store purchase witness', async () => {
@@ -924,6 +927,7 @@ describe('CCC store purchase submit', () => {
         expect(prepared.tx.outputs[0].capacity).toBe('fixed:61');
         expect(prepared.tx.witnesses.length).toBe(2);
         expect(prepared.payload.asset_id).toBe('blue_railing');
+        expect(prepared.payload.open_asset_mint.cell.metadata.traits.source).toBe('general_store');
     });
 
     it('signs and submits store purchase receipts through CCC JoyID', async () => {

@@ -430,6 +430,27 @@ the existing prop inventory path while keeping local Store behavior unchanged.
 - Tests cover the tx payload shape, fixture settlement, dynamic open-asset
   registration, prop inventory grant, and unchanged local path.
 
+Implemented 2026-06-23:
+
+- `cellshire_store_purchase_tx` now includes `outputs.open_asset_mint`, a
+  deterministic `cellshire.store.open_asset_mint` payload carrying a compliant
+  `cellshire.open_asset` prop cell for the bought catalog item.
+- The mint intent cell id is deterministic from buyer owner, catalog asset id,
+  and tx nonce: `store:<owner>:<asset_id>:<tx_nonce>`.
+- Fixture Store settlement validates the Open Asset mint intent before
+  spending CKB and returns the minted Open Asset cell in
+  `settlement.outputs.open_asset_cell`.
+- Successful chain Store purchases register the returned Open Asset cell via
+  the existing Open Asset Standard adapter and grant the dynamic
+  `open:<cell_id>` prop id through `PropInventory`.
+- Local General Store purchases still grant the catalog asset id unchanged.
+- CCC/JoyID Store receipt payloads include the same `open_asset_mint` handoff
+  while keeping receipt submit out of fixture settlement.
+
+Verification: focused Store/CCC module run `49 passed, 0 failed`;
+full browser harness `427 passed, 0 failed`; `node netlify-build.mjs`;
+`git diff --check`.
+
 ## Open Questions
 
 1. **Mint policy v2.** When the admin-mint reserve becomes uncomfortable,
