@@ -118,7 +118,28 @@ fresh module graph.
 
 ## Smoke Check
 
-After deployment:
+After deployment, run the repeatable production/demo smoke:
+
+```bash
+node scripts/production_demo_smoke.mjs
+```
+
+The smoke defaults to `https://cellshire.com/` and
+`https://cellshire.pages.dev/`. It verifies the deployed root HTML revalidates,
+both roots serve the same `src-<hash>/main.js?v=<hash>` production module
+graph, the hashed module URLs return `200`, and the guarded first-session URL
+boots to `data-cellshire-boot="ready"` without module-load failures or uncaught
+app exceptions.
+
+Use flags for preview/demo targets:
+
+```bash
+node scripts/production_demo_smoke.mjs \
+  --base https://cellshire.com/ \
+  --pages-base https://cellshire.pages.dev/
+```
+
+Manual fallback checks:
 
 ```bash
 curl -I https://cellshire.com/

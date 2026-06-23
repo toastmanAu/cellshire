@@ -59,6 +59,16 @@ and it's live on next page load.
 The real CCC/JoyID path loads `@ckb-ccc/ccc` from an ESM CDN at runtime so the
 offline prototype remains available without adding a package manager step.
 
+## Smoke deployed app
+
+```bash
+node scripts/production_demo_smoke.mjs
+```
+
+The smoke checks the live custom domain and Pages hostname, verifies the hashed
+production module graph, and boots the guarded first-session URL in headless
+Chrome. Use `--base` and `--pages-base` for preview/demo targets.
+
 ## License
 
 MIT — inherited from the upstream Mykonos engine. The PNG asset pack

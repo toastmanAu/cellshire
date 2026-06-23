@@ -6,7 +6,7 @@ cards needed to turn the current prototype into the game described in
 
 ## Session Update 2026-06-23
 
-**Latest completed card:** `First-Session Playability Proof`.
+**Latest completed card:** `Production/Demo Smoke Harness`.
 
 **What landed since the last board save:**
 - Completed the guarded sparse-seed first-session proof on seed `20260523` and
@@ -16,6 +16,10 @@ cards needed to turn the current prototype into the game described in
   `ebf0377 Record first-session playability proof`.
 - Rechecked the live Cloudflare Pages deployment and custom domains after the
   push.
+- Added `scripts/production_demo_smoke.mjs`, a zero-dependency live smoke
+  runner for the custom domain plus Pages/demo hostname.
+- Updated the Cloudflare Pages runbook and README with the repeatable smoke
+  command.
 
 **Production/demo smoke verification saved on board:**
 - `git status --short --branch` returned `## main...origin/main` with no
@@ -41,18 +45,23 @@ cards needed to turn the current prototype into the game described in
   module-load failures were reported. Console output was limited to the known
   Canvas2D readback performance warning, the existing deprecated Apple mobile
   web app meta tag warning, and Chrome/browser-service noise outside the app.
+- `node scripts/production_demo_smoke.mjs` passed against the live custom
+  domain and Pages hostname. The script verified root HTML revalidation, the
+  shared `src-73cba931c538/main.js?v=73cba931c538` module graph, hashed module
+  `200` responses, and guarded first-session boot readiness.
+- `node --check scripts/production_demo_smoke.mjs` passed.
+- `node scripts/production_demo_smoke.mjs --self-test` passed.
 
-**Current Next card:** `Production/Demo Smoke Harness` — turn the manual live
-custom-domain smoke into a repeatable repo script or browser-harness entry that
-checks the deployed root HTML revalidates, the expected hashed module graph
-loads, `data-cellshire-boot="ready"` is reached on the guarded first-session
-URL, and module-load failures or uncaught app exceptions fail the run.
+**Current Next card:** `Store Integration Order Decision` — resolve whether the
+next chain-facing store work should harden Trader first, General Store first,
+or wallet inventory first, then turn that decision into a focused
+implementation card.
 
-**Why this next:** the production deploy path is currently healthy, but the
-verification is still manual and easy to lose between pushes. Bank production
-settlement, lazy-mint real ore scripts, and Cloudflare zone-header cleanup
-remain larger external-dependency tracks; the next local implementation slice
-should make deploy confidence repeatable before reopening those tracks.
+**Why this next:** the production deploy path is now repeatably checked. Bank
+production settlement, lazy-mint real ore scripts, and Cloudflare zone-header
+cleanup remain larger external-dependency tracks; store integration order is a
+repo-local product decision that can unblock the next concrete chain-facing
+implementation slice.
 
 ## Session Update 2026-05-31
 
