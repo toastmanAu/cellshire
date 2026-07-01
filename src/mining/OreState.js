@@ -14,8 +14,11 @@
 import {
     DEFAULT_ORE_VALUE_USD_RANGE,
     amountForUsdValue,
+    microsToUsd,
     rewardCurrencyForOre,
     rollOreValueUsd,
+    splitValueMicros,
+    usdToMicros,
 } from './cryptoEconomy.js';
 import { oreConfig, randInt } from './oreCatalog.js';
 
@@ -58,9 +61,9 @@ export class OreState {
      */
     restoreCapacity(n) {
         this.capacityRemaining = Math.max(0, Math.min(this.maxCapacity, n));
-        this.remainingValueUsd = Number((
-            this.totalValueUsd * (this.capacityRemaining / Math.max(1, this.maxCapacity))
-        ).toFixed(8));
+        const totalMicros = usdToMicros(this.totalValueUsd);
+        const remainingMicros = splitValueMicros(totalMicros, this.maxCapacity, this.capacityRemaining);
+        this.remainingValueUsd = microsToUsd(remainingMicros);
     }
 
     /**
@@ -76,18 +79,19 @@ export class OreState {
             : 1;
         const requestedCapacity = Math.max(1, Math.floor(Number(capacityPerHit) || 1));
         const capacitySpent = Math.min(this.capacityRemaining, requestedCapacity);
-        const baseValueUsd = this.capacityRemaining <= capacitySpent
-            ? this.remainingValueUsd
-            : (this.remainingValueUsd / this.capacityRemaining) * capacitySpent;
-        const valueUsd = Number((baseValueUsd * multiplier).toFixed(8));
-        this.remainingValueUsd = Number(Math.max(0, this.remainingValueUsd - baseValueUsd).toFixed(8));
+        const remainingMicros = usdToMicros(this.remainingValueUsd);
+        const baseValueMicros = splitValueMicros(remainingMicros, this.capacityRemaining, capacitySpent);
+        const valueMicros = baseValueMicros * BigInt(multiplier);
+        const baseValueUsd = microsToUsd(baseValueMicros);
+        const valueUsd = microsToUsd(valueMicros);
+        this.remainingValueUsd = microsToUsd(remainingMicros - baseValueMicros);
         const currency = rewardCurrencyForOre(this.oreType);
         this.capacityRemaining -= capacitySpent;
         return {
             oreType: this.oreType,
             currency,
             amount: amountForUsdValue(currency, valueUsd, { priceSnapshot }),
-            baseValueUsd: Number(baseValueUsd.toFixed(8)),
+            baseValueUsd,
             valueUsd,
             yieldMultiplier: multiplier,
             capacitySpent,

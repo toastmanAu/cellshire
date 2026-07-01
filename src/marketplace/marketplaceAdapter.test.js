@@ -85,6 +85,41 @@ describe('marketplace adapters', () => {
         expect(marketplaceListings(state).some(item => item.id === listing.id)).toBe(false);
     });
 
+    it('indexes seller CKB proceeds after fixture marketplace settlement', async () => {
+        const indexer = new FixtureCurrencyIndexer({
+            balances: { ckb: { amount: 5000, stale: false } },
+        });
+        const buyerAdapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            owner: 'ckt1buyer',
+            chainCurrencyIds: ['ckb'],
+            indexer,
+        });
+        const state = loadMarketplaceState({ get: () => null });
+        const listing = marketplaceListings(state).find(item => item.assetId === 'olive');
+        const out = await new ChainMarketplaceAdapter({
+            owner: 'ckt1buyer',
+            inventoryAdapter: buyerAdapter,
+        }).buy({
+            listingId: listing.id,
+            buyer: { address: 'ckt1buyer', provider: 'joyid' },
+            propInventory: new PropInventory(),
+            state,
+        });
+        expect(out.ok).toBe(true);
+        expect(out.settlement.outputs.seller_balance_cell.owner).toBe(listing.seller);
+        expect(out.settlement.outputs.seller_balance_cell.amount).toBe(2200);
+
+        const sellerAdapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            owner: listing.seller,
+            chainCurrencyIds: ['ckb'],
+            indexer,
+        });
+        expect((await buyerAdapter.read()).currencies.get('ckb')).toBe(2800);
+        expect((await sellerAdapter.read()).currencies.get('ckb')).toBe(2200);
+    });
+
     it('transfers fixture Open Asset listing cells to the chain buyer', async () => {
         clearOpenAssetDefinitions();
         const indexer = new FixtureCurrencyIndexer({
@@ -214,5 +249,155 @@ describe('marketplace adapters', () => {
         expect(out.mode).toBe('chain-ccc-receipt');
         expect(settled).toBe(false);
         expect(props.get('olive')).toBe(1);
+    });
+
+    it('reconciles CCC marketplace purchases from indexed settlement readback', async () => {
+        const storage = fakeStorage();
+        const pendingDeltas = new PendingCurrencyDeltaStore({ storage, owner: 'ckt1buyer' });
+        const indexer = new FixtureCurrencyIndexer({
+            balances: { ckb: { amount: 5000, stale: false } },
+        });
+        const chainAdapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            owner: 'ckt1buyer',
+            chainCurrencyIds: ['ckb'],
+            indexer,
+            pendingDeltas,
+        });
+        const originalSettle = chainAdapter.settleMarketplacePurchaseTx.bind(chainAdapter);
+        let adapterSettled = false;
+        chainAdapter.settleMarketplacePurchaseTx = (...args) => {
+            adapterSettled = true;
+            return originalSettle(...args);
+        };
+        const state = loadMarketplaceState({ get: () => null });
+        const listing = marketplaceListings(state).find(item => item.assetId === 'olive');
+        const props = new PropInventory();
+        const out = await new ChainMarketplaceAdapter({
+            owner: 'ckt1buyer',
+            requireWallet: true,
+            submit: async tx => {
+                const external = indexer.applyMarketplacePurchaseTx(tx, { txHash: '0xmarketreal' });
+                expect(external.ok).toBe(true);
+                return {
+                    ok: true,
+                    mode: 'ccc-joyid',
+                    txHash: '0xmarketreal',
+                    payload: tx.witness.marketplace_purchase,
+                };
+            },
+            inventoryAdapter: chainAdapter,
+        }).buy({
+            listingId: listing.id,
+            buyer: { address: 'ckt1buyer', provider: 'joyid', signer: 'ccc-joyid' },
+            propInventory: props,
+            state,
+        });
+
+        expect(out.ok).toBe(true);
+        expect(out.mode).toBe('chain-ccc-readback');
+        expect(adapterSettled).toBe(false);
+        expect(out.settlement.outputs.seller_balance_cell.amount).toBe(2200);
+        expect(props.get('olive')).toBe(1);
+        expect(pendingDeltas.list().length).toBe(1);
+        const buyerSnapshot = await chainAdapter.read();
+        expect(buyerSnapshot.pending).toBe(false);
+        expect(buyerSnapshot.currencies.get('ckb')).toBe(2800);
+
+        const sellerAdapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            owner: listing.seller,
+            chainCurrencyIds: ['ckb'],
+            indexer,
+        });
+        expect((await sellerAdapter.read()).currencies.get('ckb')).toBe(2200);
+    });
+
+    it('grants the indexed Open Asset cell from CCC marketplace readback', async () => {
+        clearOpenAssetDefinitions();
+        const storage = fakeStorage();
+        const pendingDeltas = new PendingCurrencyDeltaStore({ storage, owner: 'ckt1buyer' });
+        const indexer = new FixtureCurrencyIndexer({
+            balances: { ckb: { amount: 5000, stale: false } },
+        });
+        const storeTx = buildStorePurchaseTransaction({
+            walletAccount: { provider: 'joyid', address: 'ckt1seller', network: 'testnet' },
+            item: generalStoreItem('blue_railing'),
+            txNonce: 'ccc-market-transfer-1',
+        });
+        const storeSettlement = indexer.applyStorePurchaseTx(storeTx, { txHash: '0xstore' });
+        expect(storeSettlement.ok).toBe(true);
+
+        const openAssetId = openAssetIdForCell('store:ckt1seller:blue_railing:ccc-market-transfer-1');
+        const sellerProps = new PropInventory();
+        const sellerAdapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            props: sellerProps,
+            owner: 'ckt1seller',
+            chainCurrencyIds: ['ckb'],
+            indexer,
+        });
+        await sellerAdapter.read();
+        const state = loadMarketplaceState({ get: () => null });
+        const listed = createMarketplaceListing({
+            assetId: openAssetId,
+            price: { currency: 'ckb', amount: 1500 },
+            seller: { address: 'ckt1seller', label: 'Seller' },
+            propInventory: sellerProps,
+            state,
+            now: () => 456,
+        });
+        expect(listed.ok).toBe(true);
+
+        const buyerProps = new PropInventory();
+        const chainAdapter = new ReadOnlyChainCurrencyAdapter({
+            localInventory: new Inventory(),
+            props: buyerProps,
+            owner: 'ckt1buyer',
+            chainCurrencyIds: ['ckb'],
+            indexer,
+            pendingDeltas,
+        });
+        const originalSettle = chainAdapter.settleMarketplacePurchaseTx.bind(chainAdapter);
+        let adapterSettled = false;
+        chainAdapter.settleMarketplacePurchaseTx = (...args) => {
+            adapterSettled = true;
+            return originalSettle(...args);
+        };
+        const out = await new ChainMarketplaceAdapter({
+            owner: 'ckt1buyer',
+            requireWallet: true,
+            submit: async tx => {
+                const external = indexer.applyMarketplacePurchaseTx(tx, { txHash: '0xmarketopenreal' });
+                expect(external.ok).toBe(true);
+                expect(external.outputs.open_asset_cell.owner).toBe('ckt1buyer');
+                return {
+                    ok: true,
+                    mode: 'ccc-joyid',
+                    txHash: '0xmarketopenreal',
+                    payload: tx.witness.marketplace_purchase,
+                };
+            },
+            inventoryAdapter: chainAdapter,
+        }).buy({
+            listingId: listed.listing.id,
+            buyer: { address: 'ckt1buyer', provider: 'joyid', signer: 'ccc-joyid' },
+            propInventory: buyerProps,
+            state,
+        });
+
+        expect(out.ok).toBe(true);
+        expect(out.mode).toBe('chain-ccc-readback');
+        expect(adapterSettled).toBe(false);
+        expect(out.settlement.outputs.open_asset_cell.cellId)
+            .toBe('store:ckt1seller:blue_railing:ccc-market-transfer-1');
+        expect(buyerProps.get(openAssetId)).toBe(1);
+        expect(buyerProps.get('blue_railing')).toBe(0);
+        expect((await indexer.getOpenAssetCells({ owner: 'ckt1seller' })).length).toBe(0);
+        expect((await indexer.getOpenAssetCells({ owner: 'ckt1buyer' }))[0].cellId)
+            .toBe('store:ckt1seller:blue_railing:ccc-market-transfer-1');
+        expect(pendingDeltas.list().length).toBe(1);
+        expect((await chainAdapter.read()).pending).toBe(false);
+        expect(marketplaceListings(state).some(item => item.id === listed.listing.id)).toBe(false);
     });
 });

@@ -14,6 +14,9 @@ export const TESTNET_PRICE_SNAPSHOT = {
 
 export const DEFAULT_ORE_VALUE_USD_RANGE = [50, 200];
 export const DEFAULT_EPOCH_CLEAR_VALUE_USD_RANGE = [20, 100];
+export const USD_VALUE_SCALE = 1_000_000;
+export const USD_PRICE_SCALE = 1_000_000_000_000;
+export const CURRENCY_AMOUNT_SCALE = 100_000_000;
 
 export const CURRENCY_CATALOG = {
     btc:  { symbol: 'BTC',  displayName: 'Bitcoin',      coingeckoId: 'bitcoin',        pow: true, priceUsd: 76847,      logoPath: 'logos/bitcoin-btc-logo.svg' },
@@ -90,8 +93,12 @@ export function amountForUsdValue(currencyId, usdValue, {
 } = {}) {
     const priceUsd = priceUsdForCurrency(currencyId, priceSnapshot);
     if (!Number.isFinite(priceUsd) || priceUsd <= 0) return usdValue;
-    const amount = usdValue / priceUsd;
-    return Number(amount.toFixed(decimals));
+    const usdMicros = decimalToScaledInteger(usdValue, USD_VALUE_SCALE);
+    const priceScaled = decimalToScaledInteger(priceUsd, USD_PRICE_SCALE);
+    const numerator = usdMicros * BigInt(USD_PRICE_SCALE) * BigInt(CURRENCY_AMOUNT_SCALE);
+    const denominator = BigInt(USD_VALUE_SCALE) * priceScaled;
+    const amountUnits = divRoundHalfUp(numerator, denominator);
+    return scaledIntegerToNumber(amountUnits, CURRENCY_AMOUNT_SCALE, decimals);
 }
 
 export function amountForBaseYield(currencyId, baseAmount, {
@@ -110,18 +117,46 @@ export function rollOreValueUsd(rand = Math.random, range = DEFAULT_ORE_VALUE_US
     return Number((lo + rand() * (hi - lo)).toFixed(2));
 }
 
+export function usdToMicros(value) {
+    return decimalToScaledInteger(value, USD_VALUE_SCALE);
+}
+
+export function usdPriceToScaled(value) {
+    return decimalToScaledInteger(value, USD_PRICE_SCALE);
+}
+
+export function currencyAmountToUnits(value) {
+    return decimalToScaledInteger(value, CURRENCY_AMOUNT_SCALE);
+}
+
+export function microsToUsd(micros, decimals = 8) {
+    return scaledIntegerToNumber(BigInt(micros), USD_VALUE_SCALE, decimals);
+}
+
+export function splitValueMicros(remainingValueMicros, capacityRemaining, capacitySpent) {
+    const remaining = BigInt(remainingValueMicros);
+    const remainingCapacity = BigInt(Math.max(1, Math.floor(Number(capacityRemaining) || 1)));
+    const requested = Math.floor(Number(capacitySpent) || 0);
+    if (requested <= 0) return 0n;
+    const spent = BigInt(requested);
+    if (spent >= remainingCapacity) return remaining;
+    return divRoundHalfUp(remaining * spent, remainingCapacity);
+}
+
 export function splitUsdBudget(totalUsd, count, rand = Math.random) {
     if (!Number.isFinite(totalUsd) || totalUsd <= 0 || count <= 0) return [];
     const weights = Array.from({ length: count }, () => 0.75 + rand() * 0.5);
-    const weightSum = weights.reduce((sum, n) => sum + n, 0);
-    let assigned = 0;
+    const scaledWeights = weights.map(weight => BigInt(Math.round(weight * 1_000_000)));
+    const weightSum = scaledWeights.reduce((sum, n) => sum + n, 0n);
+    const totalMicros = usdToMicros(totalUsd);
+    let assignedMicros = 0n;
     return weights.map((weight, i) => {
         if (i === weights.length - 1) {
-            return Number(Math.max(0, totalUsd - assigned).toFixed(8));
+            return microsToUsd(totalMicros - assignedMicros);
         }
-        const value = Number((totalUsd * weight / weightSum).toFixed(8));
-        assigned = Number((assigned + value).toFixed(8));
-        return value;
+        const valueMicros = divRoundHalfUp(totalMicros * scaledWeights[i], weightSum);
+        assignedMicros += valueMicros;
+        return microsToUsd(valueMicros);
     });
 }
 
@@ -150,4 +185,25 @@ export function formatUsd(value) {
     }
     if (abs >= 1) return `$${value.toFixed(2)}`;
     return `$${value.toFixed(4)}`;
+}
+
+function decimalToScaledInteger(value, scale) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0n;
+    return BigInt(Math.round(n * scale));
+}
+
+function scaledIntegerToNumber(units, scale, decimals) {
+    const negative = units < 0n;
+    const abs = negative ? -units : units;
+    const whole = abs / BigInt(scale);
+    const fraction = abs % BigInt(scale);
+    const width = String(scale).length - 1;
+    const raw = `${negative ? '-' : ''}${whole}.${fraction.toString().padStart(width, '0')}`;
+    return Number(Number(raw).toFixed(decimals));
+}
+
+function divRoundHalfUp(numerator, denominator) {
+    if (denominator <= 0n) return 0n;
+    return (numerator + (denominator / 2n)) / denominator;
 }

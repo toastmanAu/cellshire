@@ -39,7 +39,7 @@ describe('marketplace purchase transaction', () => {
         expect(tx.outputs.seller_receipt.owner).toBe(listing.seller);
     });
 
-    it('settles a fixture purchase by spending buyer CKB and keeping listing receipt data', () => {
+    it('settles a fixture purchase by spending buyer CKB and crediting seller proceeds', () => {
         const state = loadMarketplaceState({ get: () => null });
         const listing = marketplaceListings(state).find(item => item.assetId === 'olive');
         const tx = buildMarketplacePurchaseTransaction({
@@ -51,13 +51,25 @@ describe('marketplace purchase transaction', () => {
             tx,
             txHash: '0xmarket',
             indexedBalances: {
-                ckb: { amount: 5000, stale: false, outPoint: { txHash: '0xold', index: 0 } },
+                ckt1buyer: {
+                    ckb: { amount: 5000, stale: false, outPoint: { txHash: '0xold', index: 0 } },
+                },
+                [listing.seller]: {
+                    ckb: { amount: 300, stale: false, outPoint: { txHash: '0xsellerold', index: 0 } },
+                },
             },
         });
         expect(settlement.ok).toBe(true);
         expect(settlement.outputs.payment_balance_cell.amount).toBe(2800);
         expect(settlement.outputs.buyer_receipt.asset_id).toBe('olive');
         expect(settlement.outputs.seller_receipt.amount).toBe(2200);
+        expect(settlement.outputs.seller_balance_cell.owner).toBe(listing.seller);
+        expect(settlement.outputs.seller_balance_cell.amount).toBe(2500);
+        expect(settlement.balanceUpdates.length).toBe(2);
+        expect(settlement.balanceUpdates[0].role).toBe('buyer');
+        expect(settlement.balanceUpdates[0].amount).toBe(2800);
+        expect(settlement.balanceUpdates[1].role).toBe('seller');
+        expect(settlement.balanceUpdates[1].amount).toBe(2500);
     });
 
     it('carries Open Asset transfer intent through fixture settlement', () => {

@@ -7,9 +7,12 @@ import {
     currencyLogoPath,
     currencySymbol,
     formatCurrencyAmount,
+    microsToUsd,
     rewardCurrencyForOre,
     rollOreValueUsd,
+    splitValueMicros,
     splitUsdBudget,
+    usdToMicros,
 } from './cryptoEconomy.js';
 import { ORE_CATALOG } from './oreCatalog.js';
 import { RESOURCE_CATALOG } from '../resources/resourceInventory.js';
@@ -58,6 +61,14 @@ describe('crypto economy mapping', () => {
         expect(amountForUsdValue('btc', 100)).toBe(0.00130129);
         expect(amountForUsdValue('ckb', 100)).toBe(69658.74182381);
         expect(amountForUsdValue('erg', 75)).toBe(265.98008341);
+    });
+
+    it('uses integer micro-dollar splitting for committed mining value', () => {
+        expect(usdToMicros(100.1234564).toString()).toBe('100123456');
+        expect(microsToUsd(33333333n)).toBe(33.333333);
+        expect(splitValueMicros(usdToMicros(100), 3, 1).toString()).toBe('33333333');
+        expect(splitValueMicros(usdToMicros(66.666667), 2, 2).toString()).toBe('66666667');
+        expect(splitValueMicros(usdToMicros(50), 1, 0).toString()).toBe('0');
     });
 
     it('rolls deterministic per-ore USD value budgets in the target range', () => {

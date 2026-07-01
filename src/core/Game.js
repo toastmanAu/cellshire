@@ -42,6 +42,10 @@ import {
 } from '../ui/Audio.js?v=audio-wiring-3';
 import { CELL_CURSORS } from '../ui/cursors.js';
 import { recordMine } from '../mining/minedStore.js';
+import {
+    appendMiningSessionAction,
+    miningSessionActionFromResult,
+} from '../mining/miningSessionTape.js';
 import { LocalMiningAdapter } from '../mining/miningAdapter.js';
 import {
     harvestResourceConfig,
@@ -1004,6 +1008,16 @@ export class Game {
         // mid-epoch can't reset the ore. No-op when currentEpoch is
         // null (random seed path — non-deterministic world).
         recordMine(safeStorage, this.currentEpoch, obj.gx, obj.gy, state.capacityRemaining);
+        appendMiningSessionAction(safeStorage, miningSessionActionFromResult({
+            epoch: this.currentEpoch,
+            mapId: this.currentMapId,
+            obj,
+            state,
+            result,
+            capacityPerHit: result.capacitySpent,
+            yieldMultiplier: result.yieldMultiplier,
+            priceSnapshot: this.priceSnapshot,
+        }));
 
         const cfg = oreConfig(result.oreType);
         const dustColor = cfg?.dustColor ?? '#9d8e74';

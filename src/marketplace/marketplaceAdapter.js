@@ -77,7 +77,7 @@ export class ChainMarketplaceAdapter {
             };
         }
         const settlement = receipt.mode === 'ccc-joyid'
-            ? null
+            ? await this.inventoryAdapter?.readMarketplacePurchaseSettlement?.(tx, receipt)
             : this.inventoryAdapter?.settleMarketplacePurchaseTx?.(tx, receipt);
         if (settlement && !settlement.ok) {
             return {
@@ -103,7 +103,7 @@ export class ChainMarketplaceAdapter {
         return {
             ok: true,
             mode: receipt.mode === 'ccc-joyid'
-                ? 'chain-ccc-receipt'
+                ? settlement?.ok ? 'chain-ccc-readback' : 'chain-ccc-receipt'
                 : settlement?.ok ? 'chain-fixture-settled' : 'chain-prototype',
             listing,
             tx,

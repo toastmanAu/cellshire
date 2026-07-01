@@ -15,25 +15,33 @@ were structurally sound, so we kept the engine and built the game on top.
 
 ## Status
 
-- ✅ **Procgen world** at 100–300 cells/side
-  Two-octave value noise, water/sand/dirt/dark-stone biomes, Poisson-disc
-  ore scatter on stone, cypress accents on dirt.
-- ✅ **Mining-mood asset pack v0** — generated via HiDream-O1 ref-image edits
-  Terrain: `dark_stone`, `dirt`
-  Ores: `coal_seam`, `copper_ore`, `iron_ore`, `gold_ore`, `amethyst_geode`,
-  `diamond_ore`, `ckb_cluster` (signature landmark with inner glow)
-- ✅ **World-size adaptive cache renderer**
-  `CACHE_SCALE` auto-degrades to keep the cache canvas under the browser's
-  Canvas2D dimension cap, allowing 300×300+ worlds without engine rewrite.
-- ✅ **Playable local mining loop**
-  Click-to-walk, click-to-interact, collision, local ore capacity,
-  per-ore drops, inventory HUD, and per-epoch reload-safe mined-state.
-- ✅ **CKB epoch procgen seed**
-  Live RPC → cached → random fallback; PerfHUD surfaces epoch/source.
-- ⏳ Ore-as-cell mining transactions
-- ⏳ Player property zone + expansion mechanics
-- ⏳ Three-store marketplace layer
-- ⏳ Open asset standard + mint-to-game pipeline
+- ✅ **Procgen mine world**
+  CKB epoch-derived seeds drive deterministic maps with adaptive cache
+  rendering, biome terrain, harvest resources, ore scatter, high-value epoch
+  modifiers, and reload-safe local fallback play.
+- ✅ **Mining economy and chain-shaped ore cells**
+  Local mining, fixture chain mining, CCC/JoyID submit receipts, lazy ore
+  BIRTH/DECREMENT/DEPLETE tx shapes, fixed-point USD/reward math, and
+  owner-visible currency balances are covered by tests.
+- ✅ **Verifiable mining pipeline**
+  Mining hits journal into per-epoch/per-ore replay tapes. Replayed sessions
+  serialize to canonical `CSMS` bytes, commit with CKB-personalized blake2b-256,
+  and have matching JS/Rust golden vectors in `verifier/mining-parity`.
+- ✅ **Wallet-owned property and township loop**
+  Player homes, property saves, wallet owner binding, expansion tiers, building
+  progression, township landmarks, and read-only visit links are implemented.
+- ✅ **Three-store economy**
+  General Store, Trader, Bank, and Marketplace have local/fixture-chain adapter
+  boundaries, pending currency deltas, CCC/JoyID receipt paths, and indexed
+  readback coverage where real submit mode needs it.
+- ✅ **Open Asset standard and marketplace transfer path**
+  Store purchases mint deterministic Open Asset prop cells, wallet inventory
+  readback hydrates `open:<cell_id>` props, and marketplace listings transfer
+  exact indexed Open Asset ownership from seller to buyer.
+- ⏳ **Next verifier work**
+  Rust currently reproduces canonical bytes and commitment hashes from the
+  frozen fixture. The next step is a Rust reducer that derives final mining
+  state and rewards from compact hit actions before the on-chain verifier lock.
 
 See **[docs/DESIGN.md](docs/DESIGN.md)** for the full game design.
 See **[docs/superpowers/kanban.md](docs/superpowers/kanban.md)** for the

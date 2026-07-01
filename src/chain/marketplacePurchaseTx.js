@@ -99,8 +99,13 @@ export function settleMarketplacePurchaseFixture({
         }
     }
 
-    const before = normalizedBalanceAmount(indexedBalances[currency]);
+    const seller = purchase.seller;
+    const buyerBalance = balanceEntry(indexedBalances, owner, currency);
+    const sellerBalance = balanceEntry(indexedBalances, seller, currency);
+    const before = normalizedBalanceAmount(buyerBalance);
+    const sellerBefore = normalizedBalanceAmount(sellerBalance);
     const beforeUnits = amountToBaseUnits(before);
+    const sellerBeforeUnits = amountToBaseUnits(sellerBefore);
     const priceUnits = amountToBaseUnits(purchase.price_amount);
     if (priceUnits <= 0n) return { ok: false, reason: 'invalid-marketplace-price' };
     if (beforeUnits < priceUnits) {
@@ -113,8 +118,29 @@ export function settleMarketplacePurchaseFixture({
     }
 
     const afterUnits = beforeUnits - priceUnits;
+    const sellerAfterUnits = sellerBeforeUnits + priceUnits;
     const after = baseUnitsToAmount(afterUnits);
-    const outPoint = afterUnits > 0n ? fixtureOutPoint(txHash, currency) : null;
+    const sellerAfter = baseUnitsToAmount(sellerAfterUnits);
+    const outPoint = afterUnits > 0n ? fixtureOutPoint(txHash, currency, 'buyer', 1) : null;
+    const sellerOutPoint = fixtureOutPoint(txHash, currency, 'seller', 2);
+    const buyerUpdate = {
+        owner,
+        currency,
+        amount: after,
+        stale: false,
+        outPoint,
+        spent: afterUnits === 0n,
+        role: 'buyer',
+    };
+    const sellerUpdate = {
+        owner: seller,
+        currency,
+        amount: sellerAfter,
+        stale: false,
+        outPoint: sellerOutPoint,
+        spent: false,
+        role: 'seller',
+    };
     return {
         ok: true,
         mode: 'fixture-settlement',
@@ -127,7 +153,7 @@ export function settleMarketplacePurchaseFixture({
                 owner,
                 currency,
                 amount: before,
-                outPoint: indexedBalances[currency]?.outPoint ?? null,
+                outPoint: buyerBalance?.outPoint ?? null,
             },
             listing_cell: tx.inputs?.listing_cell ?? null,
         },
@@ -137,19 +163,23 @@ export function settleMarketplacePurchaseFixture({
                 : null,
             buyer_receipt: tx.outputs?.buyer_receipt ?? null,
             seller_receipt: tx.outputs?.seller_receipt ?? null,
+            seller_balance_cell: {
+                owner: seller,
+                currency,
+                amount: sellerAfter,
+                outPoint: sellerOutPoint,
+            },
             open_asset_transfer: openAssetTransfer,
         },
         updates: {
-            [currency]: {
-                owner,
-                currency,
-                amount: after,
-                stale: false,
-                outPoint,
-                spent: afterUnits === 0n,
-            },
+            [currency]: buyerUpdate,
         },
+        balanceUpdates: [buyerUpdate, sellerUpdate],
     };
+}
+
+function balanceEntry(indexedBalances, owner, currency) {
+    return indexedBalances?.[owner]?.[currency] ?? indexedBalances?.[currency] ?? null;
 }
 
 function normalizedBalanceAmount(entry) {
@@ -157,14 +187,14 @@ function normalizedBalanceAmount(entry) {
     return Number(entry?.amount ?? 0) || 0;
 }
 
-function fixtureOutPoint(txHash, currency) {
-    const raw = `${txHash || 'fixture'}:${currency}:marketplace`;
+function fixtureOutPoint(txHash, currency, role = 'buyer', index = 1) {
+    const raw = `${txHash || 'fixture'}:${currency}:marketplace:${role}`;
     let hex = '';
     for (let i = 0; i < raw.length && hex.length < 64; i++) {
         hex += raw.charCodeAt(i).toString(16).padStart(2, '0');
     }
     return {
         txHash: `0x${hex.padEnd(64, '0')}`,
-        index: 1,
+        index,
     };
 }

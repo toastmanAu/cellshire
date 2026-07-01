@@ -4,6 +4,236 @@ Status captured 2026-06-23. This board tracks the next implementation
 cards needed to turn the current prototype into the game described in
 `docs/DESIGN.md`.
 
+## Session Update 2026-07-02 — Verifiable Mining Rust Parity
+
+**Latest completed card:** `Verifiable Mining Rust Parity Harness`.
+
+**What landed since the last board save:**
+- Added `verifier/mining-parity`, a small dependency-free Rust crate for the
+  mining commitment conformance path.
+- Ported the canonical mining session byte writer to Rust with the same `CSMS`
+  magic, schema fields, length-prefixed strings, and little-endian integer
+  encoding as the JS implementation.
+- Ported CKB-personalized blake2b-256 locally in Rust so the harness can run
+  offline without fetching crates.
+- Added the frozen two-hit coal session as a Rust fixture, including final ore
+  state and summed ZEC reward units.
+- Added Rust tests that assert the empty CKB blake2b vector, canonical bytes,
+  and final mining commitment exactly match the JS golden vectors.
+
+**Verification saved on board:**
+- `cargo test` in `verifier/mining-parity`: `3 passed, 0 failed`.
+- `cargo fmt -- --check` in `verifier/mining-parity` passed.
+- `git diff --check` passed.
+
+**Current Next card:** `Verifiable Mining Rust Reducer Port` — replace the
+  fixed Rust fixture with a reducer that replays compact hit actions and
+  computes the final state/reward summary from integer yield math, then keep
+  the existing golden commitment tests as conformance guards.
+
+**Why this next:** Rust can now reproduce the frozen commitment bytes and digest.
+The remaining verifier risk is the state transition itself: the Rust side still
+needs to derive those fields from the action tape rather than receiving a
+pre-expanded golden session fixture.
+
+## Session Update 2026-07-02 — Verifiable Mining Commitment
+
+**Latest completed card:** `Verifiable Mining Session Commitment`.
+
+**What landed since the last board save:**
+- Added `src/lib/ckbBlake2b.js`, a dependency-free CKB-personalized
+  blake2b-256 helper for browser and Node test paths.
+- Added canonical mining session serialization in
+  `src/mining/miningSessionTape.js`. The payload starts with `CSMS`, writes
+  versioned little-endian fields, length-prefixed strings, fixed-scale USD
+  micros, fixed-scale reward units, fixed-scale price snapshots, replayed final
+  ore state, and summed per-currency rewards.
+- Added `commitMiningSession()`, `canonicalMiningSessionBytes()`,
+  `canonicalMiningSessionHex()`, and `summarizeMiningReplay()`. Commitment
+  generation replays the tape first and refuses forged sessions before hashing.
+- Froze a two-hit coal-session golden vector covering canonical bytes,
+  commitment hash, final ore capacity/value, and total ZEC reward units.
+- Updated `docs/VERIFIABLE-STATE.md` to mark JS client commitment as landed and
+  leave Rust parity / verifier lock as the remaining design targets.
+
+**Verification saved on board:**
+- Focused mining commitment/economy module run: `16 passed, 0 failed`.
+- Full browser harness at `http://127.0.0.1:8767/tests.html`: `442 passed,
+  0 failed`.
+- `node netlify-build.mjs` passed.
+- `git diff --check` passed.
+
+**Current Next card:** `Verifiable Mining Rust Parity Harness` — port the
+canonical mining reducer/serializer enough to produce byte-identical replay
+summaries and commitments from Rust, then run JS/Rust conformance against the
+frozen golden vectors.
+
+**Why this next:** The browser/client now has a stable commitment format. The
+next risk is cross-engine reproducibility: a verifier is only useful once Rust
+can reproduce the same fixed-point yield math, canonical bytes, and CKB blake2b
+digest.
+
+## Session Update 2026-07-02 — Verifiable Mining Tape
+
+**Latest completed card:** `Verifiable State Mining Tape Pipeline`.
+
+**What landed since the last board save:**
+- Promoted the first implementation slice from
+  [`docs/VERIFIABLE-STATE.md`](../VERIFIABLE-STATE.md) into the mining runtime.
+- Added `src/mining/miningSessionTape.js`, a replayable per-epoch/per-ore mining
+  tape that records ore identity, initial ore state, capacity spent,
+  multiplier, compact price snapshot, and expected yield results.
+- Added `replayMiningSession()`, which rebuilds an `OreState`, replays the
+  recorded hit tape, and rejects forged expected yield values.
+- Reworked the committed mining yield path to use integer-scaled USD values,
+  high-precision integer USD prices, 1e-8 reward units, and a single
+  round-half-up division rule before freezing replay vectors.
+- Removed `.toFixed(8)` from the mining yield/tape/procgen budget path; the
+  remaining uses are display formatting and unrelated bank debt-cell math.
+- Wired `Game._commitMinedOre()` to append the tape only after a mining hit is
+  actually committed. Chain mining therefore journals after successful submit;
+  random/local epoch fallback remains uncommitted and produces no tape.
+- Added focused golden tests for tape persistence, multi-hit replay, forged
+  yield rejection, and fail-closed behavior for non-epoch local mining.
+- Registered the new tape tests in `tests.html`.
+
+**Verification saved on board:**
+- Focused fixed-point mining tape/chain mining module run: `35 passed,
+  0 failed`.
+- Adjacent mining/procgen/economy module run: `75 passed, 0 failed`.
+- Full browser harness at `http://127.0.0.1:8767/tests.html`: `439 passed,
+  0 failed`.
+- `node netlify-build.mjs` passed.
+- `git diff --check` passed.
+
+**Current Next card:** `Verifiable Mining Session Commitment` — add canonical
+serialization plus a blake2b commitment for replayed mining sessions, then
+freeze golden vectors that cover the tape, final ore state, and total rewarded
+amounts.
+
+**Why this next:** The tape/replay boundary now exists and the load-bearing
+integer yield rule is in place. The next useful rung from
+`docs/VERIFIABLE-STATE.md` is a stable commitment format that a future Rust
+verifier can reproduce byte-for-byte.
+
+## Session Update 2026-07-02 — Marketplace Open Asset CCC Readback
+
+**Latest completed card:** `Marketplace Open Asset CCC Readback Grant`.
+
+**What landed since the last board save:**
+- Added regression coverage for a CCC/JoyID marketplace purchase whose indexed
+  settlement includes an Open Asset transfer.
+- Proved CCC readback grants the exact indexed `open:<cell_id>` prop from
+  `settlement.outputs.open_asset_cell` instead of falling back to the source
+  catalog prop id.
+- Verified the Open Asset cell owner moves from seller to buyer in the fixture
+  indexer during the simulated external settlement.
+- Verified receipt-mode direct fixture settlement remains unused in CCC mode,
+  buyer pending CKB still reconciles after readback, and the marketplace
+  listing closes only after the readback grant.
+
+**Verification saved on board:**
+- Focused marketplace/readback module run: `27 passed, 0 failed`.
+- Adjacent chain economy module run covering Marketplace, Store, Trader, Bank,
+  Currency Adapter, and Player Marketplace: `53 passed, 0 failed`.
+- Full browser harness at `http://127.0.0.1:8767/tests.html`: `435 passed,
+  0 failed`.
+- `node netlify-build.mjs` passed.
+- `git diff --check` passed.
+
+**Current Next card:** `Marketplace Pending Receipt State` — persist
+CCC/JoyID marketplace receipts that have not indexed yet, surface them as
+pending listing purchases, and add a retry/readback sweep so optimistic local
+grants can be replaced by authoritative indexed settlement once the indexer
+catches up.
+
+**Why this next:** The readback path can now reconcile currency and Open Asset
+ownership when settlement is already indexed. The remaining UX gap is the
+between-submit-and-indexer window: today receipt-only mode grants immediately,
+but there is no durable pending purchase record to retry readback or explain
+the pending state after reload.
+
+## Session Update 2026-07-02 — Marketplace CCC Readback
+
+**Latest completed card:** `Marketplace CCC Settlement Readback Boundary`.
+
+**What landed since the last board save:**
+- Added a `ReadOnlyChainCurrencyAdapter.readMarketplacePurchaseSettlement()`
+  boundary so marketplace CCC/JoyID receipt-mode purchases can ask an indexer
+  whether their settlement has already been observed by tx hash.
+- Extended `FixtureCurrencyIndexer` with a `marketplaceSettlements` readback
+  surface. Fixture settlement still applies only through
+  `applyMarketplacePurchaseTx()`, but observed settlements are now retained for
+  later readback by tx hash.
+- Updated `ChainMarketplaceAdapter` so CCC/JoyID mode never calls direct
+  fixture settlement, but does consume indexed readback when available and
+  reports `chain-ccc-readback`.
+- Preserved the existing `chain-ccc-receipt` behavior when no indexed
+  settlement is available yet.
+- Added regression coverage proving CCC readback can reconcile buyer pending
+  CKB, seller proceeds, and purchase grant while keeping direct adapter
+  fixture settlement unused in CCC mode.
+
+**Verification saved on board:**
+- Focused marketplace/readback module run: `26 passed, 0 failed`.
+- Adjacent chain economy module run covering Marketplace, Store, Trader, Bank,
+  Currency Adapter, and Player Marketplace: `52 passed, 0 failed`.
+- Full browser harness at `http://127.0.0.1:8767/tests.html`: `434 passed,
+  0 failed`.
+- `node netlify-build.mjs` passed.
+- `git diff --check` passed.
+
+**Current Next card:** `Marketplace Open Asset CCC Readback Grant` — extend
+the CCC readback path with an Open Asset transfer-specific test and adapter
+behavior so an indexed transferred Open Asset cell, not the optimistic local
+listing grant, becomes the authoritative prop grant for real marketplace
+settlement.
+
+**Why this next:** CCC receipt-mode purchases now have a readback boundary for
+currency reconciliation. The remaining high-value marketplace gap is proving
+the same boundary with Open Asset ownership transfer, where granting the exact
+indexed `open:<cell_id>` matters more than granting a catalog prop id.
+
+## Session Update 2026-07-02
+
+**Latest completed card:** `Marketplace Seller Proceeds Settlement`.
+
+**What landed since the last board save:**
+- Fixture marketplace settlement now emits a seller CKB balance output in
+  addition to the existing buyer debit, buyer receipt, seller receipt, and
+  Open Asset transfer intent.
+- Marketplace fixture settlements now return explicit owner-tagged
+  `balanceUpdates` for buyer and seller. The legacy buyer `updates` shape is
+  still present for compatibility with older focused fixture callers.
+- `FixtureCurrencyIndexer` now supports owner-scoped currency balances while
+  preserving the old single-owner `balances: { ckb: ... }` setup for Store,
+  Trader, Bank, and older marketplace tests.
+- Chain marketplace fixture purchases now credit seller CKB into the indexed
+  balance surface, so a seller wallet read can observe proceeds after a buyer
+  purchase settles.
+- Added regression coverage for pure marketplace fixture settlement math and
+  adapter/indexer seller-proceeds readback.
+
+**Verification saved on board:**
+- Focused marketplace module run: `10 passed, 0 failed`.
+- Adjacent chain economy module run covering Marketplace, Store, Trader, Bank,
+  Currency Adapter, and Player Marketplace: `51 passed, 0 failed`.
+- Full browser harness at `http://127.0.0.1:8767/tests.html`: `433 passed,
+  0 failed`.
+- `node netlify-build.mjs` passed.
+- `git diff --check` passed.
+
+**Current Next card:** `Marketplace CCC Settlement Readback Boundary` — define
+and implement the first non-fixture readback contract for marketplace purchases
+so CCC/JoyID receipt-mode purchases can reconcile buyer spend, seller proceeds,
+and Open Asset ownership through indexed chain data instead of immediate local
+fixture settlement.
+
+**Why this next:** The fixture path now has symmetric buyer/seller currency
+movement and Open Asset transfer. The remaining marketplace asymmetry is that
+real CCC submit mode still records a receipt and grants locally without a
+post-submit indexed settlement/readback loop.
+
 ## Session Update 2026-06-23
 
 **Latest completed card:** `Marketplace Open Asset Transfer Settlement`.

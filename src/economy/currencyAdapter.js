@@ -146,6 +146,13 @@ export class ReadOnlyChainCurrencyAdapter {
         }) ?? null;
     }
 
+    async readMarketplacePurchaseSettlement(tx, receipt = {}) {
+        return this.indexer?.readMarketplacePurchaseSettlement?.({
+            tx,
+            txHash: receipt.txHash,
+        }) ?? null;
+    }
+
     settleBankBorrowTx(tx, receipt = {}) {
         return this.indexer?.applyBankBorrowTx?.(tx, {
             txHash: receipt.txHash,
@@ -160,8 +167,10 @@ export class ReadOnlyChainCurrencyAdapter {
 }
 
 export class FixtureCurrencyIndexer {
-    constructor({ balances = {}, offline = false, bankState = null, openAssetCells = [] } = {}) {
+    constructor({ balances = {}, ownerBalances = {}, marketplaceSettlements = {}, offline = false, bankState = null, openAssetCells = [] } = {}) {
         this.balances = balances;
+        this.ownerBalances = ownerBalances;
+        this.marketplaceSettlements = marketplaceSettlements;
         this.openAssetCells = openAssetCells;
         this.offline = offline;
         this.bankState = bankState ?? {
@@ -174,7 +183,7 @@ export class FixtureCurrencyIndexer {
         this.bankState.releasedCollateral = this.bankState.releasedCollateral ?? {};
     }
 
-    async getCurrencyBalances({ currencyIds } = {}) {
+    async getCurrencyBalances({ owner, currencyIds } = {}) {
         if (this.offline) {
             return Object.fromEntries((currencyIds ?? []).map(currencyId => [
                 currencyId,
@@ -183,13 +192,18 @@ export class FixtureCurrencyIndexer {
         }
         return Object.fromEntries((currencyIds ?? []).map(currencyId => [
             currencyId,
-            this.balances[currencyId] ?? { amount: 0, stale: false },
+            this._balanceEntry(owner, currencyId) ?? { amount: 0, stale: false },
         ]));
     }
 
     async getOpenAssetCells({ owner } = {}) {
         if (this.offline) return [];
         return this.openAssetCells.filter(cell => !owner || cell.owner === owner);
+    }
+
+    async readMarketplacePurchaseSettlement({ txHash } = {}) {
+        if (this.offline || !txHash) return null;
+        return this.marketplaceSettlements[txHash] ?? null;
     }
 
     applyTraderSwapTx(tx, { txHash = null } = {}) {
@@ -253,9 +267,13 @@ export class FixtureCurrencyIndexer {
 
     applyMarketplacePurchaseTx(tx, { txHash = null } = {}) {
         if (this.offline) return { ok: false, reason: 'indexer-offline' };
+        const purchase = tx?.witness?.marketplace_purchase;
+        const buyer = tx?.witness?.address ?? tx?.inputs?.payment_balance_cell?.owner ?? null;
+        const seller = purchase?.seller ?? tx?.inputs?.listing_cell?.seller ?? null;
+        const currency = purchase?.price_currency ?? tx?.inputs?.payment_balance_cell?.currency ?? null;
         const settlement = settleMarketplacePurchaseFixture({
             tx,
-            indexedBalances: this.balances,
+            indexedBalances: this._marketplaceSettlementBalances({ buyer, seller, currency }),
             txHash,
         });
         if (!settlement.ok) return settlement;
@@ -265,7 +283,8 @@ export class FixtureCurrencyIndexer {
             if (!transferred.ok) return transferred;
             settlement.outputs.open_asset_cell = transferred.cell;
         }
-        this._applyCurrencyUpdates(settlement.updates, txHash);
+        this._applyCurrencyUpdates(settlement.balanceUpdates ?? settlement.updates, txHash);
+        if (txHash) this.marketplaceSettlements[txHash] = settlement;
         return settlement;
     }
 
@@ -302,23 +321,65 @@ export class FixtureCurrencyIndexer {
     }
 
     _applyCurrencyUpdates(updates = {}, txHash = null) {
-        for (const [currency, entry] of Object.entries(updates)) {
+        const entries = Array.isArray(updates)
+            ? updates
+            : Object.entries(updates).map(([currency, entry]) => ({ currency, ...entry }));
+        for (const entry of entries) {
+            const currency = entry.currency;
             if (entry.spent || entry.amount === 0) {
-                this.balances[currency] = {
+                this._writeBalanceEntry(entry.owner, currency, {
                     amount: 0,
                     stale: false,
                     spent: true,
                     outPoint: null,
                     updatedByTxHash: txHash,
-                };
+                });
             } else {
-                this.balances[currency] = {
+                this._writeBalanceEntry(entry.owner, currency, {
                     amount: entry.amount,
                     stale: false,
                     outPoint: entry.outPoint,
                     updatedByTxHash: txHash,
-                };
+                });
             }
+        }
+    }
+
+    _marketplaceSettlementBalances({ buyer, seller, currency } = {}) {
+        if (!currency) return this.balances;
+        const out = {};
+        if (buyer) {
+            out[buyer] = {
+                [currency]: this._balanceEntry(buyer, currency, { useLegacyFallback: true }) ?? { amount: 0, stale: false },
+            };
+        }
+        if (seller) {
+            out[seller] = {
+                [currency]: this._balanceEntry(seller, currency, { useLegacyFallback: false }) ?? { amount: 0, stale: false },
+            };
+        }
+        return out;
+    }
+
+    _balanceEntry(owner, currency, { useLegacyFallback = true } = {}) {
+        const ownerEntry = owner ? this.ownerBalances?.[owner]?.[currency] : null;
+        if (ownerEntry) return ownerEntry;
+        const legacy = this.balances[currency] ?? null;
+        if (!useLegacyFallback) return null;
+        if (owner && legacy?.owner && legacy.owner !== owner) return null;
+        return legacy;
+    }
+
+    _writeBalanceEntry(owner, currency, entry) {
+        if (!currency) return;
+        if (!owner) {
+            this.balances[currency] = entry;
+            return;
+        }
+        this.ownerBalances[owner] = this.ownerBalances[owner] ?? {};
+        this.ownerBalances[owner][currency] = { ...entry, owner, currency };
+        if (!this.balances[currency]?.owner || this.balances[currency]?.owner === owner) {
+            this.balances[currency] = this.ownerBalances[owner][currency];
         }
     }
 
